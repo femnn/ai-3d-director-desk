@@ -258,6 +258,15 @@ export function ScenePanel() {
           </div>
           <div className="inspector-toggle-row">
             <input
+              aria-label="地面网格"
+              checked={scene.showGrid}
+              type="checkbox"
+              onChange={(event) => updateScene({ showGrid: event.target.checked })}
+            />
+            <span>地面网格</span>
+          </div>
+          <div className="inspector-toggle-row">
+            <input
               aria-label="地面"
               checked={scene.showGround}
               type="checkbox"

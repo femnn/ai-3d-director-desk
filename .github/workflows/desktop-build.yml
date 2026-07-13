@@ -1,0 +1,36 @@
+name: Desktop builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            command: npm run package:win
+            artifact: windows-x64
+          - os: macos-14
+            command: npm run package:mac
+            artifact: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run src/phone/PhoneController.test.tsx src/editor/phone/phoneCameraControl.test.ts
+      - run: npm run build
+      - run: ${{ matrix.command }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-director-desk-${{ matrix.artifact }}
+          path: release/*
+          if-no-files-found: error

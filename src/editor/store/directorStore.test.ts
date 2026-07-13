@@ -65,6 +65,26 @@ it("updates the viewport aspect ratio selection in ui state", () => {
   expect(useDirectorStore.getState().viewportAspectRatio).toBe("9:16");
 });
 
+it("updates playback camera frames without persisting or adding undo work for every frame", () => {
+  const camera = useDirectorStore.getState().project.cameras[0]!;
+  const setItem = vi.spyOn(localStorage, "setItem");
+  setItem.mockClear();
+
+  useDirectorStore.getState().updateCameraForPlayback(camera.id, {
+    fov: 42,
+    target: [0, 1.4, 0],
+    transform: {
+      position: [0, 1.6, 4],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    },
+  });
+
+  expect(useDirectorStore.getState().project.cameras[0]?.fov).toBe(42);
+  expect(useDirectorStore.getState().undoStack).toHaveLength(0);
+  expect(setItem).not.toHaveBeenCalled();
+});
+
 it("updates the viewport rule-of-thirds guide toggle in ui state", () => {
   useDirectorStore.setState(createInitialDirectorState());
 
@@ -271,6 +291,64 @@ it("deletes the selected list object and linked camera data", () => {
   expect(state.project.activeCameraId).toBe("cam_1");
 });
 
+it("stores the selected control-layer mode with a recorded camera animation", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const cameraId = useDirectorStore.getState().project.cameras[0]!.id;
+
+  useDirectorStore.getState().addCameraAnimation({
+    cameraId,
+    keyframes: [
+      { time: 0, position: [0, 1.6, 4], target: [0, 1.2, 0], fov: 35 },
+      { time: 1000, position: [0, 1.6, 3], target: [0, 1.2, 0], fov: 35 },
+    ],
+  });
+
+});
+
+it("persists a recorded character motion clip and clears tracks that reference a deleted clip", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character");
+  expect(character).toBeTruthy();
+
+  const clipId = useDirectorStore.getState().addCharacterMotionClip({
+    characterId: character!.id,
+    name: "摄像头动捕",
+    duration: 5,
+    frames: [{ time: 0, controls: { "head.yaw": 0 } }, { time: 5, controls: { "head.yaw": 20 } }],
+  });
+  useDirectorStore.getState().setCharacterActionTrack(character!.id, {
+    actionId: "idle",
+    duration: 5,
+    loop: false,
+    playbackMode: "normal",
+    enabled: true,
+    source: "mocap",
+    motionClipId: clipId,
+  });
+
+  expect(useDirectorStore.getState().project.characterMotionClips).toHaveLength(1);
+  useDirectorStore.getState().deleteCharacterMotionClip(clipId);
+  expect(useDirectorStore.getState().project.characterMotionClips).toEqual([]);
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === character!.id)?.characterActionTrack).toBeUndefined();
+});
+
+it("returns an imported media pose to manual controls on the first pose edit", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const character = useDirectorStore.getState().project.objects.find((object) => object.kind === "character")!;
+  useDirectorStore.getState().replacePoseControls(character.id, {
+    "head.pitch": 12,
+    "mediaPose.11.x": -0.2,
+    "mediaPose.11.y": 0.4,
+    "mediaPose.11.z": 0.1,
+  });
+
+  useDirectorStore.getState().updatePoseControl(character.id, "head.pitch", 18);
+
+  const controls = useDirectorStore.getState().project.objects.find((object) => object.id === character.id)?.characterRig?.controls;
+  expect(controls?.["head.pitch"]).toBe(18);
+  expect(Object.keys(controls ?? {}).some((key) => key.startsWith("mediaPose."))).toBe(false);
+});
+
 it("supports multi-selecting objects and deleting the selected set", () => {
   useDirectorStore.setState(createInitialDirectorState());
   useDirectorStore.getState().addPresetCharacter("female");
@@ -321,6 +399,75 @@ it("keeps imported local models separate from procedural body types", () => {
   expect(imported?.kind).toBe("prop");
   expect(imported?.bodyType).toBeUndefined();
   expect(imported?.characterRig).toBeUndefined();
+});
+
+it("attaches an animated model to the existing character without losing its editable identity", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character");
+  expect(character).toBeTruthy();
+
+  useDirectorStore.getState().updateObjectColor(character!.id, "#123456");
+  const attached = useDirectorStore.getState().attachImportedAssetToCharacter(character!.id, {
+    kind: "character",
+    name: "AI 动作",
+    fileName: "action.glb",
+    url: "/api/animoflow/files/action.glb",
+    animated: true,
+  });
+
+  const updated = useDirectorStore.getState().project.objects.find((item) => item.id === character!.id);
+  expect(attached).toBe(true);
+  expect(updated?.name).toBe(character?.name);
+  expect(updated?.color).toBe("#123456");
+  expect(updated?.assetRefId).toBeTruthy();
+  expect(useDirectorStore.getState().selectedObjectId).toBe(character?.id);
+});
+
+it("detaches a generated animation without leaving an orphaned project asset", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  useDirectorStore.getState().attachImportedAssetToCharacter(character.id, {
+    kind: "character",
+    name: "AI 动作",
+    fileName: "generated.glb",
+    url: "/api/generated-animations/generated.glb",
+    animated: true,
+  });
+
+  useDirectorStore.getState().clearCharacterAsset(character.id);
+
+  const state = useDirectorStore.getState();
+  expect(state.project.objects.find((item) => item.id === character.id)?.assetRefId).toBeUndefined();
+  expect(state.project.assets.some((asset) => asset.url === "/api/generated-animations/generated.glb")).toBe(false);
+});
+
+it("replaces an edited pose as a custom pose instead of retaining stale preset controls", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  useDirectorStore.getState().applyPosePreset(character.id, "t-pose");
+  useDirectorStore.getState().replacePoseControls(character.id, { "head.yaw": 24 });
+
+  const updated = useDirectorStore.getState().project.objects.find((item) => item.id === character.id);
+  expect(updated?.characterRig?.posePresetId).toBeNull();
+  expect(updated?.characterRig?.controls).toEqual({ "head.yaw": 24 });
+});
+
+it("resets the director desk to one character and its required default camera", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const store = useDirectorStore.getState();
+  store.addGeometryPrimitive("box");
+  store.addPresetCharacter("female");
+  store.addCameraShot();
+
+  store.resetDirectorDesk();
+
+  const project = useDirectorStore.getState().project;
+  expect(project.assets).toEqual([]);
+  expect(project.cameraAnimations).toEqual([]);
+  expect(project.objects.filter((item) => item.kind === "character")).toHaveLength(1);
+  expect(project.objects.filter((item) => item.kind === "camera")).toHaveLength(1);
+  expect(project.objects.filter((item) => item.kind === "prop" || item.kind === "scene")).toHaveLength(0);
+  expect(project.cameras).toHaveLength(1);
 });
 
 it("keeps imported model object ids unique after deleting an earlier model", () => {
@@ -602,6 +749,35 @@ it("adds the built-in UE4 mannequin rig to persisted characters that predate rig
     posePresetId: "stand",
     controls: {},
   });
+});
+
+it("falls back to a safe default project when a persisted project is structurally invalid", () => {
+  useDirectorStore.getState().replaceProject({ scene: { backgroundColor: "#000000" } } as never);
+
+  const project = useDirectorStore.getState().project;
+
+  expect(project.objects.some((item) => item.kind === "character")).toBe(true);
+  expect(project.cameras).toHaveLength(1);
+});
+
+it("restores a legacy AnimoFlow character as an editable mannequin after restart", () => {
+  const project = createDefaultDirectorProject();
+  const role = project.objects.find((item) => item.kind === "character")!;
+  project.assets.push({
+    id: "legacy-ai-action",
+    kind: "character",
+    sourceType: "model",
+    fileName: "old-action.fbx",
+    url: "/api/animoflow/files/old-action.fbx",
+    animated: true,
+  });
+  role.assetRefId = "legacy-ai-action";
+
+  useDirectorStore.getState().replaceProject(project);
+
+  const restoredRole = useDirectorStore.getState().project.objects.find((item) => item.id === role.id);
+  expect(restoredRole?.assetRefId).toBeUndefined();
+  expect(restoredRole?.characterRig?.rigType).toBe("ue4-mannequin");
 });
 
 it("copies and pastes the current selection as new scene objects", () => {

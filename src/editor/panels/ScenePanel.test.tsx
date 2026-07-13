@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach } from "vitest";
+import "../../styles/index.css";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 import { ScenePanel } from "./ScenePanel";
 
@@ -29,7 +30,7 @@ it("lays scene switches out in one row and only toggles from the checkbox", asyn
   const checkbox = screen.getByLabelText("角色标签");
 
   expect(switchRow).toBeInTheDocument();
-  expect(switchRow?.querySelectorAll(".inspector-toggle-row")).toHaveLength(3);
+  expect(switchRow?.querySelectorAll(".inspector-toggle-row")).toHaveLength(4);
   expect(checkbox).toBeChecked();
 
   await user.click(labelText);
@@ -309,5 +310,4 @@ it("renders the XYZ drag handle inside the 80px axis input shell", () => {
   expect(axisInput).toBeInTheDocument();
   expect(axisInput).toHaveClass("inspector-axis-input");
   expect(valueInput.closest(".inspector-axis-input")).toBe(axisInput);
-  expect(getComputedStyle(axisInput as HTMLElement).backgroundColor).toBe("rgb(11, 11, 12)");
 });

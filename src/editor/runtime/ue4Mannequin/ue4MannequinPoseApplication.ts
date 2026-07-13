@@ -1,4 +1,4 @@
-import { Euler, Quaternion, type Object3D } from "three";
+import { Euler, Quaternion, Vector3, type Object3D } from "three";
 import type { CharacterBodyType } from "../mannequin/bodyTypes";
 import {
   getUE4BodyBoneScales,
@@ -27,6 +27,50 @@ function isBone(object: Object3D): object is Object3D & { isBone: true } {
 
 function applyRotationOffset(object: Object3D, rotation: [number, number, number]) {
   object.quaternion.multiply(new Quaternion().setFromEuler(new Euler(rotation[0], rotation[1], rotation[2])));
+}
+
+function readMediaPosePoint(controls: Record<string, number>, index: number) {
+  const x = controls[`mediaPose.${index}.x`];
+  const y = controls[`mediaPose.${index}.y`];
+  const z = controls[`mediaPose.${index}.z`];
+  if (![x, y, z].every((value) => typeof value === "number" && Number.isFinite(value))) return null;
+  return new Vector3(x, y, z);
+}
+
+function applyMediaPoseDirections(scene: Object3D, controls: Record<string, number>) {
+  const chains = [
+    ["Bip001_L_UpperArm_08", "Bip001_L_Forearm_09", 11, 13],
+    ["Bip001_L_Forearm_09", "Bip001_L_Hand_010", 13, 15],
+    ["Bip001_R_UpperArm_032", "Bip001_R_Forearm_033", 12, 14],
+    ["Bip001_R_Forearm_033", "Bip001_R_Hand_034", 14, 16],
+    ["Bip001_L_Thigh_057", "Bip001_L_Calf_058", 23, 25],
+    ["Bip001_L_Calf_058", "Bip001_L_Foot_059", 25, 27],
+    ["Bip001_R_Thigh_061", "Bip001_R_Calf_062", 24, 26],
+    ["Bip001_R_Calf_062", "Bip001_R_Foot_063", 26, 28],
+  ] as const;
+  if (!readMediaPosePoint(controls, 11) || !readMediaPosePoint(controls, 12)) return;
+
+  const sceneWorldRotation = scene.getWorldQuaternion(new Quaternion());
+  const parentWorldInverse = new Quaternion();
+  const desiredDirection = new Vector3();
+  const authoredChildDirection = new Vector3();
+
+  chains.forEach(([boneName, childName, fromIndex, toIndex]) => {
+    const from = readMediaPosePoint(controls, fromIndex);
+    const to = readMediaPosePoint(controls, toIndex);
+    const bone = scene.getObjectByName(boneName);
+    const child = scene.getObjectByName(childName);
+    if (!from || !to || !bone?.parent || !child || child.parent !== bone) return;
+
+    desiredDirection.copy(to).sub(from);
+    if (desiredDirection.lengthSq() < 0.000001 || child.position.lengthSq() < 0.000001) return;
+    desiredDirection.normalize().applyQuaternion(sceneWorldRotation);
+    bone.parent.getWorldQuaternion(parentWorldInverse).invert();
+    desiredDirection.applyQuaternion(parentWorldInverse).normalize();
+    authoredChildDirection.copy(child.position).normalize();
+    bone.quaternion.setFromUnitVectors(authoredChildDirection, desiredDirection);
+    scene.updateMatrixWorld(true);
+  });
 }
 
 export function captureUE4RestPose(scene: Object3D): UE4RestPose {
@@ -88,4 +132,7 @@ export function applyUE4RestPoseAndRig(
       applyRotationOffset(object, rotation);
     }
   });
+
+  scene.updateMatrixWorld(true);
+  applyMediaPoseDirections(scene, controls);
 }

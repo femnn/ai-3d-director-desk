@@ -1,10 +1,17 @@
 import "./styles/index.css";
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { Camera, RotateCcw, X } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
+import { DirectorDeskErrorBoundary } from "./app/DirectorDeskErrorBoundary";
+import { AgentCommandPanel } from "./editor/agent/AgentCommandPanel";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { initDirectorDeskHostBridge } from "./editor/io/hostBridge";
+import { CameraAnimationPanel } from "./editor/phone/CameraAnimationPanel";
+import { startDirectorDeskRealtime } from "./editor/realtime/directorRealtime";
 import { useDirectorStore } from "./editor/store/directorStore";
+import { PhoneController } from "./phone/PhoneController";
+import { PhoneJoinPanel } from "./phone/PhoneJoinPanel";
+import { PhonePoseEditor } from "./phone/PhonePoseEditor";
 
 function isEditableShortcutTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -15,11 +22,28 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 export default function App() {
   const viewMode = useDirectorStore((state) => state.viewMode);
   const setViewMode = useDirectorStore((state) => state.setViewMode);
+  const cameraMonitorCollapsed = useDirectorStore((state) => state.cameraMonitorCollapsed);
+  const setCameraMonitorCollapsed = useDirectorStore((state) => state.setCameraMonitorCollapsed);
+  const resetDirectorDesk = useDirectorStore((state) => state.resetDirectorDesk);
+  const isPhoneRoute = window.location.pathname === "/phone";
 
   useEffect(() => {
+    document.body.classList.toggle("phone-route", isPhoneRoute);
+    return () => document.body.classList.remove("phone-route");
+  }, [isPhoneRoute]);
+
+  useEffect(() => {
+    if (isPhoneRoute) return;
+
     initDirectorDeskHostBridge();
     window.parent?.postMessage({ type: "storyai:director-desk-ready" }, window.location.origin);
-  }, []);
+  }, [isPhoneRoute]);
+
+  useEffect(() => {
+    if (isPhoneRoute) return;
+
+    return startDirectorDeskRealtime();
+  }, [isPhoneRoute]);
 
   function handleClose() {
     window.parent?.postMessage({ type: "storyai:director-desk-close" }, window.location.origin);
@@ -56,6 +80,12 @@ export default function App() {
     };
   }, []);
 
+  if (isPhoneRoute) {
+    const phoneMode = new URLSearchParams(window.location.search).get("mode");
+    if (phoneMode === "pose") return <PhonePoseEditor />;
+    return <PhoneController />;
+  }
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -83,6 +113,33 @@ export default function App() {
           </div>
         </div>
         <div className="top-bar-actions">
+          {cameraMonitorCollapsed ? (
+            <button
+              className="top-bar-action-button"
+              type="button"
+              aria-label="展开机位监看"
+              title="展开机位监看"
+              onClick={() => setCameraMonitorCollapsed(false)}
+            >
+              <Camera aria-hidden="true" size={16} strokeWidth={1.8} />
+            </button>
+          ) : null}
+          <PhoneJoinPanel />
+          <CameraAnimationPanel />
+          <AgentCommandPanel />
+          <button
+            className="top-bar-action-button"
+            type="button"
+            aria-label="重置导演台"
+            title="重置导演台"
+            onClick={() => {
+              if (window.confirm("将清空当前布景、机位和轨迹，只保留一个默认角色。是否继续？")) {
+                resetDirectorDesk();
+              }
+            }}
+          >
+            <RotateCcw aria-hidden="true" size={16} strokeWidth={1.8} />
+          </button>
           <button
             className="top-bar-action-button"
             type="button"
@@ -94,9 +151,11 @@ export default function App() {
           </button>
         </div>
       </header>
-      <DirectorDeskShell>
-        <DirectorCanvas />
-      </DirectorDeskShell>
+      <DirectorDeskErrorBoundary>
+        <DirectorDeskShell>
+          <DirectorCanvas />
+        </DirectorDeskShell>
+      </DirectorDeskErrorBoundary>
     </div>
   );
 }

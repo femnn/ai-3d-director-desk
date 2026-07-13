@@ -4,10 +4,20 @@ import {
   InspectorColorField,
   InspectorPanel,
   InspectorRangeNumberField,
+  InspectorSelectField,
   InspectorTextField,
   InspectorSection,
 } from "./InspectorControls";
+import {
+  CHARACTER_ACTION_OPTIONS,
+  MIN_CHARACTER_ACTION_DURATION,
+  playNormalCharacterAnimations,
+  stopNormalCharacterAnimations,
+} from "../animation/characterAnimation";
+import { AnimoFlowActionGenerator } from "../animation/AnimoFlowActionGenerator";
+import { PoseImageImporter, PoseVideoImporter } from "../mocap/PoseMediaImporter";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
+import type { CharacterActionTrack } from "../schema/directorProject";
 import { getCrowdAnchorTransform, useDirectorStore } from "../store/directorStore";
 
 function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: number): [number, number, number] {
@@ -15,7 +25,7 @@ function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: nu
 }
 
 export function CharacterPanel() {
-  const [activeTab, setActiveTab] = useState<"properties" | "pose">("properties");
+  const [activeTab, setActiveTab] = useState<"properties" | "pose" | "animation">("properties");
   const selectedCrowdId = useDirectorStore((state) => state.selectedCrowdId);
   const selectedObjectId = useDirectorStore((state) => state.selectedObjectId);
   const objects = useDirectorStore((state) => state.project.objects);
@@ -31,6 +41,13 @@ export function CharacterPanel() {
   const applyCrowdPosePreset = useDirectorStore((state) => state.applyCrowdPosePreset);
   const updatePoseControl = useDirectorStore((state) => state.updatePoseControl);
   const updateCrowdPoseControl = useDirectorStore((state) => state.updateCrowdPoseControl);
+  const setCharacterActionTrack = useDirectorStore((state) => state.setCharacterActionTrack);
+  const setCrowdCharacterActionTrack = useDirectorStore((state) => state.setCrowdCharacterActionTrack);
+  const cameras = useDirectorStore((state) => state.project.cameras);
+  const motionClips = useDirectorStore((state) => state.project.characterMotionClips ?? []);
+  const deleteCharacterMotionClip = useDirectorStore((state) => state.deleteCharacterMotionClip);
+  const poseEditMode = useDirectorStore((state) => state.poseEditMode);
+  const setPoseEditMode = useDirectorStore((state) => state.setPoseEditMode);
 
   const selection = useMemo(() => {
     const role = objects.find((item) => item.id === selectedObjectId && item.kind === "character");
@@ -71,6 +88,51 @@ export function CharacterPanel() {
   const roleColor = selection.color;
   const transform = selection.crowdAnchor;
   const isCrowd = selection.mode === "crowd";
+  const actionTrack: CharacterActionTrack = role.characterActionTrack ?? {
+    actionId: "idle" as const,
+    duration: MIN_CHARACTER_ACTION_DURATION,
+    loop: true,
+    playbackMode: "normal" as const,
+    cameraId: null,
+    enabled: true,
+  };
+  const startNormalActions = () => {
+    const nextObjects = useDirectorStore.getState().project.objects;
+    playNormalCharacterAnimations(
+      nextObjects
+        .filter(
+          (item) =>
+            item.kind === "character" &&
+            item.characterActionTrack?.enabled &&
+            item.characterActionTrack.playbackMode === "normal"
+        )
+        .map((item) => item.id)
+    );
+  };
+  const updateActionTrack = (patch: Partial<CharacterActionTrack>) => {
+    const next = {
+      ...actionTrack,
+      ...patch,
+      duration: Math.max(Number(patch.duration ?? actionTrack.duration), MIN_CHARACTER_ACTION_DURATION),
+    };
+    if (isCrowd && selection.crowdId) {
+      setCrowdCharacterActionTrack(selection.crowdId, next);
+      if (next.enabled && next.playbackMode === "normal") startNormalActions();
+      return;
+    }
+    setCharacterActionTrack(role.id, next);
+    if (next.enabled && next.playbackMode === "normal") startNormalActions();
+  };
+  const playAllNormalActions = () => {
+    playNormalCharacterAnimations(
+      objects
+        .filter((item) => item.kind === "character" && item.characterActionTrack?.enabled && item.characterActionTrack.playbackMode === "normal")
+        .map((item) => item.id)
+    );
+  };
+  const selectedMotionClips = motionClips.filter((clip) =>
+    isCrowd ? selection.crowdMembers.some((member) => member.id === clip.characterId) : clip.characterId === role.id
+  );
   const poseGroups = [
     {
       title: "身体",
@@ -154,6 +216,7 @@ export function CharacterPanel() {
       tabs={[
         { label: "属性", active: activeTab === "properties", onClick: () => setActiveTab("properties") },
         { label: "姿势", active: activeTab === "pose", onClick: () => setActiveTab("pose") },
+        { label: "动作", active: activeTab === "animation", onClick: () => setActiveTab("animation") },
       ]}
     >
       {activeTab === "properties" ? (
@@ -333,10 +396,22 @@ export function CharacterPanel() {
             }
           />
         </>
-      ) : (
+      ) : activeTab === "pose" ? (
         <InspectorSection title="姿势预设" className="pose-preset-section">
           {role.characterRig ? (
             <>
+              {!isCrowd && role.characterRig.rigType === "ue4-mannequin" && !role.assetRefId ? (
+                <>
+                  <button
+                    type="button"
+                    className={`pose-edit-launch${poseEditMode ? " is-active" : ""}`}
+                    onClick={() => setPoseEditMode(!poseEditMode)}
+                  >
+                    {poseEditMode ? "关闭骨骼编辑" : "打开骨骼编辑"}
+                  </button>
+                  <PoseImageImporter character={role} />
+                </>
+              ) : null}
               <div className="preset-grid">
                 {MANNEQUIN_POSE_PRESETS.map((preset) => (
                   <button
@@ -383,6 +458,90 @@ export function CharacterPanel() {
           ) : (
             <p>该模型未识别到标准 humanoid 骨骼，暂不支持姿势编辑。</p>
           )}
+        </InspectorSection>
+      ) : (
+        <InspectorSection title="角色动作" className="pose-preset-section">
+          <InspectorSelectField
+            label="动作"
+            ariaLabel="角色动作"
+            value={actionTrack.actionId}
+            options={CHARACTER_ACTION_OPTIONS.map((action) => ({ value: action.id, label: action.label }))}
+            onChange={(value) =>
+              updateActionTrack({
+                actionId: value as typeof actionTrack.actionId,
+                source: "built-in",
+                motionClipId: null,
+              })
+            }
+          />
+          <InspectorRangeNumberField
+            label="动作时长"
+            rangeAriaLabel="角色动作时长滑杆"
+            numberAriaLabel="角色动作时长"
+            min={MIN_CHARACTER_ACTION_DURATION}
+            max="15"
+            step="1"
+            value={actionTrack.duration}
+            onValueChange={(value) => updateActionTrack({ duration: Number(value) })}
+          />
+          <InspectorSelectField
+            label="播放方式"
+            ariaLabel="角色动作播放方式"
+            value={actionTrack.playbackMode}
+            options={[
+              { value: "normal", label: "普通播放" },
+              { value: "camera-driven", label: "镜头驱动" },
+            ]}
+            onChange={(value) => updateActionTrack({ playbackMode: value as "normal" | "camera-driven" })}
+          />
+          {actionTrack.playbackMode === "camera-driven" ? (
+            <InspectorSelectField
+              label="关联机位"
+              ariaLabel="动作关联机位"
+              value={actionTrack.cameraId ?? ""}
+              options={[
+                { value: "", label: "当前录制机位" },
+                ...cameras.map((camera) => ({ value: camera.id, label: camera.name })),
+              ]}
+              onChange={(value) => updateActionTrack({ cameraId: value || null })}
+            />
+          ) : null}
+          <div className="inspector-action-row" role="group" aria-label="角色动画播放">
+            <button type="button" onClick={playAllNormalActions}>播放普通动画</button>
+            <button type="button" onClick={stopNormalCharacterAnimations}>暂停动画</button>
+          </div>
+          <p className="inspector-help-text">
+            每个动作按所选时长循环。走路和跑步会在一个动作段内向面朝方向前进一次，随后保持位置，避免持续穿过场景。镜头驱动动作只在录制时随机位实际移动推进，机位停止即暂停。
+          </p>
+          {!isCrowd && role.characterRig?.rigType === "ue4-mannequin" && !role.assetRefId ? <PoseVideoImporter character={role} /> : null}
+          {selectedMotionClips.length ? (
+            <section className="mocap-clip-list" aria-label="视频动作片段">
+              <strong>视频动作片段</strong>
+              {selectedMotionClips.map((clip) => (
+                <div key={clip.id}>
+                  <button
+                    type="button"
+                    className={actionTrack.motionClipId === clip.id ? "is-active" : undefined}
+                    onClick={() =>
+                      updateActionTrack({
+                        actionId: "idle",
+                        duration: Math.max(clip.duration, MIN_CHARACTER_ACTION_DURATION),
+                        loop: true,
+                        playbackMode: "normal",
+                        source: "video",
+                        motionClipId: clip.id,
+                        enabled: true,
+                      })
+                    }
+                  >
+                    {clip.name} · {clip.duration.toFixed(1)}秒
+                  </button>
+                  <button type="button" aria-label={`删除 ${clip.name}`} onClick={() => deleteCharacterMotionClip(clip.id)}>删除</button>
+                </div>
+              ))}
+            </section>
+          ) : null}
+          {!isCrowd ? <AnimoFlowActionGenerator character={role} /> : null}
         </InspectorSection>
       )}
     </InspectorPanel>

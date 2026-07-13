@@ -44,6 +44,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function enablePoseEditing() {
+  const state = useDirectorStore.getState();
+  const character = state.project.objects.find((object) => object.kind === "character" && !object.assetRefId);
+  if (!character) throw new Error("Test project requires a built-in character");
+  useDirectorStore.setState({
+    ...state,
+    poseEditMode: true,
+    selectedObjectId: character.id,
+    selectedObjectIds: [character.id],
+  });
+}
+
 vi.mock("@react-three/fiber", async () => {
   const actual = await vi.importActual<typeof import("@react-three/fiber")>("@react-three/fiber");
 
@@ -258,11 +270,12 @@ it("does not render a full-viewport transform drag layer over the 3D viewport", 
 it("renders only the dark major viewport grid lines", () => {
   render(<App />);
 
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-cell-thickness", "0");
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-position", "[0,0.002,0]");
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-section-color", "#2A4065");
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-fade-distance", "80");
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-infinite-grid", "true");
+  const directorGrid = screen.getAllByTestId("viewport-grid")[0];
+  expect(directorGrid).toHaveAttribute("data-cell-thickness", "0");
+  expect(directorGrid).toHaveAttribute("data-position", "[0,0.002,0]");
+  expect(directorGrid).toHaveAttribute("data-section-color", "#2A4065");
+  expect(directorGrid).toHaveAttribute("data-fade-distance", "80");
+  expect(directorGrid).toHaveAttribute("data-infinite-grid", "true");
 });
 
 it("keeps the viewport grid slightly above the configured ground plane", () => {
@@ -279,7 +292,7 @@ it("keeps the viewport grid slightly above the configured ground plane", () => {
 
   render(<App />);
 
-  expect(screen.getByTestId("viewport-grid")).toHaveAttribute("data-position", "[0,1.502,0]");
+  expect(screen.getAllByTestId("viewport-grid")[0]).toHaveAttribute("data-position", "[0,1.502,0]");
 });
 
 it("opens the scene inspector when users click empty 3D viewport space", () => {
@@ -308,7 +321,7 @@ it("renders the viewport aspect ratio overlay when a non-auto frame is selected"
   render(<App />);
 
   expect(screen.getByLabelText("视口画幅框")).toBeInTheDocument();
-  expect(screen.getAllByLabelText("视口画幅遮罩")).toHaveLength(4);
+  expect(screen.getAllByLabelText("视口画幅遮罩")).toHaveLength(1);
   expect(screen.getByLabelText("视口画幅框")).toHaveAttribute("data-aspect-ratio", "9:16");
 });
 
@@ -328,24 +341,20 @@ it("toggles the viewport rule-of-thirds guide from the aspect frame button", () 
   expect(screen.getByLabelText("九宫格辅助线")).toBeInTheDocument();
 });
 
-it("renders the native 3D viewport gizmo in an overlay canvas above the aspect mask", () => {
+it("renders the viewport gizmo as a draggable trackball above the aspect mask", () => {
+  enablePoseEditing();
   render(<App />);
 
-  expect(screen.getAllByTestId("mock-r3f-canvas")).toHaveLength(2);
-  expect(screen.getByLabelText("3D视口原生坐标控件")).toContainElement(screen.getByTestId("native-gizmo-helper"));
-  expect(screen.getByTestId("native-gizmo-helper")).toHaveAttribute("data-alignment", "center-center");
-  expect(screen.getByTestId("native-gizmo-helper")).toHaveAttribute("data-margin", "[0,0]");
-  expect(screen.getByTestId("native-gizmo-viewport")).toHaveAttribute(
-    "data-axis-colors",
-    "[\"#E56C5B\",\"#6CDB7A\",\"#7AA7FF\"]"
-  );
-  expect(screen.getByTestId("native-gizmo-viewport")).toHaveAttribute("data-disabled", "true");
-  expect(screen.getByTestId("native-gizmo-viewport")).toHaveAttribute("data-scale", "25");
-  expect(screen.getByTestId("native-gizmo-viewport").closest(".director-canvas")).not.toBeInTheDocument();
-  expect(screen.queryByLabelText("3D视口坐标指示")).not.toBeInTheDocument();
+  expect(screen.getAllByTestId("mock-r3f-canvas")).toHaveLength(1);
+  const gizmo = screen.getByLabelText("3D视口原生坐标控件");
+  expect(gizmo.querySelector(".viewport-gizmo-static")).toBeInTheDocument();
+  expect(within(gizmo).queryAllByRole("button")).toHaveLength(0);
+  expect(gizmo.querySelectorAll(".viewport-gizmo-hit-button")).toHaveLength(6);
+  expect(gizmo.closest(".director-canvas")).not.toBeInTheDocument();
 });
 
 it("offsets the native viewport gizmo inward when overlay side panels are open", () => {
+  enablePoseEditing();
   render(<App />);
 
   const gizmo = screen.getByLabelText("3D视口原生坐标控件");
@@ -355,16 +364,22 @@ it("offsets the native viewport gizmo inward when overlay side panels are open",
   });
 });
 
-it("syncs native viewport gizmo axis clicks back to the main director view", () => {
+it("syncs viewport gizmo drag gestures back to the main director view", () => {
+  enablePoseEditing();
   render(<App />);
   mockCameraPositionSet.mockClear();
 
-  const xAxisHitTarget = screen.getByRole("button", { name: "切换到 X 正向视图" });
-  expect(xAxisHitTarget).toHaveClass("viewport-gizmo-hit-button");
+  const gizmo = screen.getByLabelText("3D视口原生坐标控件");
+  fireEvent.pointerDown(gizmo, { pointerId: 1, clientX: 40, clientY: 40 });
+  fireEvent.pointerMove(gizmo, { pointerId: 1, clientX: 72, clientY: 40 });
 
-  fireEvent.click(xAxisHitTarget);
+  expect(mockCameraPositionSet).toHaveBeenCalled();
+});
 
-  expect(mockCameraPositionSet).toHaveBeenCalledWith(expect.closeTo(5.423099, 5), 1.05, 0);
+it("hides the viewport gizmo outside bone editing", () => {
+  render(<App />);
+
+  expect(screen.queryByLabelText("3D视口原生坐标控件")).not.toBeInTheDocument();
 });
 
 it("captures screenshots using the selected viewport aspect ratio crop", async () => {

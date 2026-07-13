@@ -266,10 +266,10 @@ it("renders the viewport aspect frame overlay with frosted mask treatment", () =
 it("keeps the native viewport gizmo in a separate overlay above the frosted aspect mask", () => {
   const css = readFileSync("src/styles/index.css", "utf8");
 
-  expect(css).toMatch(/\.viewport-gizmo-overlay\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*20px;[\s\S]*?right:\s*20px;[\s\S]*?z-index:\s*20;[\s\S]*?width:\s*80px;[\s\S]*?height:\s*80px;[\s\S]*?pointer-events:\s*auto;/);
+  expect(css).toMatch(/\.viewport-gizmo-overlay\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*20px;[\s\S]*?right:\s*20px;[\s\S]*?z-index:\s*130;[\s\S]*?width:\s*80px;[\s\S]*?height:\s*80px;[\s\S]*?pointer-events:\s*auto;[\s\S]*?touch-action:\s*none;/);
   expect(css).toMatch(/\.viewport-gizmo-overlay\s*>\s*div,\s*[\r\n]+\s*\.viewport-gizmo-overlay\s*canvas\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?height:\s*100%\s*!important;/);
   expect(css).toMatch(/\.viewport-gizmo-hit-layer\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*0;[\s\S]*?pointer-events:\s*none;/);
-  expect(css).toMatch(/\.viewport-gizmo-hit-button\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*15px;[\s\S]*?height:\s*15px;[\s\S]*?background:\s*transparent;[\s\S]*?pointer-events:\s*auto;/);
+  expect(css).toMatch(/\.viewport-gizmo-hit-button\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*20px;[\s\S]*?height:\s*20px;[\s\S]*?background:\s*rgb\(18 28 43 \/ 0\.95\);[\s\S]*?pointer-events:\s*none;/);
   expect(css).toMatch(/\.viewport-aspect-overlay\s*\{[\s\S]*?z-index:\s*6;/);
 });
 

@@ -1,4 +1,4 @@
-import { Bone, Euler, Group, Quaternion } from "three";
+import { Bone, Euler, Group, Quaternion, Vector3 } from "three";
 import {
   applyUE4RestPoseAndRig,
   captureUE4RestPose,
@@ -176,4 +176,46 @@ it("does not accumulate pose offsets when controls are applied repeatedly", () =
 
   expectQuaternionClose(leftArm.quaternion, expectedSecondPose);
   expect(leftArm.quaternion.angleTo(expectedFirstPose)).toBeGreaterThan(0.1);
+});
+
+it("aligns a media-pose arm chain to the detected 3D joint directions", () => {
+  const scene = new Group();
+  const upperArm = new Bone();
+  const forearm = new Bone();
+  const hand = new Bone();
+  upperArm.name = "Bip001_L_UpperArm_08";
+  forearm.name = "Bip001_L_Forearm_09";
+  hand.name = "Bip001_L_Hand_010";
+  forearm.position.set(0, -1, 0);
+  hand.position.set(0, -1, 0);
+  scene.add(upperArm);
+  upperArm.add(forearm);
+  forearm.add(hand);
+  const restPose = captureUE4RestPose(scene);
+
+  applyUE4RestPoseAndRig(scene, {
+    bodyType: "mannequin",
+    controls: {
+      "mediaPose.11.x": 0,
+      "mediaPose.11.y": 0,
+      "mediaPose.11.z": 0,
+      "mediaPose.13.x": -1,
+      "mediaPose.13.y": 0,
+      "mediaPose.13.z": 0,
+      "mediaPose.15.x": -2,
+      "mediaPose.15.y": 0,
+      "mediaPose.15.z": 0,
+      "mediaPose.12.x": 0,
+      "mediaPose.12.y": 0,
+      "mediaPose.12.z": 0,
+    },
+    restPose,
+  });
+
+  scene.updateMatrixWorld(true);
+  const upperPosition = upperArm.getWorldPosition(new Vector3());
+  const elbowPosition = forearm.getWorldPosition(new Vector3());
+  const wristPosition = hand.getWorldPosition(new Vector3());
+  expect(elbowPosition.sub(upperPosition).normalize().x).toBeLessThan(-0.999);
+  expect(wristPosition.sub(forearm.getWorldPosition(new Vector3())).normalize().x).toBeLessThan(-0.999);
 });

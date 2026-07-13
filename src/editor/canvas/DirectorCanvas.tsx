@@ -1,4 +1,4 @@
-import { GizmoHelper, GizmoViewport, Grid, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { Grid, Line, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   Suspense,
@@ -9,6 +9,8 @@ import {
   useState,
   type CSSProperties,
   type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { Euler, Matrix4, PerspectiveCamera as ThreePerspectiveCamera, Quaternion, Spherical, Vector3 } from "three";
 import type { Object3D } from "three";
@@ -25,13 +27,13 @@ import { ViewportAspectOverlay } from "./ViewportAspectOverlay";
 import { ViewportBackground } from "./ViewportBackground";
 import { ViewportToolbar } from "./ViewportToolbar";
 import { getViewportAspectFrameRect, type ViewportSafeAreaInsets } from "./viewportAspectFrame";
+import { useLiveVideoCaptureActive, usePhoneCameraPath } from "../phone/phoneCameraControl";
+import { CameraMonitor } from "./CameraMonitor";
 
 export const DEFAULT_DIRECTOR_VIEW_SNAPSHOT: CameraShotSnapshot = DEFAULT_DIRECTOR_CAMERA_VIEW_SNAPSHOT;
 const VIEWPORT_FRAME_PADDING = 40;
 const VIEWPORT_TOOLBAR_BOTTOM_OFFSET = 40;
 const DEFAULT_VIEWPORT_TOOLBAR_HEIGHT = 44;
-const GIZMO_AXIS_COLORS: [string, string, string] = ["#E56C5B", "#6CDB7A", "#7AA7FF"];
-const GIZMO_VIEWPORT_SCALE = 25;
 const GIZMO_HIT_LAYER_SIZE = 80;
 const GIZMO_HIT_LAYER_CENTER = GIZMO_HIT_LAYER_SIZE / 2;
 const GIZMO_AXIS_SCREEN_RADIUS = 25;
@@ -124,22 +126,6 @@ function applySnapshotToCamera(camera: ThreePerspectiveCamera, snapshot: CameraS
   camera.fov = snapshot.fov;
   camera.position.set(...snapshot.position);
   camera.lookAt(...snapshot.target);
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld();
-}
-
-function applySnapshotToRelativeGizmoCamera(camera: ThreePerspectiveCamera, snapshot: CameraShotSnapshot) {
-  const position = new Vector3(...snapshot.position);
-  const target = new Vector3(...snapshot.target);
-  const offset = position.sub(target);
-
-  if (offset.lengthSq() === 0) {
-    offset.set(0, 0, 1);
-  }
-
-  camera.fov = snapshot.fov;
-  camera.position.copy(offset);
-  camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
 }
@@ -504,85 +490,133 @@ function DirectorViewCameraSync({
   return null;
 }
 
-function ViewportGizmoContent({
-  onSnapshotChange,
-  snapshot,
-}: {
-  onSnapshotChange: (snapshot: CameraShotSnapshot) => void;
-  snapshot: CameraShotSnapshot;
-}) {
+function getPoseEditorViewSnapshot(position: [number, number, number]): CameraShotSnapshot {
+  return {
+    fov: 35,
+    position: [position[0] + 3.2, position[1] + 1.65, position[2] + 4.2],
+    target: [position[0], position[1] + 1.05, position[2]],
+  };
+}
+
+function PoseEditorCameraSync({ snapshot }: { snapshot: CameraShotSnapshot }) {
   const { camera } = useThree();
-  const targetRef = useRef(new Vector3(...snapshot.target));
 
   useLayoutEffect(() => {
-    targetRef.current.set(...snapshot.target);
-    applySnapshotToRelativeGizmoCamera(camera as ThreePerspectiveCamera, snapshot);
+    const perspectiveCamera = camera as ThreePerspectiveCamera;
+    perspectiveCamera.position.set(...snapshot.position);
+    perspectiveCamera.fov = snapshot.fov;
+    perspectiveCamera.lookAt(...snapshot.target);
+    perspectiveCamera.updateProjectionMatrix();
+    perspectiveCamera.updateMatrixWorld();
   }, [camera, snapshot]);
 
-  const handleGizmoUpdate = useCallback(() => {
-    const relativeCamera = camera as ThreePerspectiveCamera;
-    const target = targetRef.current;
-    const position = target.clone().add(relativeCamera.position);
-
-    onSnapshotChange({
-      fov: snapshot.fov,
-      position: toSnapshotTuple(position),
-      target: toSnapshotTuple(target),
-    });
-  }, [camera, onSnapshotChange, snapshot.fov]);
-
-  const getGizmoTarget = useCallback(() => new Vector3(0, 0, 0), []);
-
-  return (
-    <GizmoHelper alignment="center-center" margin={[0, 0]} onTarget={getGizmoTarget} onUpdate={handleGizmoUpdate}>
-      <GizmoViewport
-        axisColors={GIZMO_AXIS_COLORS}
-        disabled
-        scale={GIZMO_VIEWPORT_SCALE}
-      />
-    </GizmoHelper>
-  );
+  return null;
 }
 
 function ViewportGizmoOverlay({
+  leftOffset,
   onSnapshotChange,
   rightOffset = GIZMO_EDGE_PADDING,
   snapshot,
 }: {
+  leftOffset?: number;
   onSnapshotChange: (snapshot: CameraShotSnapshot) => void;
   rightOffset?: number;
   snapshot: CameraShotSnapshot;
 }) {
-  function selectAxisDirection(direction: [number, number, number]) {
-    onSnapshotChange(getViewportSnapshotFromGizmoDirection(snapshot, new Vector3(...direction)));
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    snapshot: CameraShotSnapshot;
+  } | null>(null);
+
+  function rotateFromPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const target = new Vector3(...drag.snapshot.target);
+    const offset = new Vector3(...drag.snapshot.position).sub(target);
+    const spherical = new Spherical().setFromVector3(offset.lengthSq() ? offset : new Vector3(0, 0, 1));
+    spherical.theta -= (event.clientX - drag.startX) * 0.012;
+    spherical.phi = Math.min(Math.max(spherical.phi + (event.clientY - drag.startY) * 0.012, 0.08), Math.PI - 0.08);
+    const position = target.clone().add(new Vector3().setFromSpherical(spherical));
+    onSnapshotChange({ ...drag.snapshot, position: toSnapshotTuple(position) });
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  function zoomFromWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const target = new Vector3(...snapshot.target);
+    const offset = new Vector3(...snapshot.position).sub(target);
+    const distance = Math.min(Math.max(offset.length() * Math.exp(event.deltaY * 0.001), 0.8), 30);
+    if (offset.lengthSq() === 0) offset.set(0, 0, 1);
+    onSnapshotChange({ ...snapshot, position: toSnapshotTuple(target.add(offset.normalize().multiplyScalar(distance))) });
   }
 
   return (
-    <div className="viewport-gizmo-overlay" aria-label="3D视口原生坐标控件" style={{ right: `${rightOffset}px` }}>
-      <Canvas
-        className="viewport-gizmo-canvas"
-        camera={{ fov: snapshot.fov, position: [0, 0, 1] }}
-        gl={{ alpha: true, antialias: true }}
-      >
-        <ViewportGizmoContent onSnapshotChange={onSnapshotChange} snapshot={snapshot} />
-      </Canvas>
-      <div className="viewport-gizmo-hit-layer" aria-label="3D视口坐标切换按钮">
+    <div
+      className="viewport-gizmo-overlay"
+      aria-label="3D视口原生坐标控件"
+      role="application"
+      style={leftOffset === undefined ? { right: `${rightOffset}px` } : { left: `${leftOffset}px`, right: "auto" }}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        dragRef.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          snapshot,
+        };
+      }}
+      onPointerMove={rotateFromPointer}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onWheel={zoomFromWheel}
+    >
+      <div className="viewport-gizmo-static" aria-hidden="true">
+        <span className="viewport-gizmo-center" />
+        <span className="viewport-gizmo-axis-line is-x" />
+        <span className="viewport-gizmo-axis-line is-y" />
+        <span className="viewport-gizmo-axis-line is-z" />
+      </div>
+      <div className="viewport-gizmo-hit-layer" aria-hidden="true">
         {GIZMO_AXIS_HIT_TARGETS.map((target) => (
-          <button
+          <span
             key={target.label}
-            aria-label={target.label}
             className={`viewport-gizmo-hit-button ${target.className}`}
             style={getViewportGizmoHitButtonStyle(snapshot, target.direction)}
-            type="button"
-            onClick={() => selectAxisDirection(target.direction)}
-          />
+          >
+            {target.className.includes("is-x") ? "X" : target.className.includes("is-y") ? "Y" : "Z"}
+          </span>
         ))}
       </div>
     </div>
   );
 }
 
+function PhoneCameraPathLine() {
+  const path = usePhoneCameraPath();
+  if (path.length < 2) return null;
+
+  return (
+    <Line
+      color="#FFB020"
+      lineWidth={2}
+      points={path}
+      userData={{ [HIDE_FROM_VIEWPORT_CAPTURE_KEY]: true }}
+    />
+  );
+}
+
 export function DirectorCanvas() {
+  const recordingVideo = useLiveVideoCaptureActive();
   const viewMode = useDirectorStore((state) => state.viewMode);
   const openSceneInspector = useDirectorStore((state) => state.openSceneInspector);
   const sceneSettings = useDirectorStore((state) => state.project.scene);
@@ -595,18 +629,28 @@ export function DirectorCanvas() {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const viewportCameraSnapshotRef = useRef<CameraShotSnapshot>(DEFAULT_DIRECTOR_VIEW_SNAPSHOT);
   const [directorViewSnapshot, setDirectorViewSnapshot] = useState(DEFAULT_DIRECTOR_VIEW_SNAPSHOT);
+  const [poseEditorViewSnapshot, setPoseEditorViewSnapshot] = useState<CameraShotSnapshot>(DEFAULT_DIRECTOR_VIEW_SNAPSHOT);
   const [toolbarHeight, setToolbarHeight] = useState(DEFAULT_VIEWPORT_TOOLBAR_HEIGHT);
   const hasPanorama = Boolean(panoramaAssetId);
   const panoramaAsset = assets.find((item) => item.id === panoramaAssetId);
-  const showViewportGrid = shouldRenderViewportGrid(hasPanorama, sceneSettings.snapToGrid);
+  const showViewportGrid = sceneSettings.showGrid && shouldRenderViewportGrid(hasPanorama, sceneSettings.snapToGrid);
   const activeCameraView = activeCamera ? getCameraViewSnapshotFromShot(activeCamera) : undefined;
   const viewportAspectRatio = useDirectorStore((state) => state.viewportAspectRatio);
   const viewportRuleOfThirdsEnabled = useDirectorStore((state) => state.viewportRuleOfThirdsEnabled);
   const viewportPanelsCollapsed = useDirectorStore((state) => state.viewportPanelsCollapsed);
+  const poseEditMode = useDirectorStore((state) => state.poseEditMode);
+  const poseEditCharacter = useDirectorStore((state) =>
+    state.poseEditMode
+      ? state.project.objects.find((object) => object.id === state.selectedObjectId && object.kind === "character" && !object.assetRefId)
+      : null
+  );
   const setViewMode = useDirectorStore((state) => state.setViewMode);
   const setViewportRuleOfThirdsEnabled = useDirectorStore((state) => state.setViewportRuleOfThirdsEnabled);
-  const visibleViewportSnapshot =
-    viewMode === "camera" && activeCameraView ? activeCameraView : directorViewSnapshot;
+  const visibleViewportSnapshot = poseEditCharacter
+    ? poseEditorViewSnapshot
+    : viewMode === "camera" && activeCameraView
+      ? activeCameraView
+      : directorViewSnapshot;
   const viewportSafeAreaInsets: ViewportSafeAreaInsets = viewportPanelsCollapsed
     ? { left: 0, right: 0, top: 0, bottom: 0 }
     : { left: LEFT_PANEL_WIDTH, right: RIGHT_PANEL_WIDTH, top: 0, bottom: 0 };
@@ -640,6 +684,11 @@ export function DirectorCanvas() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!poseEditCharacter) return;
+    setPoseEditorViewSnapshot(getPoseEditorViewSnapshot(poseEditCharacter.transform.position));
+  }, [poseEditCharacter?.id]);
+
   function getViewportCameraSnapshot(): CameraShotSnapshot {
     return viewportCameraSnapshotRef.current;
   }
@@ -652,6 +701,10 @@ export function DirectorCanvas() {
   }
 
   function updateViewportGizmoSnapshot(snapshot: CameraShotSnapshot) {
+    if (poseEditCharacter) {
+      setPoseEditorViewSnapshot(snapshot);
+      return;
+    }
     if (viewMode !== "director") {
       setViewMode("director");
     }
@@ -666,8 +719,16 @@ export function DirectorCanvas() {
       <div className="director-canvas" data-testid="director-canvas">
         <Canvas
           camera={{ position: DEFAULT_DIRECTOR_VIEW_SNAPSHOT.position, fov: DEFAULT_DIRECTOR_VIEW_SNAPSHOT.fov }}
+          dpr={recordingVideo ? 1 : [1, 1.5]}
+          frameloop={recordingVideo ? "demand" : "always"}
           gl={{ antialias: true, preserveDrawingBuffer: true }}
-          onPointerMissed={openSceneInspector}
+          onPointerMissed={() => {
+            if (poseEditCharacter) {
+              window.dispatchEvent(new Event("storyai:pose-cancel"));
+              return;
+            }
+            openSceneInspector();
+          }}
           onCreated={({ camera }) => {
             const perspectiveCamera = camera as ThreePerspectiveCamera;
             perspectiveCamera.lookAt(...DEFAULT_DIRECTOR_VIEW_SNAPSHOT.target);
@@ -680,14 +741,14 @@ export function DirectorCanvas() {
           }}
         >
           <ViewportBackground
-            backgroundColor={sceneSettings.backgroundColor}
-            panoramaAsset={panoramaAsset}
+            backgroundColor={poseEditCharacter ? "#10151d" : sceneSettings.backgroundColor}
+            panoramaAsset={poseEditCharacter ? undefined : panoramaAsset}
             panoramaRadius={sceneSettings.panoramaRadius}
             panoramaYaw={sceneSettings.panoramaYaw}
           />
           <ambientLight intensity={1.15} />
           <directionalLight intensity={1.2} position={[8, 10, 6]} />
-          {showViewportGrid ? (
+          {showViewportGrid && !poseEditCharacter ? (
             <Grid
               cellThickness={0}
               fadeDistance={80}
@@ -701,7 +762,7 @@ export function DirectorCanvas() {
             <OrbitControls
               ref={controlsRef}
               enableDamping
-              enabled
+              enabled={!poseEditCharacter}
               makeDefault
               target={DEFAULT_DIRECTOR_VIEW_SNAPSHOT.target}
               onChange={(event) => {
@@ -717,6 +778,7 @@ export function DirectorCanvas() {
             />
           ) : null}
           <DirectorViewCameraSync controlsRef={controlsRef} snapshot={directorViewSnapshot} viewMode={viewMode} />
+          {poseEditCharacter ? <PoseEditorCameraSync snapshot={poseEditorViewSnapshot} /> : null}
           {viewMode === "camera" && activeCameraView ? (
             <PerspectiveCamera
               fov={activeCameraView.fov}
@@ -733,8 +795,9 @@ export function DirectorCanvas() {
             viewportAspectRatio={viewportAspectRatio}
             viewMode={viewMode}
           />
+          <PhoneCameraPathLine />
           <Suspense fallback={null}>
-            <SceneRoot />
+            <SceneRoot focusCharacterId={poseEditCharacter?.id} />
           </Suspense>
         </Canvas>
       </div>
@@ -745,11 +808,14 @@ export function DirectorCanvas() {
         safeAreaInsets={viewportSafeAreaInsets}
         showRuleOfThirds={viewportRuleOfThirdsEnabled}
       />
-      <ViewportGizmoOverlay
-        onSnapshotChange={updateViewportGizmoSnapshot}
-        rightOffset={gizmoRightOffset}
-        snapshot={visibleViewportSnapshot}
-      />
+      {poseEditCharacter ? (
+        <ViewportGizmoOverlay
+          onSnapshotChange={updateViewportGizmoSnapshot}
+          rightOffset={gizmoRightOffset}
+          snapshot={visibleViewportSnapshot}
+        />
+      ) : null}
+      {poseEditCharacter ? null : <CameraMonitor />}
       <ViewportToolbar getViewportCameraSnapshot={getViewportCameraSnapshot} toolbarContainerRef={toolbarRef} />
     </div>
   );

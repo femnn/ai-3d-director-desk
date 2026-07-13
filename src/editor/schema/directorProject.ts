@@ -11,6 +11,26 @@ export const GEOMETRY_PRIMITIVE_OPTIONS = [
 ] as const;
 export type GeometryPrimitiveType = (typeof GEOMETRY_PRIMITIVE_OPTIONS)[number]["type"];
 export type CharacterRigType = "mannequin" | "ue4-mannequin" | "mixamo" | "vrm" | "custom-humanoid";
+export type CharacterActionId =
+  | "still"
+  | "idle"
+  | "sit"
+  | "drink-tea"
+  | "talk"
+  | "walk"
+  | "run"
+  | "turn"
+  | "look"
+  | "wave"
+  | "bow"
+  | "think"
+  | "reach"
+  | "push"
+  | "fight"
+  | "dance"
+  | "phone";
+export type CharacterActionPlaybackMode = "normal" | "camera-driven";
+export type CharacterMotionSource = "built-in" | "video" | "mocap";
 export type CharacterBodyType =
   | "mannequin"
   | "female"
@@ -39,6 +59,7 @@ export interface SceneSettings {
   panoramaRadius: number;
   showLabels: boolean;
   snapToGrid: boolean;
+  showGrid: boolean;
   showGround: boolean;
   groundOpacity: number;
   groundHeight: number;
@@ -50,6 +71,43 @@ export interface CharacterRigState {
   controls: Record<string, number>;
 }
 
+export interface CharacterActionTrack {
+  actionId: CharacterActionId;
+  duration: number;
+  loop: boolean;
+  playbackMode: CharacterActionPlaybackMode;
+  cameraId?: string | null;
+  enabled: boolean;
+  source?: CharacterMotionSource;
+  motionClipId?: string | null;
+}
+
+export interface CharacterMotionFrame {
+  time: number;
+  controls: Record<string, number>;
+}
+
+export interface CharacterMotionClip {
+  id: string;
+  characterId: string;
+  name: string;
+  duration: number;
+  frames: CharacterMotionFrame[];
+}
+
+export interface ScenePlan {
+  intent: string;
+  roles: Array<{
+    name: string;
+    purpose?: string;
+    pose?: string;
+    relation?: string;
+  }>;
+  composition?: string;
+  environment?: string;
+  reviewNotes?: string;
+}
+
 export interface DirectorAssetRef {
   id: string;
   kind: DirectorAssetKind;
@@ -59,6 +117,7 @@ export interface DirectorAssetRef {
   url: string;
   assetSource?: DirectorAssetSource;
   projectionMode?: PanoramaProjectionMode;
+  animated?: boolean;
 }
 
 export interface DirectorObject {
@@ -76,6 +135,7 @@ export interface DirectorObject {
   crowdLabel?: string;
   linkedCameraId?: string | null;
   characterRig?: CharacterRigState;
+  characterActionTrack?: CharacterActionTrack;
 }
 
 export interface DirectorCameraCapture {
@@ -97,12 +157,29 @@ export interface DirectorCameraShot {
   captures?: DirectorCameraCapture[];
 }
 
+export interface DirectorCameraAnimationKeyframe {
+  time: number;
+  position: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+}
+
+export interface DirectorCameraAnimation {
+  id: string;
+  name: string;
+  cameraId: string;
+  keyframes: DirectorCameraAnimationKeyframe[];
+}
+
 export interface DirectorProject {
   version: 1;
   scene: SceneSettings;
   assets: DirectorAssetRef[];
   objects: DirectorObject[];
   cameras: DirectorCameraShot[];
+  cameraAnimations: DirectorCameraAnimation[];
+  characterMotionClips?: CharacterMotionClip[];
   activeCameraId: string | null;
   panoramaAssetId: string | null;
+  scenePlan?: ScenePlan | null;
 }

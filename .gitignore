@@ -6,3 +6,12 @@ coverage
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+release
+versions
+tools/desktop-bin
+tools/cloudflared/cloudflared
+*.log
+.director-desk
+server/.certs
+public/mediapipe
+启动AnimoFlow动作服务.command

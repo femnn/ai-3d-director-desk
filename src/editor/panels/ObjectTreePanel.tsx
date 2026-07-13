@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { Box, Camera, ChevronDown, ChevronRight, Eye, EyeOff, Lock, Search, Unlock, User, Users } from "lucide-react";
+import { Box, Camera, ChevronDown, ChevronRight, Eye, EyeOff, Lock, Search, Trash2, Unlock, User, Users } from "lucide-react";
 import type { DirectorObject, DirectorObjectKind } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 
@@ -281,6 +281,19 @@ export function ObjectTreePanel() {
     return state.selectedObjectId ? [state.selectedObjectId] : [];
   }
 
+  function deleteTreeItem(item: SceneTreeItem) {
+    if (item.crowdId) {
+      selectCrowd(item.crowdId);
+    } else if (item.objectIds.length === 1) {
+      selectObject(item.id);
+    } else {
+      const [firstId, ...restIds] = item.objectIds;
+      selectObject(firstId ?? null);
+      restIds.forEach((id) => toggleObjectSelection(id));
+    }
+    window.setTimeout(() => useDirectorStore.getState().deleteSelectedObject(), 0);
+  }
+
   return (
     <section className="panel-card object-tree-panel">
       <h2 className="visually-hidden">场景对象</h2>
@@ -383,6 +396,17 @@ export function ObjectTreePanel() {
                             </button>
                           </>
                         ) : null}
+                        <button
+                          className="object-flag-button object-icon-flag-button object-delete-button"
+                          type="button"
+                          aria-label={`删除 ${item.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deleteTreeItem(item);
+                          }}
+                        >
+                          <Trash2 aria-hidden="true" size={15} strokeWidth={1.8} />
+                        </button>
                       </div>
                       {item.crowdId && expanded && item.previewChildren?.length ? (
                         <ul className="object-crowd-preview-list" aria-label={`${item.name} 成员预览`}>

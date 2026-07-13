@@ -8,6 +8,7 @@ interface CharacterModelProps {
   bodyType?: CharacterBodyType;
   color?: string;
   onLabelAnchorYChange?: (anchorY: number) => void;
+  onJointPositionsChange?: (positions: Record<string, [number, number, number]>) => void;
   rigState?: CharacterRigState;
 }
 
@@ -31,7 +32,7 @@ class CharacterModelBoundary extends Component<
   }
 }
 
-export function CharacterModel({ bodyType, color, onLabelAnchorYChange, rigState }: CharacterModelProps) {
+export function CharacterModel({ bodyType, color, onJointPositionsChange, onLabelAnchorYChange, rigState }: CharacterModelProps) {
   const fallback = <PrimitiveMannequin bodyType={bodyType} color={color} rigState={rigState} />;
 
   if (rigState?.rigType !== "ue4-mannequin") {
@@ -43,6 +44,7 @@ export function CharacterModel({ bodyType, color, onLabelAnchorYChange, rigState
       <UE4MannequinModel
         bodyType={bodyType}
         color={color}
+        onJointPositionsChange={onJointPositionsChange}
         onLabelAnchorYChange={onLabelAnchorYChange}
         rigState={rigState}
       />

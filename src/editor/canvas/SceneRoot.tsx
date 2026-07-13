@@ -1,10 +1,13 @@
 import { Html, Line, TransformControls, type TransformControlsProps } from "@react-three/drei";
-import { useLoader, type ThreeEvent } from "@react-three/fiber";
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Box3, Matrix4, Quaternion, Vector3, type Group, type Object3D } from "three";
+import { useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { AnimationMixer, Box3, Matrix4, Plane, Quaternion, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
 import type { TransformControls as TransformControlsImpl } from "three-stdlib";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type {
   DirectorAssetRef,
   DirectorCameraShot,
@@ -21,6 +24,7 @@ import { VIEWPORT_OBJECT_LABEL_VERTICAL_GAP } from "../schema/viewportLabels";
 import type { TransformMode } from "../store/directorStore";
 import { useDirectorStore } from "../store/directorStore";
 import { CharacterModel } from "../runtime/CharacterModel";
+import { getActionTrackDuration, useAnimatedCharacterRigState } from "../animation/characterAnimation";
 import { getGroundedLabelY } from "../runtime/mannequin/bodyTypes";
 import { getUE4GroundedLabelY } from "../runtime/ue4Mannequin/ue4MannequinRig";
 import { getEffectiveGroundOpacity } from "./panoramaMath";
@@ -336,16 +340,33 @@ export function getViewportCameraHitArea(): CameraHitArea {
   };
 }
 
-function NormalizedImportedObject({ object }: { object: Object3D }) {
+function tintImportedObject(object: Object3D, color?: string) {
+  if (!color) return;
+
+  object.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    const originalMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const tintedMaterials = originalMaterials.map((material) => {
+      const copy = material.clone() as typeof material & { color?: { set: (value: string) => unknown } };
+      copy.color?.set(color);
+      return copy;
+    });
+    mesh.material = Array.isArray(mesh.material) ? tintedMaterials : tintedMaterials[0];
+  });
+}
+
+function NormalizedImportedObject({ color, object }: { color?: string; object: Object3D }) {
   const { clone, normalization } = useMemo(() => {
     const clonedObject = object.clone(true);
+    tintImportedObject(clonedObject, color);
     clonedObject.updateMatrixWorld(true);
 
     return {
       clone: clonedObject,
       normalization: getImportedModelNormalization(new Box3().setFromObject(clonedObject)),
     };
-  }, [object]);
+  }, [color, object]);
 
   return (
     <group
@@ -357,28 +378,174 @@ function NormalizedImportedObject({ object }: { object: Object3D }) {
   );
 }
 
-function FbxModel({ url }: { url: string }) {
+function FbxModel({
+  animated = false,
+  animationDuration,
+  animationElapsed,
+  color,
+  url,
+}: {
+  animated?: boolean;
+  animationDuration?: number;
+  animationElapsed?: number;
+  color?: string;
+  url: string;
+}) {
   const object = useLoader(FBXLoader, url);
 
-  return <NormalizedImportedObject object={object} />;
+  const { actions, clone, mixer, normalization } = useMemo(() => {
+    const clonedObject = object.clone(true);
+    tintImportedObject(clonedObject, color);
+    clonedObject.updateMatrixWorld(true);
+    const nextMixer = animated ? new AnimationMixer(clonedObject) : null;
+    const clips = (object as Object3D & { animations?: Parameters<AnimationMixer["clipAction"]>[0][] }).animations ?? [];
+    const nextActions = nextMixer ? clips.map((clip) => nextMixer.clipAction(clip).reset().play()) : [];
+    return {
+      actions: nextActions,
+      clone: clonedObject,
+      mixer: nextMixer,
+      normalization: getImportedModelNormalization(new Box3().setFromObject(clonedObject)),
+    };
+  }, [animated, color, object]);
+
+  useEffect(
+    () => () => {
+      mixer?.stopAllAction();
+    },
+    [mixer]
+  );
+  useFrame((_, delta) => {
+    if (!mixer) return;
+    if (typeof animationElapsed !== "number") {
+      actions.forEach((action) => {
+        action.paused = false;
+      });
+      mixer.update(delta);
+      return;
+    }
+    const duration = Math.max(animationDuration ?? 5, 5);
+    actions.forEach((action) => {
+      action.paused = true;
+      action.time = ((animationElapsed % duration) / duration) * action.getClip().duration;
+    });
+    mixer.update(0);
+  });
+
+  return (
+    <group position={normalization.position} scale={[normalization.scale, normalization.scale, normalization.scale]}>
+      <primitive object={clone} />
+    </group>
+  );
 }
 
-function ObjModel({ url }: { url: string }) {
+function ObjModel({ color, url }: { color?: string; url: string }) {
   const object = useLoader(OBJLoader, url);
 
-  return <NormalizedImportedObject object={object} />;
+  return <NormalizedImportedObject color={color} object={object} />;
+}
+
+function GltfModel({
+  animated = false,
+  animationDuration,
+  animationElapsed,
+  color,
+  url,
+}: {
+  animated?: boolean;
+  animationDuration?: number;
+  animationElapsed?: number;
+  color?: string;
+  url: string;
+}) {
+  const gltf = useLoader(GLTFLoader, url, (loader) => loader.setMeshoptDecoder(MeshoptDecoder));
+  const { actions, clone, mixer, normalization } = useMemo(() => {
+    const clonedObject = cloneSkeleton(gltf.scene) as Group;
+    tintImportedObject(clonedObject, color);
+    clonedObject.updateMatrixWorld(true);
+    const nextMixer = animated ? new AnimationMixer(clonedObject) : null;
+    const nextActions = nextMixer ? gltf.animations.map((clip) => nextMixer.clipAction(clip).reset().play()) : [];
+    return {
+      actions: nextActions,
+      clone: clonedObject,
+      mixer: nextMixer,
+      normalization: getImportedModelNormalization(new Box3().setFromObject(clonedObject)),
+    };
+  }, [animated, color, gltf.animations, gltf.scene]);
+
+  useEffect(
+    () => () => {
+      mixer?.stopAllAction();
+    },
+    [mixer]
+  );
+  useFrame((_, delta) => {
+    if (!mixer) return;
+    if (typeof animationElapsed !== "number") {
+      actions.forEach((action) => {
+        action.paused = false;
+      });
+      mixer.update(delta);
+      return;
+    }
+    const duration = Math.max(animationDuration ?? 5, 5);
+    actions.forEach((action) => {
+      action.paused = true;
+      action.time = ((animationElapsed % duration) / duration) * action.getClip().duration;
+    });
+    mixer.update(0);
+  });
+
+  return (
+    <group position={normalization.position} scale={[normalization.scale, normalization.scale, normalization.scale]}>
+      <primitive object={clone} />
+    </group>
+  );
 }
 
 function ImportedModel({
+  animated,
+  animationDuration,
+  animationElapsed,
+  color,
   fileName,
   url,
 }: {
+  animated?: boolean;
+  animationDuration?: number;
+  animationElapsed?: number;
+  color?: string;
   fileName: string;
   url: string;
 }) {
-  if (/\.fbx$/i.test(fileName)) return <FbxModel url={url} />;
-  if (/\.obj$/i.test(fileName)) return <ObjModel url={url} />;
+  if (/\.fbx$/i.test(fileName)) {
+    return <FbxModel animated={animated} animationDuration={animationDuration} animationElapsed={animationElapsed} color={color} url={url} />;
+  }
+  if (/\.glb$|\.gltf$/i.test(fileName)) {
+    return <GltfModel animated={animated} animationDuration={animationDuration} animationElapsed={animationElapsed} color={color} url={url} />;
+  }
+  if (/\.obj$/i.test(fileName)) return <ObjModel color={color} url={url} />;
   return null;
+}
+
+class ImportedModelBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function ImportedModelFallback({ color = "#ff9f43" }: { color?: string }) {
+  return (
+    <mesh name="missing-imported-model" position={[0, 0.9, 0]}>
+      <boxGeometry args={[0.9, 1.8, 0.6]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.15} wireframe />
+    </mesh>
+  );
 }
 
 function GeometryPrimitiveModel({
@@ -443,6 +610,385 @@ function GeometryPrimitiveModel({
   );
 }
 
+type PoseJointName =
+  | "body"
+  | "torso"
+  | "head"
+  | "leftShoulder"
+  | "rightShoulder"
+  | "leftElbow"
+  | "rightElbow"
+  | "leftHand"
+  | "rightHand"
+  | "leftHip"
+  | "rightHip"
+  | "leftKnee"
+  | "rightKnee"
+  | "leftFoot"
+  | "rightFoot";
+
+type PoseJointPositions = Partial<Record<PoseJointName, [number, number, number]>>;
+
+const TERMINAL_JOINTS = new Set<PoseJointName>(["head", "leftHand", "rightHand", "leftFoot", "rightFoot"]);
+
+function clampPose(value: number, min = -90, max = 90) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getSegmentControls(
+  root: [number, number, number],
+  target: [number, number, number],
+  side: "left" | "right",
+  prefix: "Shoulder" | "Hip"
+) {
+  const vector = new Vector3(...target).sub(new Vector3(...root));
+  const sideSign = side === "left" ? -1 : 1;
+  const degrees = (radians: number) => (radians * 180) / Math.PI;
+  return {
+    [`${side}${prefix}.pitch`]: clampPose(degrees(Math.atan2(-vector.z, Math.max(-vector.y, 0.001))), -150, 150),
+    [`${side}${prefix}.spread`]: clampPose(sideSign * degrees(Math.atan2(vector.x, Math.max(-vector.y, 0.001))), -150, 150),
+  };
+}
+
+function getJointBend(root: [number, number, number], joint: [number, number, number], end: [number, number, number]) {
+  const first = new Vector3(...root).sub(new Vector3(...joint));
+  const second = new Vector3(...end).sub(new Vector3(...joint));
+  const denominator = Math.max(first.length() * second.length(), 0.0001);
+  const angle = Math.acos(Math.min(Math.max(first.dot(second) / denominator, -1), 1));
+  return clampPose(180 - (angle * 180) / Math.PI, 0, 155);
+}
+
+function getLimbIkControls(
+  root: [number, number, number],
+  middle: [number, number, number],
+  end: [number, number, number],
+  target: [number, number, number],
+  side: "left" | "right",
+  prefix: "Shoulder" | "Hip",
+  bendKey: string
+) {
+  const rootPoint = new Vector3(...root);
+  const middlePoint = new Vector3(...middle);
+  const targetPoint = new Vector3(...target);
+  const upperLength = rootPoint.distanceTo(middlePoint);
+  const lowerLength = middlePoint.distanceTo(new Vector3(...end));
+  const vector = targetPoint.sub(rootPoint);
+  const distance = Math.min(Math.max(vector.length(), 0.001), Math.max(upperLength + lowerLength - 0.001, 0.001));
+  const sideSign = side === "left" ? -1 : 1;
+  const degrees = (radians: number) => (radians * 180) / Math.PI;
+  const jointAngle = Math.acos(
+    clampPose((upperLength * upperLength + lowerLength * lowerLength - distance * distance) / Math.max(2 * upperLength * lowerLength, 0.001), -1, 1)
+  );
+
+  return {
+    [`${side}${prefix}.pitch`]: clampPose(degrees(Math.atan2(-vector.z, Math.max(-vector.y, 0.001))), -150, 150),
+    [`${side}${prefix}.spread`]: clampPose(sideSign * degrees(Math.atan2(vector.x, Math.max(-vector.y, 0.001))), -150, 150),
+    [bendKey]: clampPose(180 - degrees(jointAngle), 0, 140),
+  };
+}
+
+function PoseEditHandles({
+  interactionMode,
+  item,
+  positions,
+  parentRef,
+  rootOffset,
+  onPoseControlChange,
+}: {
+  interactionMode: "persistent" | "hold";
+  item: DirectorObject;
+  positions: PoseJointPositions;
+  parentRef: MutableRefObject<Group | null>;
+  rootOffset: [number, number, number];
+  onPoseControlChange?: (characterId: string, controls: Record<string, number>) => void;
+}) {
+  const [selectedJoint, setSelectedJoint] = useState<PoseJointName | null>(null);
+  const draggingJointRef = useRef<PoseJointName | null>(null);
+  const dragPlaneRef = useRef(new Plane());
+  const dragPointRef = useRef(new Vector3());
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const dragOriginRef = useRef<[number, number, number] | null>(null);
+  const dragPointerOriginRef = useRef<[number, number, number] | null>(null);
+  const dragDirectionRef = useRef(1);
+  const dragControlsRef = useRef<Record<string, number>>({});
+  const updateDragHandlerRef = useRef<(clientX: number, clientY: number, ray: { intersectPlane: (plane: Plane, target: Vector3) => Vector3 | null }) => void>(() => {});
+  const cancelDragHandlerRef = useRef<() => void>(() => {});
+  const pendingDragRef = useRef<{ joint: PoseJointName; target: [number, number, number] } | null>(null);
+  const dragFrameRef = useRef(0);
+  const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+  const raycaster = useThree((state) => state.raycaster);
+  const updatePoseControls = useDirectorStore((state) => state.updatePoseControls);
+  const beginUndoBatch = useDirectorStore((state) => state.beginUndoBatch);
+  const endUndoBatch = useDirectorStore((state) => state.endUndoBatch);
+  const currentControls = item.characterRig?.controls ?? {};
+  const toHandlePosition = (position: [number, number, number]) =>
+    [position[0] + rootOffset[0], position[1] + rootOffset[1], position[2] + rootOffset[2]] as [number, number, number];
+  const toBonePosition = (position: [number, number, number]) =>
+    [position[0] - rootOffset[0], position[1] - rootOffset[1], position[2] - rootOffset[2]] as [number, number, number];
+
+  function applyControls(nextControls: Record<string, number>) {
+    const normalizedControls = Object.fromEntries(
+      Object.entries(nextControls).map(([key, value]) => [key, Number(value.toFixed(3))])
+    );
+    updatePoseControls(item.id, normalizedControls);
+    onPoseControlChange?.(item.id, normalizedControls);
+  }
+
+  function applyJointTarget(joint: PoseJointName, target: [number, number, number]) {
+    if (joint === "leftHand" && positions.leftShoulder && positions.leftElbow) {
+      applyControls(getLimbIkControls(positions.leftShoulder, positions.leftElbow, positions.leftHand ?? target, target, "left", "Shoulder", "leftElbow.bend"));
+      return;
+    }
+    if (joint === "rightHand" && positions.rightShoulder && positions.rightElbow) {
+      applyControls(getLimbIkControls(positions.rightShoulder, positions.rightElbow, positions.rightHand ?? target, target, "right", "Shoulder", "rightElbow.bend"));
+      return;
+    }
+    if (joint === "leftFoot" && positions.leftHip && positions.leftKnee) {
+      applyControls(getLimbIkControls(positions.leftHip, positions.leftKnee, positions.leftFoot ?? target, target, "left", "Hip", "leftKnee.bend"));
+      return;
+    }
+    if (joint === "rightFoot" && positions.rightHip && positions.rightKnee) {
+      applyControls(getLimbIkControls(positions.rightHip, positions.rightKnee, positions.rightFoot ?? target, target, "right", "Hip", "rightKnee.bend"));
+      return;
+    }
+    if (joint === "head" && positions.head) {
+      return;
+    }
+    if (joint === "leftElbow" && positions.leftShoulder && positions.leftHand) {
+      applyControls({
+        ...getSegmentControls(positions.leftShoulder, target, "left", "Shoulder"),
+        "leftElbow.bend": getJointBend(positions.leftShoulder, target, positions.leftHand),
+      });
+      return;
+    }
+    if (joint === "rightElbow" && positions.rightShoulder && positions.rightHand) {
+      applyControls({
+        ...getSegmentControls(positions.rightShoulder, target, "right", "Shoulder"),
+        "rightElbow.bend": getJointBend(positions.rightShoulder, target, positions.rightHand),
+      });
+      return;
+    }
+    if (joint === "leftKnee" && positions.leftHip && positions.leftFoot) {
+      applyControls({
+        ...getSegmentControls(positions.leftHip, target, "left", "Hip"),
+        "leftKnee.bend": getJointBend(positions.leftHip, target, positions.leftFoot),
+      });
+      return;
+    }
+    if (joint === "rightKnee" && positions.rightHip && positions.rightFoot) {
+      applyControls({
+        ...getSegmentControls(positions.rightHip, target, "right", "Hip"),
+        "rightKnee.bend": getJointBend(positions.rightHip, target, positions.rightFoot),
+      });
+      return;
+    }
+
+    const original = positions[joint];
+    if (!original) return;
+    const delta = new Vector3(...target).sub(new Vector3(...original));
+    if (joint === "leftShoulder" || joint === "rightShoulder" || joint === "leftHip" || joint === "rightHip") {
+      const isShoulder = joint.endsWith("Shoulder");
+      const side = joint.startsWith("left") ? "left" : "right";
+      const prefix = isShoulder ? "Shoulder" : "Hip";
+      const controlPrefix = `${side}${prefix}`;
+      applyControls({
+        [`${controlPrefix}.pitch`]: clampPose((currentControls[`${controlPrefix}.pitch`] ?? 0) - delta.z * 100, -150, 150),
+        [`${controlPrefix}.spread`]: clampPose((currentControls[`${controlPrefix}.spread`] ?? 0) + (side === "left" ? -1 : 1) * delta.x * 120, -150, 150),
+        [`${controlPrefix}.twist`]: clampPose((currentControls[`${controlPrefix}.twist`] ?? 0) + delta.y * 80, -150, 150),
+      });
+      return;
+    }
+    if (joint === "body" || joint === "torso") {
+      applyControls({
+        [`${joint}.pitch`]: clampPose((currentControls[`${joint}.pitch`] ?? 0) - delta.z * 100, -110, 110),
+        [`${joint}.yaw`]: clampPose((currentControls[`${joint}.yaw`] ?? 0) + delta.x * 100, -110, 110),
+        [`${joint}.roll`]: clampPose((currentControls[`${joint}.roll`] ?? 0) + delta.x * 80, -110, 110),
+      });
+    }
+  }
+
+  function updateDirectDragFromPoint(
+    clientX: number,
+    clientY: number,
+    ray: { intersectPlane: (plane: Plane, target: Vector3) => Vector3 | null }
+  ) {
+    const joint = draggingJointRef.current;
+    const dragStart = dragStartRef.current;
+    if (!joint || !dragStart) return;
+    if (joint === "head") {
+      const dx = clientX - dragStart.x;
+      const dy = clientY - dragStart.y;
+      applyControls({
+        "head.yaw": clampPose((dragControlsRef.current["head.yaw"] ?? 0) + dx * 0.28, -65, 65),
+        "head.pitch": clampPose((dragControlsRef.current["head.pitch"] ?? 0) - dy * 0.24, -45, 45),
+        "head.roll": clampPose(dragControlsRef.current["head.roll"] ?? 0, -25, 25),
+      });
+      return;
+    }
+    if (!ray.intersectPlane(dragPlaneRef.current, dragPointRef.current)) return;
+    const localPoint = dragPointRef.current.clone();
+    parentRef.current?.worldToLocal(localPoint);
+    const pointerTarget = toBonePosition([localPoint.x, localPoint.y, localPoint.z]);
+    const origin = dragOriginRef.current;
+    const pointerOrigin = dragPointerOriginRef.current;
+    if (!origin || !pointerOrigin) return;
+    const direction = dragDirectionRef.current;
+    const target: [number, number, number] = [
+      origin[0] + (pointerTarget[0] - pointerOrigin[0]) * direction,
+      origin[1] + (pointerTarget[1] - pointerOrigin[1]) * direction,
+      origin[2] + (pointerTarget[2] - pointerOrigin[2]) * direction,
+    ];
+    pendingDragRef.current = {
+      joint,
+      target,
+    };
+    if (!dragFrameRef.current) {
+      dragFrameRef.current = window.requestAnimationFrame(() => {
+        dragFrameRef.current = 0;
+        const pending = pendingDragRef.current;
+        pendingDragRef.current = null;
+        if (pending) applyJointTarget(pending.joint, pending.target);
+      });
+    }
+  }
+
+  function rotateJointWithWheel(joint: PoseJointName, event: ThreeEvent<WheelEvent>) {
+    event.stopPropagation();
+    event.nativeEvent.preventDefault();
+    const keyByJoint: Partial<Record<PoseJointName, string>> = {
+      body: "body.roll",
+      torso: "torso.roll",
+      head: "head.roll",
+      leftShoulder: "leftShoulder.twist",
+      rightShoulder: "rightShoulder.twist",
+      leftElbow: "leftElbow.bend",
+      rightElbow: "rightElbow.bend",
+      leftHand: "leftHand.twist",
+      rightHand: "rightHand.twist",
+      leftHip: "leftHip.twist",
+      rightHip: "rightHip.twist",
+      leftKnee: "leftKnee.bend",
+      rightKnee: "rightKnee.bend",
+      leftFoot: "leftFoot.twist",
+      rightFoot: "rightFoot.twist",
+    };
+    const key = keyByJoint[joint];
+    if (!key) return;
+    const min = key.endsWith(".bend") ? 0 : -150;
+    const max = key.endsWith(".bend") ? 155 : 150;
+    applyControls({ [key]: clampPose((currentControls[key] ?? 0) + -event.deltaY * 0.18, min, max) });
+  }
+
+  function cancelDirectDrag() {
+    if (!draggingJointRef.current) return;
+    draggingJointRef.current = null;
+    dragStartRef.current = null;
+    dragOriginRef.current = null;
+    dragPointerOriginRef.current = null;
+    dragDirectionRef.current = 1;
+    if (dragFrameRef.current) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = 0;
+    }
+    const pending = pendingDragRef.current;
+    pendingDragRef.current = null;
+    if (pending) applyJointTarget(pending.joint, pending.target);
+    setSelectedJoint(null);
+    endUndoBatch();
+  }
+
+  updateDragHandlerRef.current = updateDirectDragFromPoint;
+  cancelDragHandlerRef.current = cancelDirectDrag;
+
+  useEffect(() => {
+    function handlePointerMove(event: PointerEvent) {
+      if (!draggingJointRef.current) return;
+      const rect = gl.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const pointer = new Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      raycaster.setFromCamera(pointer, camera);
+      updateDragHandlerRef.current(event.clientX, event.clientY, raycaster.ray);
+    }
+    const handleCancel = () => cancelDragHandlerRef.current();
+    const handlePointerUp = () => {
+      if (interactionMode === "hold") cancelDragHandlerRef.current();
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("storyai:pose-cancel", handleCancel);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("storyai:pose-cancel", handleCancel);
+    };
+  }, [camera, gl, interactionMode, raycaster]);
+
+  return (
+    <>
+      {Object.entries(positions).map(([joint, position]) => {
+        if (!position) return null;
+        const name = joint as PoseJointName;
+        return (
+          <mesh
+            key={name}
+            position={toHandlePosition(position)}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              if (draggingJointRef.current === name) {
+                cancelDirectDrag();
+                return;
+              }
+              if (draggingJointRef.current) cancelDirectDrag();
+              setSelectedJoint(name);
+              const normal = camera.getWorldDirection(new Vector3());
+              const worldPosition = new Vector3(...toHandlePosition(position));
+              parentRef.current?.localToWorld(worldPosition);
+              dragPlaneRef.current.setFromNormalAndCoplanarPoint(normal, worldPosition);
+              draggingJointRef.current = name;
+              dragStartRef.current = { x: event.clientX, y: event.clientY };
+              dragOriginRef.current = position;
+              const bodyPosition = positions.body ?? positions.torso;
+              if (bodyPosition && name !== "body" && name !== "torso" && name !== "head") {
+                const projectedJoint = worldPosition.clone().project(camera);
+                const projectedBody = new Vector3(...toHandlePosition(bodyPosition));
+                parentRef.current?.localToWorld(projectedBody);
+                projectedBody.project(camera);
+                dragDirectionRef.current = projectedJoint.x < projectedBody.x ? -1 : 1;
+              } else {
+                dragDirectionRef.current = 1;
+              }
+              if (event.ray.intersectPlane(dragPlaneRef.current, dragPointRef.current)) {
+                const localPointer = dragPointRef.current.clone();
+                parentRef.current?.worldToLocal(localPointer);
+                dragPointerOriginRef.current = toBonePosition([localPointer.x, localPointer.y, localPointer.z]);
+              } else {
+                dragPointerOriginRef.current = position;
+              }
+              dragControlsRef.current = { ...currentControls };
+              beginUndoBatch();
+            }}
+            onPointerUp={(event) => {
+              if (interactionMode !== "hold") return;
+              event.stopPropagation();
+              cancelDirectDrag();
+            }}
+            onWheel={(event) => rotateJointWithWheel(name, event)}
+          >
+            <sphereGeometry args={[selectedJoint === name ? 0.13 : 0.09, 16, 12]} />
+            <meshBasicMaterial color={TERMINAL_JOINTS.has(name) ? "#17c3ff" : "#ffd166"} depthTest={false} />
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
+
 function ObjectSceneNode({
   asset,
   item,
@@ -452,6 +998,8 @@ function ObjectSceneNode({
   transformable,
   translationSnap,
   onSelect,
+  onPoseControlChange,
+  poseHandleInteractionMode,
 }: {
   asset?: DirectorAssetRef;
   item: DirectorObject;
@@ -461,13 +1009,25 @@ function ObjectSceneNode({
   transformable: boolean;
   translationSnap: number | null;
   onSelect?: (item: DirectorObject) => void;
+  onPoseControlChange?: (characterId: string, controls: Record<string, number>) => void;
+  poseHandleInteractionMode: "persistent" | "hold";
 }) {
   const groupRef = useRef<Group>(null!);
   const [measuredCharacterLabel, setMeasuredCharacterLabel] = useState<{
     key: string;
     y: number;
   } | null>(null);
+  const [jointPositions, setJointPositions] = useState<PoseJointPositions>({});
   const updateObjectTransform = useDirectorStore((state) => state.updateObjectTransform);
+  const poseEditMode = useDirectorStore((state) => state.poseEditMode);
+  const motionClips = useDirectorStore((state) => state.project.characterMotionClips ?? []);
+  const motionClip = item.characterActionTrack?.motionClipId
+    ? motionClips.find((clip) => clip.id === item.characterActionTrack?.motionClipId)
+    : undefined;
+  const animatedCharacter = useAnimatedCharacterRigState(item, motionClip);
+  const editingPose = poseEditMode && selected && item.characterRig?.rigType === "ue4-mannequin" && !item.assetRefId;
+  const visibleRigState = editingPose ? item.characterRig : animatedCharacter.rigState;
+  const visibleRootOffset: [number, number, number] = editingPose ? [0, 0, 0] : animatedCharacter.rootOffset;
   const isImportedModel = asset?.sourceType === "model";
   const characterLabelKey = `${item.id}:${item.bodyType ?? ""}:${item.characterRig?.rigType ?? ""}`;
   const fallbackCharacterLabelY =
@@ -495,6 +1055,13 @@ function ObjectSceneNode({
     },
     [characterLabelKey]
   );
+  const handleJointPositionsChange = useCallback((positions: Record<string, [number, number, number]>) => {
+    setJointPositions((current) => {
+      const previous = JSON.stringify(current);
+      const next = JSON.stringify(positions);
+      return previous === next ? current : (positions as PoseJointPositions);
+    });
+  }, []);
 
   function commitTransformFromViewport() {
     const group = groupRef.current;
@@ -517,23 +1084,52 @@ function ObjectSceneNode({
         event.stopPropagation();
         onSelect?.(item);
       }}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        if (poseEditMode && selected) {
+          window.dispatchEvent(new Event("storyai:pose-cancel"));
+        }
+        onSelect?.(item);
+      }}
     >
       {isImportedModel && asset ? (
-        <Suspense fallback={null}>
-          <ImportedModel fileName={asset.fileName} url={asset.url} />
-        </Suspense>
-      ) : item.kind === "character" ? (
-        <>
-          <Suspense fallback={null}>
-            <CharacterModel
-              bodyType={item.bodyType}
+        <ImportedModelBoundary key={`${asset.id}:${asset.url}`} fallback={<ImportedModelFallback color={item.color} />}>
+          <Suspense fallback={<ImportedModelFallback color={item.color} />}>
+            <ImportedModel
+              animated={asset.animated}
+              animationDuration={item.characterActionTrack ? getActionTrackDuration(item.characterActionTrack) : undefined}
+              animationElapsed={item.characterActionTrack?.enabled ? animatedCharacter.elapsed : undefined}
               color={item.color}
-              onLabelAnchorYChange={handleCharacterLabelAnchorYChange}
-              rigState={item.characterRig}
+              fileName={asset.fileName}
+              url={asset.url}
             />
           </Suspense>
+        </ImportedModelBoundary>
+      ) : item.kind === "character" ? (
+        <>
+          <group position={visibleRootOffset}>
+            <Suspense fallback={null}>
+              <CharacterModel
+                bodyType={item.bodyType}
+                color={item.color}
+                onJointPositionsChange={editingPose ? handleJointPositionsChange : undefined}
+                onLabelAnchorYChange={handleCharacterLabelAnchorYChange}
+                rigState={visibleRigState}
+              />
+            </Suspense>
+          </group>
           {showLabels ? (
             <ViewportObjectLabel position={[0, characterLabelY, 0]}>{item.name}</ViewportObjectLabel>
+          ) : null}
+          {editingPose ? (
+            <PoseEditHandles
+              interactionMode={poseHandleInteractionMode}
+              item={item}
+              positions={jointPositions}
+              parentRef={groupRef}
+              rootOffset={visibleRootOffset}
+              onPoseControlChange={onPoseControlChange}
+            />
           ) : null}
         </>
       ) : item.kind === "prop" && item.geometryType ? (
@@ -542,7 +1138,7 @@ function ObjectSceneNode({
     </group>
   );
 
-  if (!selected || !transformable) return node;
+  if (!selected || !transformable || (poseEditMode && item.characterRig?.rigType === "ue4-mannequin" && !item.assetRefId)) return node;
 
   return (
     <>
@@ -748,7 +1344,21 @@ function ViewportCameraRig({
   );
 }
 
-export function SceneRoot() {
+export function SceneRoot({
+  showCameraRigs = true,
+  showGround = true,
+  showOnlyCharacters = false,
+  focusCharacterId,
+  onPoseControlChange,
+  poseHandleInteractionMode = "persistent",
+}: {
+  showCameraRigs?: boolean;
+  showGround?: boolean;
+  showOnlyCharacters?: boolean;
+  focusCharacterId?: string | null;
+  onPoseControlChange?: (characterId: string, controls: Record<string, number>) => void;
+  poseHandleInteractionMode?: "persistent" | "hold";
+} = {}) {
   const scene = useDirectorStore((state) => state.project.scene);
   const assets = useDirectorStore((state) => state.project.assets);
   const objects = useDirectorStore((state) => state.project.objects);
@@ -797,7 +1407,7 @@ export function SceneRoot() {
       rotation={scene.rotation}
       scale={[scene.scale, scene.scale, scene.scale]}
     >
-      {scene.showGround ? (
+      {showGround && scene.showGround ? (
         <mesh position={[0, scene.groundHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[200, 200]} />
           <meshBasicMaterial
@@ -811,7 +1421,13 @@ export function SceneRoot() {
         </mesh>
       ) : null}
       {objects
-        .filter((item) => item.visible && item.kind !== "camera")
+        .filter(
+          (item) =>
+            item.visible &&
+            item.kind !== "camera" &&
+            (!showOnlyCharacters || item.kind === "character") &&
+            (!focusCharacterId || item.id === focusCharacterId)
+        )
         .map((item) => {
           const asset = item.assetRefId ? assetsById.get(item.assetRefId) : undefined;
 
@@ -826,6 +1442,8 @@ export function SceneRoot() {
               transformable={!item.locked}
               translationSnap={translationSnap}
               onSelect={handleObjectSelect}
+              onPoseControlChange={onPoseControlChange}
+              poseHandleInteractionMode={poseHandleInteractionMode}
             />
           );
         })}
@@ -842,7 +1460,7 @@ export function SceneRoot() {
           />
         )
       )}
-      {viewMode === "director"
+      {showCameraRigs && viewMode === "director"
         ? cameras
             .map((camera) => ({ camera, object: cameraObjectsByCameraId.get(camera.id) }))
             .filter(({ object }) => object?.visible ?? true)

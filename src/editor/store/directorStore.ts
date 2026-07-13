@@ -5,7 +5,11 @@ import type {
   DirectorAssetRef,
   DirectorAssetSource,
   CharacterBodyType,
+  CharacterActionTrack,
+  CharacterMotionClip,
   DirectorAssetKind,
+  DirectorCameraAnimation,
+  DirectorCameraAnimationKeyframe,
   DirectorCameraCapture,
   DirectorCameraShot,
   DirectorObject,
@@ -14,6 +18,7 @@ import type {
   GeometryPrimitiveType,
   PanoramaProjectionMode,
   SceneSettings,
+  ScenePlan,
   ViewMode,
 } from "../schema/directorProject";
 import type { PosePresetId } from "../schema/poseSchema";
@@ -35,6 +40,7 @@ export interface ImportedAssetInput {
   addToScene?: boolean;
   assetSource?: DirectorAssetSource;
   projectionMode?: PanoramaProjectionMode;
+  animated?: boolean;
 }
 
 export interface CameraShotSnapshot {
@@ -48,6 +54,10 @@ export interface CrowdCharactersInput {
   rows: number;
   columns: number;
   spacing: number;
+}
+
+function withoutMediaPoseControls(controls: Record<string, number>) {
+  return Object.fromEntries(Object.entries(controls).filter(([key]) => !key.startsWith("mediaPose.")));
 }
 
 export interface DirectorStateOptions {
@@ -66,6 +76,8 @@ export interface DirectorUiState {
   viewportAspectRatio: ViewportAspectRatio;
   viewportRuleOfThirdsEnabled: boolean;
   viewportPanelsCollapsed: boolean;
+  cameraMonitorCollapsed: boolean;
+  poseEditMode: boolean;
 }
 
 export interface DirectorState extends DirectorUiState {
@@ -93,6 +105,8 @@ export interface DirectorActions {
   setViewportRuleOfThirdsEnabled: (enabled: boolean) => void;
   toggleViewportPanelsCollapsed: () => void;
   setViewportPanelsCollapsed: (collapsed: boolean) => void;
+  setCameraMonitorCollapsed: (collapsed: boolean) => void;
+  setPoseEditMode: (enabled: boolean) => void;
   selectObject: (id: string | null) => void;
   selectCrowd: (crowdId: string | null) => void;
   toggleObjectSelection: (id: string) => void;
@@ -110,21 +124,44 @@ export interface DirectorActions {
   updateUniformScale: (id: string, scale: number) => void;
   updateCrowdUniformScale: (crowdId: string, scale: number) => void;
   addImportedAsset: (input: ImportedAssetInput) => void;
+  attachImportedAssetToCharacter: (id: string, input: ImportedAssetInput) => boolean;
+  clearCharacterAsset: (id: string) => void;
   addObjectFromAsset: (assetId: string) => string | null;
   addPresetCharacter: (bodyType?: CharacterBodyType) => void;
   addCrowdCharacters: (input: CrowdCharactersInput) => string[];
   addGeometryPrimitive: (geometryType: GeometryPrimitiveType) => void;
   addCameraShot: (snapshot?: CameraShotSnapshot) => string;
+  addCameraAnimation: (input: {
+    cameraId: string;
+    name?: string;
+    keyframes: DirectorCameraAnimationKeyframe[];
+  }) => string;
+  deleteCameraAnimation: (animationId: string) => void;
+  replaceCameraAnimations: (animations: DirectorCameraAnimation[]) => void;
   deleteSelectedObject: () => void;
   toggleObjectVisible: (id: string) => void;
   toggleObjectLocked: (id: string) => void;
   applyPosePreset: (id: string, presetId: PosePresetId) => void;
   applyCrowdPosePreset: (crowdId: string, presetId: PosePresetId) => void;
   updatePoseControl: (id: string, key: string, value: number) => void;
+  updatePoseControls: (id: string, controls: Record<string, number>) => void;
+  replacePoseControls: (id: string, controls: Record<string, number>) => void;
   updateCrowdPoseControl: (crowdId: string, key: string, value: number) => void;
+  setCharacterActionTrack: (id: string, track: CharacterActionTrack | null) => void;
+  setCrowdCharacterActionTrack: (crowdId: string, track: CharacterActionTrack | null) => void;
+  addCharacterMotionClip: (input: Omit<CharacterMotionClip, "id">) => string;
+  deleteCharacterMotionClip: (clipId: string) => void;
+  setScenePlan: (plan: ScenePlan | null) => void;
   setActiveCamera: (cameraId: string) => void;
   addCameraCaptures: (cameraId: string | null | undefined, dataUrls: string[]) => void;
   updateCamera: (
+    cameraId: string,
+    patch: Partial<DirectorCameraShot> & {
+      transform?: DirectorTransform;
+      target?: [number, number, number];
+    }
+  ) => void;
+  updateCameraForPlayback: (
     cameraId: string,
     patch: Partial<DirectorCameraShot> & {
       transform?: DirectorTransform;
@@ -137,6 +174,7 @@ export interface DirectorActions {
   pasteClipboardObjects: () => void;
   undo: () => void;
   openScopedScene: (scopeId: string | null | undefined) => void;
+  resetDirectorDesk: () => void;
   replaceProject: (project: DirectorProject) => void;
   saveLatestSnapshot: () => void;
   restoreLatestSnapshot: () => void;
@@ -155,6 +193,7 @@ const DEFAULT_SCENE: SceneSettings = {
   panoramaRadius: 60,
   showLabels: true,
   snapToGrid: false,
+  showGrid: true,
   showGround: true,
   groundOpacity: 0.4,
   groundHeight: 0,
@@ -187,6 +226,8 @@ const DEFAULT_UI_STATE: DirectorUiState = {
   viewportAspectRatio: "auto",
   viewportRuleOfThirdsEnabled: false,
   viewportPanelsCollapsed: false,
+  cameraMonitorCollapsed: false,
+  poseEditMode: false,
 };
 
 function normalizeDirectorScenePersistenceScopeId(scopeId: string | null | undefined) {
@@ -339,11 +380,114 @@ function withPersistedLocalAssets(project: DirectorProject, includePersistedLoca
   };
 }
 
-function migrateDirectorProject(project: DirectorProject): DirectorProject {
+function isSafeAsset(asset: unknown): asset is DirectorAssetRef {
+  return Boolean(
+    asset &&
+      typeof asset === "object" &&
+      typeof (asset as DirectorAssetRef).id === "string" &&
+      typeof (asset as DirectorAssetRef).fileName === "string" &&
+      typeof (asset as DirectorAssetRef).url === "string" &&
+      ((asset as DirectorAssetRef).sourceType === "model" || (asset as DirectorAssetRef).sourceType === "image")
+  );
+}
+
+function isFiniteVector(value: unknown, length: number) {
+  return Array.isArray(value) && value.length === length && value.every((entry) => typeof entry === "number" && Number.isFinite(entry));
+}
+
+function isSafeObject(object: unknown): object is DirectorObject {
+  const value = object as DirectorObject | null;
+  return Boolean(
+    value &&
+      typeof value.id === "string" &&
+      typeof value.name === "string" &&
+      ["character", "scene", "prop", "camera", "panorama"].includes(value.kind) &&
+      value.transform &&
+      isFiniteVector(value.transform.position, 3) &&
+      isFiniteVector(value.transform.rotation, 3) &&
+      isFiniteVector(value.transform.scale, 3)
+  );
+}
+
+function isSafeCamera(camera: unknown): camera is DirectorCameraShot {
+  const value = camera as DirectorCameraShot | null;
+  return Boolean(
+    value &&
+      typeof value.id === "string" &&
+      typeof value.name === "string" &&
+      typeof value.fov === "number" &&
+      value.transform &&
+      isFiniteVector(value.transform.position, 3) &&
+      isFiniteVector(value.target, 3)
+  );
+}
+
+function isSafeMotionClip(clip: unknown): clip is CharacterMotionClip {
+  const value = clip as CharacterMotionClip | null;
+  return Boolean(
+    value &&
+      typeof value.id === "string" &&
+      typeof value.characterId === "string" &&
+      typeof value.name === "string" &&
+      typeof value.duration === "number" &&
+      Number.isFinite(value.duration) &&
+      Array.isArray(value.frames) &&
+      value.frames.every(
+        (frame) =>
+          frame &&
+          typeof frame.time === "number" &&
+          Number.isFinite(frame.time) &&
+          frame.controls &&
+          typeof frame.controls === "object" &&
+          Object.values(frame.controls).every((control) => typeof control === "number" && Number.isFinite(control))
+      )
+  );
+}
+
+function migrateDirectorProject(project: DirectorProject | null | undefined): DirectorProject {
+  const fallback = createDefaultDirectorProject();
+  if (!project || typeof project !== "object" || !Array.isArray(project.assets) || !Array.isArray(project.objects) || !Array.isArray(project.cameras)) {
+    return fallback;
+  }
+
+  const assets = project.assets.filter(isSafeAsset);
+  const objects = project.objects.filter(isSafeObject);
+  const cameras = project.cameras.filter(isSafeCamera);
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const cameraIds = new Set(cameras.map((camera) => camera.id));
+
   return {
     ...project,
-    objects: project.objects.map((object) => {
+    assets,
+    cameras,
+    scene: {
+      ...fallback.scene,
+      ...(project.scene && typeof project.scene === "object" ? project.scene : {}),
+      showGrid: project.scene?.showGrid ?? true,
+    },
+    cameraAnimations: (project.cameraAnimations ?? []).filter(
+      (animation) =>
+        animation &&
+        typeof animation.id === "string" &&
+        typeof animation.cameraId === "string" &&
+        cameraIds.has(animation.cameraId) &&
+        Array.isArray(animation.keyframes)
+    ),
+    characterMotionClips: (project.characterMotionClips ?? []).filter(isSafeMotionClip),
+    scenePlan: project.scenePlan ?? null,
+    objects: objects.map((object) => {
       if (object.kind !== "character") return object;
+
+      const asset = object.assetRefId ? assetsById.get(object.assetRefId) : undefined;
+      // Older AnimoFlow runs referenced a transient service URL. It cannot survive a
+      // director-desk restart, so keep the role editable as a standard mannequin.
+      if (asset?.url.startsWith("/api/animoflow/files/")) {
+        return {
+          ...object,
+          assetRefId: undefined,
+          characterActionTrack: undefined,
+        };
+      }
 
       const rig = object.characterRig;
       if (rig?.rigType === "ue4-mannequin") return object;
@@ -371,6 +515,10 @@ function extractPersistedDirectorState(state: DirectorRuntimeState): DirectorSta
     viewportAspectRatio: state.viewportAspectRatio,
     viewportRuleOfThirdsEnabled: state.viewportRuleOfThirdsEnabled,
     viewportPanelsCollapsed: state.viewportPanelsCollapsed,
+    cameraMonitorCollapsed: state.cameraMonitorCollapsed,
+    // Pose editing is a transient tool. Restoring it on a later launch can lock
+    // the viewport unexpectedly before the user explicitly opens the editor.
+    poseEditMode: false,
     project: state.project,
   });
 }
@@ -425,6 +573,8 @@ function readPersistedDirectorState(options: DirectorStateOptions = {}): Directo
       viewportAspectRatio: state.viewportAspectRatio ?? "auto",
       viewportRuleOfThirdsEnabled: Boolean(state.viewportRuleOfThirdsEnabled),
       viewportPanelsCollapsed: Boolean(state.viewportPanelsCollapsed),
+      cameraMonitorCollapsed: Boolean(state.cameraMonitorCollapsed),
+      poseEditMode: false,
       project: withPersistedLocalAssets(
         migrateDirectorProject(cloneJsonValue(state.project)),
         options.includePersistedLocalAssets
@@ -501,8 +651,11 @@ export function createDefaultDirectorProject({
     assets: includePersistedLocalAssets ? readPersistedLocalModelAssets() : [],
     objects: [role, cameraObject],
     cameras: [camera],
+    cameraAnimations: [],
+    characterMotionClips: [],
     activeCameraId: camera.id,
     panoramaAssetId: null,
+    scenePlan: null,
   };
 }
 
@@ -1154,6 +1307,11 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         ...state,
         viewportPanelsCollapsed: collapsed,
       })),
+    setCameraMonitorCollapsed: (collapsed) =>
+      commitUiMutation((state) => ({
+        ...state,
+        cameraMonitorCollapsed: collapsed,
+      })),
     setViewMode: (mode) =>
       commitUiMutation((state) => ({
         ...state,
@@ -1185,6 +1343,11 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           },
         };
       }),
+    setPoseEditMode: (enabled) =>
+      commitUiMutation((state) => ({
+        ...state,
+        poseEditMode: enabled,
+      })),
     selectCrowd: (crowdId) =>
       commitUiMutation((state) => {
         if (!crowdId) {
@@ -1507,6 +1670,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           url: input.url,
           assetSource: input.kind === "panorama" ? undefined : (input.assetSource ?? "local"),
           projectionMode: input.projectionMode,
+          animated: input.animated,
         } satisfies DirectorAssetRef;
 
         if (input.kind === "panorama") {
@@ -1548,6 +1712,75 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             ...state.project,
             assets: [...state.project.assets, nextAsset],
             objects: [...state.project.objects, nextObject],
+          },
+        };
+      }),
+    attachImportedAssetToCharacter: (id, input) => {
+      let attached = false;
+
+      commitMutation((state) => {
+        const character = state.project.objects.find((item) => item.id === id && item.kind === "character");
+        if (!character) return state;
+
+        const assetId = getNextSequentialId(
+          state.project.assets.map((item) => item.id),
+          "asset_",
+          state.project.assets.length + 1
+        );
+        const asset = {
+          id: assetId,
+          kind: "character" as const,
+          sourceType: "model" as const,
+          fileName: input.fileName,
+          name: input.name,
+          url: input.url,
+          assetSource: input.assetSource ?? "local",
+          animated: input.animated,
+        } satisfies DirectorAssetRef;
+        attached = true;
+
+        return {
+          ...state,
+          selectedObjectId: id,
+          selectedObjectIds: [id],
+          selectedCrowdId: null,
+          directorInspectorMode: "auto",
+          project: {
+            ...state.project,
+            assets: [...state.project.assets, asset],
+            objects: updateObjectById(state.project.objects, id, (item) => ({
+              ...item,
+              assetRefId: assetId,
+            })),
+          },
+        };
+      });
+
+      return attached;
+    },
+    clearCharacterAsset: (id) =>
+      commitMutation((state) => {
+        const character = state.project.objects.find((item) => item.id === id && item.kind === "character");
+        if (!character?.assetRefId) return state;
+        const detachedAssetId = character.assetRefId;
+        const detachedAsset = state.project.assets.find((asset) => asset.id === detachedAssetId);
+        const usedByAnotherObject = state.project.objects.some(
+          (item) => item.id !== id && item.assetRefId === detachedAssetId
+        );
+        const shouldRemoveDetachedAsset =
+          !usedByAnotherObject && Boolean(detachedAsset?.url.startsWith("/api/generated-animations/"));
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            assets: shouldRemoveDetachedAsset
+              ? state.project.assets.filter((asset) => asset.id !== detachedAssetId)
+              : state.project.assets,
+            objects: updateObjectById(state.project.objects, id, (item) => ({
+              ...item,
+              assetRefId: undefined,
+              characterRig: item.characterRig ?? { rigType: "ue4-mannequin", posePresetId: "stand", controls: {} },
+            })),
           },
         };
       }),
@@ -1740,6 +1973,56 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
 
       return nextCameraId;
     },
+    addCameraAnimation: ({ cameraId, name, keyframes }) => {
+      let nextAnimationId = "";
+
+      commitMutation((state) => {
+        const camera = state.project.cameras.find((item) => item.id === cameraId);
+        if (!camera || keyframes.length < 2) return state;
+
+        const animationIndex = state.project.cameraAnimations.length + 1;
+        const animationId = getNextSequentialId(
+          state.project.cameraAnimations.map((item) => item.id),
+          "cam_anim_",
+          animationIndex
+        );
+        nextAnimationId = animationId;
+
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            cameraAnimations: [
+              ...state.project.cameraAnimations,
+              {
+                id: animationId,
+                name: name ?? `${camera.name}-轨迹${String(animationIndex).padStart(2, "0")}`,
+                cameraId,
+                keyframes: cloneJsonValue(keyframes),
+              },
+            ],
+          },
+        };
+      });
+
+      return nextAnimationId;
+    },
+    deleteCameraAnimation: (animationId) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          cameraAnimations: state.project.cameraAnimations.filter((animation) => animation.id !== animationId),
+        },
+      })),
+    replaceCameraAnimations: (animations) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          cameraAnimations: cloneJsonValue(animations),
+        },
+      })),
     deleteSelectedObject: () =>
       commitMutation((state) => {
         const selectedObjectIds = getOrderedSelectedObjectIds(state);
@@ -1762,6 +2045,9 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         const nextCameras = linkedCameraIds.size
           ? state.project.cameras.filter((camera) => !linkedCameraIds.has(camera.id))
           : state.project.cameras;
+        const nextCameraAnimations = linkedCameraIds.size
+          ? state.project.cameraAnimations.filter((animation) => !linkedCameraIds.has(animation.cameraId))
+          : state.project.cameraAnimations;
         const selectedObjectIdSet = new Set(selectedObjectIds);
         const nextFocusedCameras = nextCameras.map((camera) =>
           camera.targetObjectId && selectedObjectIdSet.has(camera.targetObjectId)
@@ -1787,10 +2073,11 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             .filter(
               (assetRefId): assetRefId is string => {
                 if (typeof assetRefId !== "string" || remainingAssetRefIds.has(assetRefId)) return false;
-                return assetsById.get(assetRefId)?.assetSource !== "local";
+                return assetsById.has(assetRefId);
               }
             )
         );
+        removedAssetRefIds.forEach(removePersistedLocalModelAsset);
 
         return {
           ...state,
@@ -1803,6 +2090,10 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             assets: state.project.assets.filter((item) => !removedAssetRefIds.has(item.id)),
             objects: nextObjects,
             cameras: nextFocusedCameras,
+            cameraAnimations: nextCameraAnimations,
+            characterMotionClips: (state.project.characterMotionClips ?? []).filter((clip) =>
+              nextObjects.some((object) => object.kind === "character" && object.id === clip.characterId)
+            ),
             activeCameraId: nextActiveCameraId,
           },
         };
@@ -1885,13 +2176,51 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             characterRig: item.characterRig
               ? {
                   ...item.characterRig,
+                  posePresetId: null,
                   controls: {
-                    ...item.characterRig.controls,
+                    ...withoutMediaPoseControls(item.characterRig.controls),
                     [key]: value,
                   },
                 }
               : item.characterRig,
             })),
+        },
+      })),
+    updatePoseControls: (id, controls) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({
+            ...item,
+            characterRig: item.characterRig
+              ? {
+                  ...item.characterRig,
+                  posePresetId: null,
+                  controls: {
+                    ...withoutMediaPoseControls(item.characterRig.controls),
+                    ...controls,
+                  },
+                }
+              : item.characterRig,
+          })),
+        },
+      })),
+    replacePoseControls: (id, controls) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({
+            ...item,
+            characterRig: item.characterRig
+              ? {
+                  ...item.characterRig,
+                  posePresetId: null,
+                  controls: cloneJsonValue(controls),
+                }
+              : item.characterRig,
+          })),
         },
       })),
     updateCrowdPoseControl: (crowdId, key, value) =>
@@ -1906,6 +2235,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
                   characterRig: item.characterRig
                     ? {
                         ...item.characterRig,
+                        posePresetId: null,
                         controls: {
                           ...item.characterRig.controls,
                           [key]: value,
@@ -1915,6 +2245,75 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
                 }
               : item
           ),
+        },
+      })),
+    setCharacterActionTrack: (id, track) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) =>
+            item.kind === "character" ? { ...item, characterActionTrack: track ? cloneJsonValue(track) : undefined } : item
+          ),
+        },
+      })),
+    setCrowdCharacterActionTrack: (crowdId, track) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: state.project.objects.map((item) =>
+            item.kind === "character" && item.crowdId === crowdId
+              ? { ...item, characterActionTrack: track ? cloneJsonValue(track) : undefined }
+              : item
+          ),
+        },
+      })),
+    addCharacterMotionClip: (input) => {
+      let clipId = "";
+
+      commitMutation((state) => {
+        const clips = state.project.characterMotionClips ?? [];
+        clipId = getNextSequentialId(
+          clips.map((clip) => clip.id),
+          "mocap_",
+          clips.length + 1
+        );
+        const clip: CharacterMotionClip = {
+          ...cloneJsonValue(input),
+          id: clipId,
+          duration: Math.max(input.duration, 0.1),
+        };
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            characterMotionClips: [...clips, clip],
+          },
+        };
+      });
+
+      return clipId;
+    },
+    deleteCharacterMotionClip: (clipId) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          characterMotionClips: (state.project.characterMotionClips ?? []).filter((clip) => clip.id !== clipId),
+          objects: state.project.objects.map((object) =>
+            object.characterActionTrack?.motionClipId === clipId
+              ? { ...object, characterActionTrack: undefined }
+              : object
+          ),
+        },
+      })),
+    setScenePlan: (plan) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          scenePlan: plan ? cloneJsonValue(plan) : null,
         },
       })),
     setActiveCamera: (cameraId) =>
@@ -1980,13 +2379,46 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
                 }
               : item
           ),
-          objects: state.project.objects.map((item) =>
-            item.kind === "camera" && item.linkedCameraId === cameraId && patch.transform
-              ? { ...item, transform: patch.transform }
-              : item
+            objects: state.project.objects.map((item) =>
+              item.kind === "camera" && item.linkedCameraId === cameraId
+                ? {
+                    ...item,
+                    name: typeof patch.name === "string" ? patch.name : item.name,
+                    transform: patch.transform ?? item.transform,
+                  }
+                : item
           ),
         },
       })),
+    updateCameraForPlayback: (cameraId, patch) =>
+      commitMutation(
+        (state) => ({
+          ...state,
+          project: {
+            ...state.project,
+            cameras: state.project.cameras.map((item) =>
+              item.id === cameraId
+                ? {
+                    ...item,
+                    ...patch,
+                    transform: patch.transform ?? item.transform,
+                    target: patch.target ?? item.target,
+                  }
+                : item
+            ),
+            objects: state.project.objects.map((item) =>
+              item.kind === "camera" && item.linkedCameraId === cameraId
+                ? {
+                    ...item,
+                    name: typeof patch.name === "string" ? patch.name : item.name,
+                    transform: patch.transform ?? item.transform,
+                  }
+                : item
+            ),
+          },
+        }),
+        { trackUndo: false, persist: false }
+      ),
     copySelectedObjects: () => {
       const currentState = get() as DirectorRuntimeState;
       const clipboard = buildClipboardEntries(currentState);
@@ -2029,10 +2461,23 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
       });
       writePersistedDirectorState(snapshot);
     },
+    resetDirectorDesk: () =>
+      commitMutation((state) => ({
+        ...state,
+        ...DEFAULT_UI_STATE,
+        project: createDefaultDirectorProject(),
+        selectedObjectId: null,
+        selectedObjectIds: [],
+        selectedCrowdId: null,
+        directorInspectorMode: "auto",
+      })),
     replaceProject: (project) =>
       commitMutation((state) => ({
         ...state,
-        project: cloneJsonValue(project),
+        poseEditMode: false,
+        viewMode: "director",
+        cameraMonitorCollapsed: false,
+        project: migrateDirectorProject(cloneJsonValue(project)),
         selectedObjectId: null,
         selectedObjectIds: [],
         selectedCrowdId: null,

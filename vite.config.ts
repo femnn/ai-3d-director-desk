@@ -14,6 +14,7 @@ export default defineConfig({
     },
   },
   test: {
+    exclude: ["versions/**", "release/**", "node_modules/**", "dist/**"],
     environment: "jsdom",
     globals: true,
     pool: "threads",

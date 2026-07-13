@@ -18,6 +18,7 @@ import { VIEWPORT_OBJECT_LABEL_VERTICAL_GAP } from "../schema/viewportLabels";
 import type { CharacterBodyType } from "./mannequin/bodyTypes";
 import {
   UE4_MANNEQUIN_MODEL_URL,
+  UE4_MANNEQUIN_BONE_MAP,
   getUE4ModelScale,
 } from "./ue4Mannequin/ue4MannequinRig";
 import { applyUE4RestPoseAndRig, captureUE4RestPose } from "./ue4Mannequin/ue4MannequinPoseApplication";
@@ -26,6 +27,7 @@ interface UE4MannequinModelProps {
   bodyType?: CharacterBodyType;
   color?: string;
   onLabelAnchorYChange?: (anchorY: number) => void;
+  onJointPositionsChange?: (positions: Record<string, [number, number, number]>) => void;
   rigState?: CharacterRigState;
 }
 
@@ -128,6 +130,7 @@ export function UE4MannequinModel({
   bodyType = "mannequin",
   color = "#F3F5F7",
   onLabelAnchorYChange,
+  onJointPositionsChange,
   rigState,
 }: UE4MannequinModelProps) {
   const gltf = useLoader(GLTFLoader, UE4_MANNEQUIN_MODEL_URL) as LoadedGLTF;
@@ -137,12 +140,17 @@ export function UE4MannequinModel({
 
   useLayoutEffect(() => {
     isolateAndTintUE4MannequinMaterials(scene, color);
+  }, [color, scene]);
 
+  useLayoutEffect(() => {
     applyUE4RestPoseAndRig(scene, {
       bodyType,
       controls: rigState?.controls ?? {},
       restPose,
     });
+  }, [bodyType, restPose, rigState?.controls, scene]);
+
+  useLayoutEffect(() => {
     alignUE4MannequinToGround(scene);
 
     const modelRoot = scene.parent ?? scene;
@@ -152,7 +160,24 @@ export function UE4MannequinModel({
     if (Number.isFinite(labelAnchorY)) {
       onLabelAnchorYChange?.(Number(labelAnchorY.toFixed(4)));
     }
-  }, [bodyType, color, onLabelAnchorYChange, restPose, rigState?.controls, scene]);
+  }, [bodyType, onLabelAnchorYChange, scene]);
+
+  useLayoutEffect(() => {
+    if (!onJointPositionsChange) return;
+    const handleRoot = scene.parent?.parent ?? scene.parent ?? scene;
+    handleRoot.updateMatrixWorld(true);
+    const inverse = new Matrix4().copy(handleRoot.matrixWorld).invert();
+    const point = new Vector3();
+    const positions: Record<string, [number, number, number]> = {};
+    Object.entries(UE4_MANNEQUIN_BONE_MAP).forEach(([joint, boneName]) => {
+      const bone = scene.getObjectByName(boneName);
+      if (!bone) return;
+      bone.getWorldPosition(point);
+      point.applyMatrix4(inverse);
+      positions[joint] = [Number(point.x.toFixed(4)), Number(point.y.toFixed(4)), Number(point.z.toFixed(4))];
+    });
+    onJointPositionsChange?.(positions);
+  }, [onJointPositionsChange, rigState?.controls, scene]);
 
   return (
     <group name={`ue-retopology-mannequin-${bodyType}`} scale={modelScale}>
