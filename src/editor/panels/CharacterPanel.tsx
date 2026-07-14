@@ -461,6 +461,7 @@ export function CharacterPanel() {
         </InspectorSection>
       ) : (
         <InspectorSection title="角色动作" className="pose-preset-section">
+          {!isCrowd ? <AnimoFlowActionGenerator character={role} /> : null}
           <InspectorSelectField
             label="动作"
             ariaLabel="角色动作"
@@ -541,7 +542,6 @@ export function CharacterPanel() {
               ))}
             </section>
           ) : null}
-          {!isCrowd ? <AnimoFlowActionGenerator character={role} /> : null}
         </InspectorSection>
       )}
     </InspectorPanel>

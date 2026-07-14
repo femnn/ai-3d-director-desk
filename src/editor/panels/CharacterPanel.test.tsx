@@ -76,6 +76,18 @@ it("marks the pose adjustment section for the compact character inspector layout
   expect(screen.getByText("姿势调节").closest(".inspector-section")).toHaveClass("pose-adjust-section");
 });
 
+it("keeps the AnimoFlow prompt visible before the built-in action controls", async () => {
+  const user = userEvent.setup();
+  render(<CharacterPanel />);
+
+  await user.click(screen.getByRole("button", { name: "动作" }));
+
+  const generator = screen.getByLabelText("AnimoFlow 动作生成");
+  const actionControl = screen.getByLabelText("角色动作");
+  expect(screen.getByLabelText("AnimoFlow 动作描述")).toHaveValue("一个人自然地端起茶杯喝茶，再放回桌上");
+  expect(generator.compareDocumentPosition(actionControl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it("adjusts axis values by dragging the gray XYZ prefix handles", () => {
   render(<CharacterPanel />);
 

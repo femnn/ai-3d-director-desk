@@ -3933,9 +3933,9 @@ body.phone-immersive .phone-action-grid button {
 .animoflow-generator {
   display: grid;
   gap: 9px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid rgb(var(--border-rgb) / 0.24);
+  margin: 0 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgb(var(--border-rgb) / 0.24);
 }
 
 .animoflow-generator-heading {
@@ -3948,6 +3948,7 @@ body.phone-immersive .phone-action-grid button {
 }
 
 .animoflow-generator textarea {
+  width: 100%;
   min-height: 66px;
   resize: vertical;
   border: 1px solid rgb(var(--border-rgb) / 0.42);
