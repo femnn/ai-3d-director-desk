@@ -5,6 +5,7 @@ import type { DirectorProject } from "../editor/schema/directorProject";
 import type { ViewportAspectRatio } from "../editor/schema/viewportAspectRatio";
 import { useDirectorStore } from "../editor/store/directorStore";
 import { setCharacterAnimationElapsedSnapshot } from "../editor/animation/characterAnimation";
+import { setObjectAnimationElapsedSnapshot } from "../editor/animation/objectAnimation";
 import { PhoneCameraPreview } from "./PhoneCameraPreview";
 import { PhoneModeNav } from "./PhoneModeNav";
 import {
@@ -43,6 +44,7 @@ interface DesktopStateMessage {
   viewportAspectRatio?: ViewportAspectRatio;
   cameraDrivenAnimationCameraIds?: string[];
   characterAnimationElapsed?: Record<string, number>;
+  objectAnimationElapsed?: Record<string, number>;
 }
 
 interface LiveCameraState {
@@ -356,6 +358,9 @@ export function PhoneController() {
           if (message.state.characterAnimationElapsed) {
             setCharacterAnimationElapsedSnapshot(message.state.characterAnimationElapsed);
           }
+          if (message.state.objectAnimationElapsed) {
+            setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);
+          }
           setPreviewAspectRatio((current) => (current === desktopAspectRatio ? current : desktopAspectRatio));
           if (message.state.phonePreviewPending && !previewReady && !message.state.phonePreviewProject) {
             setPreviewReady(false);
@@ -373,6 +378,9 @@ export function PhoneController() {
           if (message.state.phonePreviewProject && previewRevision > previewRevisionRef.current) {
             previewRevisionRef.current = previewRevision;
             useDirectorStore.getState().replaceProject(message.state.phonePreviewProject);
+            if (message.state.objectAnimationElapsed) {
+              setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);
+            }
             setPreviewReady(true);
             if (!liveStateRef.current.recording) setStatus("当前布景已同步");
           }

@@ -95,11 +95,14 @@ npm run dev
 - `add_character` / `update_character`
 - `add_camera` / `set_camera_view`
 - `add_prop` / `delete_object`
+- `add_group` / `update_prop`（父子层级、局部旋转轴和通用物体动画）
 - `capture_shot` / `screenshot`
 - `export_scene_script` / `import_scene_script`
 - `record_camera_animation` / `play_camera_animation`
 
 布景命令使用固定 JSON schema，不接受任意 JavaScript。
+
+`apply_scene_script` 支持递归 `groups[].children` 部件树，以及 `repeat`、`mirror`、`pathCopy`。几何体支持立方体、圆角盒、球体、半球、胶囊体、圆柱体、管道、圆盘、平面、楔形、环状体、圆锥和棱锥。任意组合或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
 
 ### 致谢与来源
 

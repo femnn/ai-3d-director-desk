@@ -7,8 +7,15 @@ const IMPORTED_MODEL_FOCUS_OFFSET_Y = 1;
 
 const GEOMETRY_FOCUS_OFFSET_Y: Record<GeometryPrimitiveType, number> = {
   box: 0.5,
+  "rounded-box": 0.5,
   sphere: 0.55,
+  hemisphere: 0.3,
+  capsule: 0.8,
   cylinder: 0.6,
+  pipe: 0.6,
+  disc: 0.04,
+  plane: 0.01,
+  wedge: 0.5,
   torus: 0.14,
   cone: 0.55,
   pyramid: 0.55,

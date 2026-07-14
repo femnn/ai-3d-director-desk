@@ -40,9 +40,9 @@ export function AgentCommandPanel() {
     try {
       const payload = JSON.parse(script) as unknown;
       const result = await executeDirectorAgentTool("apply_scene_script", payload);
-      const summary = result && typeof result === "object" ? result as { characterIds?: string[]; propIds?: string[]; cameraIds?: string[]; scenePlan?: unknown } : {};
+      const summary = result && typeof result === "object" ? result as { characterIds?: string[]; groupIds?: string[]; propIds?: string[]; cameraIds?: string[]; scenePlan?: unknown } : {};
       setStatus(
-        `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.propIds?.length ?? 0} 个道具、${summary.cameraIds?.length ?? 0} 个机位。已自动截取当前画面供 agent 复查。`
+        `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位。已自动截取当前画面供 agent 复查。`
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "执行失败");

@@ -16,6 +16,7 @@ import type {
   DirectorProject,
   DirectorTransform,
   GeometryPrimitiveType,
+  ObjectAnimationTrack,
   PanoramaProjectionMode,
   SceneSettings,
   ScenePlan,
@@ -29,6 +30,7 @@ import {
   getCameraRigPositionFromViewSnapshot,
 } from "../schema/cameraGeometry";
 import type { ViewportAspectRatio } from "../schema/viewportAspectRatio";
+import { resetObjectAnimationRuntime } from "../animation/objectAnimation";
 
 export type TransformMode = "translate" | "rotate" | "scale";
 
@@ -115,6 +117,8 @@ export interface DirectorActions {
   removePanoramaAsset: () => void;
   removeImportedAsset: (assetId: string) => void;
   updateObjectTransform: (id: string, patch: Partial<DirectorTransform>) => void;
+  updateObjectPivot: (id: string, pivot: [number, number, number]) => void;
+  setObjectParent: (id: string, parentId: string | null) => void;
   updateCrowdTransform: (crowdId: string, patch: Partial<DirectorTransform>) => void;
   updateObjectName: (id: string, name: string) => void;
   updateCrowdLabel: (crowdId: string, label: string) => void;
@@ -130,6 +134,9 @@ export interface DirectorActions {
   addPresetCharacter: (bodyType?: CharacterBodyType) => void;
   addCrowdCharacters: (input: CrowdCharactersInput) => string[];
   addGeometryPrimitive: (geometryType: GeometryPrimitiveType) => void;
+  addGroup: (input?: { name?: string; parentId?: string | null; transform?: Partial<DirectorTransform>; pivot?: [number, number, number] }) => string;
+  groupObjects: (objectIds?: string[], name?: string) => string | null;
+  setObjectAnimationTrack: (id: string, track: ObjectAnimationTrack | null) => void;
   addCameraShot: (snapshot?: CameraShotSnapshot) => string;
   addCameraAnimation: (input: {
     cameraId: string;
@@ -401,7 +408,7 @@ function isSafeObject(object: unknown): object is DirectorObject {
     value &&
       typeof value.id === "string" &&
       typeof value.name === "string" &&
-      ["character", "scene", "prop", "camera", "panorama"].includes(value.kind) &&
+      ["character", "scene", "prop", "group", "camera", "panorama"].includes(value.kind) &&
       value.transform &&
       isFiniteVector(value.transform.position, 3) &&
       isFiniteVector(value.transform.rotation, 3) &&
@@ -444,6 +451,51 @@ function isSafeMotionClip(clip: unknown): clip is CharacterMotionClip {
   );
 }
 
+function normalizeObjectAnimationTrack(track: unknown, objectId: string, objectName: string): ObjectAnimationTrack | undefined {
+  if (!track || typeof track !== "object") return undefined;
+  const value = track as Partial<ObjectAnimationTrack>;
+  const requestedDuration = typeof value.duration === "number" && Number.isFinite(value.duration) ? value.duration : 5;
+  const duration = ([5, 10, 15] as const).reduce((nearest, candidate) =>
+    Math.abs(candidate - requestedDuration) < Math.abs(nearest - requestedDuration) ? candidate : nearest
+  );
+  const keyframes = Array.isArray(value.keyframes)
+    ? value.keyframes.flatMap((keyframe) => {
+        if (!keyframe || typeof keyframe.time !== "number" || !Number.isFinite(keyframe.time)) return [];
+        return [{
+          time: Math.max(0, keyframe.time),
+          position: isFiniteVector(keyframe.position, 3) ? keyframe.position : undefined,
+          rotation: isFiniteVector(keyframe.rotation, 3) ? keyframe.rotation : undefined,
+          scale: isFiniteVector(keyframe.scale, 3) ? keyframe.scale : undefined,
+        }];
+      })
+    : [];
+  const pathPoints = Array.isArray(value.path?.points)
+    ? value.path.points.filter((point): point is [number, number, number] => isFiniteVector(point, 3))
+    : [];
+  return {
+    id: typeof value.id === "string" && value.id.trim() ? value.id : `object_animation_${objectId}`,
+    name: typeof value.name === "string" && value.name.trim() ? value.name : `${objectName}动画`,
+    duration,
+    loop: value.loop !== false,
+    enabled: value.enabled !== false,
+    playbackMode:
+      value.playbackMode === "camera-driven" || value.playbackMode === "recording-sync"
+        ? value.playbackMode
+        : "normal",
+    cameraId: typeof value.cameraId === "string" ? value.cameraId : null,
+    keyframes,
+    path:
+      value.path && pathPoints.length >= 2
+        ? {
+            type: value.path.type === "linear" ? "linear" : "curve",
+            closed: Boolean(value.path.closed),
+            orientToPath: Boolean(value.path.orientToPath),
+            points: pathPoints,
+          }
+        : undefined,
+  };
+}
+
 function migrateDirectorProject(project: DirectorProject | null | undefined): DirectorProject {
   const fallback = createDefaultDirectorProject();
   if (!project || typeof project !== "object" || !Array.isArray(project.assets) || !Array.isArray(project.objects) || !Array.isArray(project.cameras)) {
@@ -455,6 +507,18 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
   const cameras = project.cameras.filter(isSafeCamera);
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const cameraIds = new Set(cameras.map((camera) => camera.id));
+  const objectById = new Map(objects.map((object) => [object.id, object]));
+  const getSafeParentId = (object: DirectorObject) => {
+    if (!object.parentId || object.parentId === object.id || !objectById.has(object.parentId)) return null;
+    const visited = new Set<string>([object.id]);
+    let parentId: string | null | undefined = object.parentId;
+    while (parentId) {
+      if (visited.has(parentId)) return null;
+      visited.add(parentId);
+      parentId = objectById.get(parentId)?.parentId;
+    }
+    return object.parentId;
+  };
 
   return {
     ...project,
@@ -476,24 +540,31 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
     characterMotionClips: (project.characterMotionClips ?? []).filter(isSafeMotionClip),
     scenePlan: project.scenePlan ?? null,
     objects: objects.map((object) => {
-      if (object.kind !== "character") return object;
+      const parentId = getSafeParentId(object);
+      const normalizedObject: DirectorObject = {
+        ...object,
+        parentId,
+        pivot: isFiniteVector(object.pivot, 3) ? object.pivot : [0, 0, 0],
+        objectAnimationTrack: normalizeObjectAnimationTrack(object.objectAnimationTrack, object.id, object.name),
+      };
+      if (object.kind !== "character") return normalizedObject;
 
       const asset = object.assetRefId ? assetsById.get(object.assetRefId) : undefined;
       // Older AnimoFlow runs referenced a transient service URL. It cannot survive a
       // director-desk restart, so keep the role editable as a standard mannequin.
       if (asset?.url.startsWith("/api/animoflow/files/")) {
         return {
-          ...object,
+          ...normalizedObject,
           assetRefId: undefined,
           characterActionTrack: undefined,
         };
       }
 
       const rig = object.characterRig;
-      if (rig?.rigType === "ue4-mannequin") return object;
+      if (rig?.rigType === "ue4-mannequin") return normalizedObject;
 
       return {
-        ...object,
+        ...normalizedObject,
         characterRig: {
           rigType: "ue4-mannequin",
           posePresetId: rig?.posePresetId ?? "stand",
@@ -1508,6 +1579,40 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           },
         };
       }),
+    updateObjectPivot: (id, pivot) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, pivot })),
+        },
+      })),
+    setObjectParent: (id, parentId) =>
+      commitMutation((state) => {
+        const validParentId =
+          parentId && parentId !== id && state.project.objects.some((item) => item.id === parentId)
+            ? parentId
+            : null;
+        const descendants = new Set<string>([id]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          state.project.objects.forEach((item) => {
+            if (item.parentId && descendants.has(item.parentId) && !descendants.has(item.id)) {
+              descendants.add(item.id);
+              changed = true;
+            }
+          });
+        }
+        if (validParentId && descendants.has(validParentId)) return state;
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, parentId: validParentId })),
+          },
+        };
+      }),
     updateCrowdTransform: (crowdId, patch) =>
       commitMutation((state) => {
         const nextTransformState = applyCrowdTransformPatch(state.project.objects, crowdId, patch);
@@ -1917,6 +2022,102 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           },
         };
       }),
+    addGroup: (input = {}) => {
+      let createdGroupId = "";
+      commitMutation((state) => {
+        const groupIndex = state.project.objects.filter((item) => item.kind === "group").length + 1;
+        const groupId = getNextSequentialId(
+          state.project.objects.map((item) => item.id),
+          "group_",
+          groupIndex
+        );
+        createdGroupId = groupId;
+        const group: DirectorObject = {
+          id: groupId,
+          name: input.name?.trim() || `组合${String(groupIndex).padStart(2, "0")}`,
+          kind: "group",
+          visible: true,
+          locked: false,
+          parentId: input.parentId ?? null,
+          pivot: input.pivot ?? [0, 0, 0],
+          transform: {
+            position: input.transform?.position ?? [0, 0, 0],
+            rotation: input.transform?.rotation ?? [0, 0, 0],
+            scale: input.transform?.scale ?? [1, 1, 1],
+          },
+        };
+        return {
+          ...state,
+          selectedObjectId: groupId,
+          selectedObjectIds: [groupId],
+          selectedCrowdId: null,
+          directorInspectorMode: "auto",
+          project: { ...state.project, objects: [...state.project.objects, group] },
+        };
+      });
+      return createdGroupId;
+    },
+    groupObjects: (objectIds, name) => {
+      let createdGroupId: string | null = null;
+      commitMutation((state) => {
+        const requestedIds = objectIds?.length ? objectIds : getOrderedSelectedObjectIds(state);
+        const selected = state.project.objects.filter(
+          (item) => requestedIds.includes(item.id) && item.kind !== "camera" && !item.parentId
+        );
+        if (!selected.length) return state;
+        const center: [number, number, number] = [0, 1, 2].map((axis) =>
+          Number((selected.reduce((sum, item) => sum + item.transform.position[axis], 0) / selected.length).toFixed(4))
+        ) as [number, number, number];
+        const groupId = getNextSequentialId(
+          state.project.objects.map((item) => item.id),
+          "group_",
+          state.project.objects.filter((item) => item.kind === "group").length + 1
+        );
+        createdGroupId = groupId;
+        const group: DirectorObject = {
+          id: groupId,
+          name: name?.trim() || `组合${String(state.project.objects.filter((item) => item.kind === "group").length + 1).padStart(2, "0")}`,
+          kind: "group",
+          visible: true,
+          locked: false,
+          transform: createTransform(center),
+          pivot: [0, 0, 0],
+        };
+        const selectedIds = new Set(selected.map((item) => item.id));
+        const objects = state.project.objects.map((item) =>
+          selectedIds.has(item.id)
+            ? {
+                ...item,
+                parentId: groupId,
+                transform: {
+                  ...item.transform,
+                  position: item.transform.position.map((value, axis) => Number((value - center[axis]).toFixed(4))) as [number, number, number],
+                },
+              }
+            : item
+        );
+        return {
+          ...state,
+          selectedObjectId: groupId,
+          selectedObjectIds: [groupId],
+          selectedCrowdId: null,
+          directorInspectorMode: "auto",
+          project: { ...state.project, objects: [...objects, group] },
+        };
+      });
+      return createdGroupId;
+    },
+    setObjectAnimationTrack: (id, track) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({
+            ...item,
+            objectAnimationTrack: track ?? undefined,
+          })),
+        },
+      })),
     addCameraShot: (snapshot) => {
       let nextCameraId = "";
 
@@ -2028,7 +2229,18 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         const selectedObjectIds = getOrderedSelectedObjectIds(state);
         if (!selectedObjectIds.length) return state;
 
-        const selectedObjects = state.project.objects.filter((item) => selectedObjectIds.includes(item.id));
+        const selectedObjectIdSet = new Set(selectedObjectIds);
+        let foundDescendant = true;
+        while (foundDescendant) {
+          foundDescendant = false;
+          state.project.objects.forEach((item) => {
+            if (item.parentId && selectedObjectIdSet.has(item.parentId) && !selectedObjectIdSet.has(item.id)) {
+              selectedObjectIdSet.add(item.id);
+              foundDescendant = true;
+            }
+          });
+        }
+        const selectedObjects = state.project.objects.filter((item) => selectedObjectIdSet.has(item.id));
         if (!selectedObjects.length) {
           return {
             ...state,
@@ -2048,7 +2260,6 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         const nextCameraAnimations = linkedCameraIds.size
           ? state.project.cameraAnimations.filter((animation) => !linkedCameraIds.has(animation.cameraId))
           : state.project.cameraAnimations;
-        const selectedObjectIdSet = new Set(selectedObjectIds);
         const nextFocusedCameras = nextCameras.map((camera) =>
           camera.targetObjectId && selectedObjectIdSet.has(camera.targetObjectId)
             ? {
@@ -2062,7 +2273,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           state.project.activeCameraId && linkedCameraIds.has(state.project.activeCameraId)
             ? nextFocusedCameras[0]?.id ?? null
             : state.project.activeCameraId;
-        const nextObjects = state.project.objects.filter((item) => !selectedObjectIds.includes(item.id));
+        const nextObjects = state.project.objects.filter((item) => !selectedObjectIdSet.has(item.id));
         const assetsById = new Map(state.project.assets.map((item) => [item.id, item]));
         const remainingAssetRefIds = new Set(
           nextObjects.map((item) => item.assetRefId).filter((assetRefId): assetRefId is string => Boolean(assetRefId))
@@ -2461,7 +2672,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
       });
       writePersistedDirectorState(snapshot);
     },
-    resetDirectorDesk: () =>
+    resetDirectorDesk: () => {
+      resetObjectAnimationRuntime();
       commitMutation((state) => ({
         ...state,
         ...DEFAULT_UI_STATE,
@@ -2470,8 +2682,10 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         selectedObjectIds: [],
         selectedCrowdId: null,
         directorInspectorMode: "auto",
-      })),
-    replaceProject: (project) =>
+      }));
+    },
+    replaceProject: (project) => {
+      resetObjectAnimationRuntime();
       commitMutation((state) => ({
         ...state,
         poseEditMode: false,
@@ -2482,7 +2696,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         selectedObjectIds: [],
         selectedCrowdId: null,
         directorInspectorMode: "auto",
-      })),
+      }));
+    },
     saveLatestSnapshot: () => {
       writePersistedDirectorState(extractPersistedDirectorState(get() as DirectorRuntimeState));
     },

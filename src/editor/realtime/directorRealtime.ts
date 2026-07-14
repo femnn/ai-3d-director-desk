@@ -1,5 +1,6 @@
 import { executeDirectorAgentTool } from "../agent/directorAgent";
 import { getCharacterAnimationElapsedSnapshot, subscribeCharacterAnimationRuntime } from "../animation/characterAnimation";
+import { getObjectAnimationElapsedSnapshot } from "../animation/objectAnimation";
 import {
   getPhoneCameraAssignments,
   getPhoneCameraOwners,
@@ -191,6 +192,7 @@ function buildDesktopState() {
       .filter((object) => object.kind === "character" && object.characterRig?.rigType === "ue4-mannequin" && !object.assetRefId)
       .map((object) => ({ id: object.id, name: object.name, crowdId: object.crowdId ?? null })),
     characterAnimationElapsed: getCharacterAnimationElapsedSnapshot(),
+    objectAnimationElapsed: getObjectAnimationElapsedSnapshot(state.project.objects),
     cameraDrivenAnimationCameraIds: state.project.cameras
       .filter((camera) =>
         state.project.objects.some(

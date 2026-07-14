@@ -18,6 +18,7 @@ const tools = [
   "add_character",
   "update_character",
   "add_prop",
+  "add_group",
   "update_prop",
   "add_camera",
   "set_camera_view",

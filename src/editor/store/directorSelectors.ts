@@ -13,7 +13,7 @@ export function selectRightPanelKind(state: DirectorState): RightPanelKind {
     ? state.project.assets.find((asset) => asset.id === selected.assetRefId)
     : undefined;
   if (selected?.kind === "character") return "character";
-  if (selected?.kind === "prop" || selectedAsset?.sourceType === "model") return "prop";
+  if (selected?.kind === "prop" || selected?.kind === "group" || selectedAsset?.sourceType === "model") return "prop";
   if (selected?.kind === "camera") return "camera";
   if (state.viewMode === "camera") return "camera";
   return "scene";

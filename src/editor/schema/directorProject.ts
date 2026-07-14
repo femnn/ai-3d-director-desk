@@ -1,10 +1,17 @@
 export type ViewMode = "director" | "camera";
 export type RightPanelKind = "scene" | "character" | "prop" | "camera";
-export type DirectorObjectKind = "character" | "scene" | "prop" | "camera" | "panorama";
+export type DirectorObjectKind = "character" | "scene" | "prop" | "group" | "camera" | "panorama";
 export const GEOMETRY_PRIMITIVE_OPTIONS = [
   { type: "box", label: "立方体" },
+  { type: "rounded-box", label: "圆角盒" },
   { type: "sphere", label: "球体" },
+  { type: "hemisphere", label: "半球" },
+  { type: "capsule", label: "胶囊体" },
   { type: "cylinder", label: "圆柱体" },
+  { type: "pipe", label: "管道" },
+  { type: "disc", label: "圆盘" },
+  { type: "plane", label: "平面" },
+  { type: "wedge", label: "楔形" },
   { type: "torus", label: "环状体" },
   { type: "cone", label: "圆锥" },
   { type: "pyramid", label: "棱锥" },
@@ -48,6 +55,35 @@ export interface DirectorTransform {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
+}
+
+export type ObjectAnimationPlaybackMode = "normal" | "recording-sync" | "camera-driven";
+export type ObjectAnimationPathType = "linear" | "curve";
+
+export interface ObjectAnimationKeyframe {
+  time: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+}
+
+export interface ObjectAnimationPath {
+  type: ObjectAnimationPathType;
+  closed: boolean;
+  points: Array<[number, number, number]>;
+  orientToPath?: boolean;
+}
+
+export interface ObjectAnimationTrack {
+  id: string;
+  name: string;
+  duration: 5 | 10 | 15;
+  loop: boolean;
+  enabled: boolean;
+  playbackMode: ObjectAnimationPlaybackMode;
+  cameraId?: string | null;
+  keyframes: ObjectAnimationKeyframe[];
+  path?: ObjectAnimationPath;
 }
 
 export interface SceneSettings {
@@ -105,6 +141,11 @@ export interface ScenePlan {
   }>;
   composition?: string;
   environment?: string;
+  assemblies?: Array<{
+    name: string;
+    parts: string[];
+    motion?: string;
+  }>;
   reviewNotes?: string;
 }
 
@@ -127,6 +168,9 @@ export interface DirectorObject {
   visible: boolean;
   locked: boolean;
   transform: DirectorTransform;
+  /** Transform is local to parentId. Pivot is also expressed in local coordinates. */
+  parentId?: string | null;
+  pivot?: [number, number, number];
   bodyType?: CharacterBodyType;
   color?: string;
   assetRefId?: string;
@@ -136,6 +180,7 @@ export interface DirectorObject {
   linkedCameraId?: string | null;
   characterRig?: CharacterRigState;
   characterActionTrack?: CharacterActionTrack;
+  objectAnimationTrack?: ObjectAnimationTrack;
 }
 
 export interface DirectorCameraCapture {

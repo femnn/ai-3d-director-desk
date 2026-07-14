@@ -17,6 +17,8 @@ import type {
   DirectorProject,
   DirectorTransform,
   GeometryPrimitiveType,
+  ObjectAnimationPlaybackMode,
+  ObjectAnimationTrack,
   PanoramaProjectionMode,
   ScenePlan,
 } from "../schema/directorProject";
@@ -55,6 +57,44 @@ export interface SceneScriptProp {
   rotationY?: number;
   scale?: number | number[];
   color?: string;
+  parentId?: string | null;
+  pivot?: number[];
+  animation?: SceneScriptObjectAnimation;
+  repeat?: {
+    count: number;
+    offset: number[];
+    rotationStep?: number[];
+    scaleStep?: number[];
+  };
+  mirror?: { axis: "x" | "y" | "z" | Array<"x" | "y" | "z"> };
+  pathCopy?: { points: number[][]; count: number; orientToPath?: boolean };
+  children?: Array<SceneScriptGroup | SceneScriptProp>;
+}
+
+export interface SceneScriptObjectAnimation {
+  id?: string;
+  name?: string;
+  duration?: number;
+  loop?: boolean;
+  enabled?: boolean;
+  playbackMode?: ObjectAnimationPlaybackMode;
+  cameraId?: string | null;
+  keyframes?: ObjectAnimationTrack["keyframes"];
+  path?: ObjectAnimationTrack["path"];
+}
+
+export interface SceneScriptGroup {
+  kind?: "group";
+  id?: string;
+  name?: string;
+  position?: number[];
+  rotation?: number[];
+  rotationY?: number;
+  scale?: number | number[];
+  pivot?: number[];
+  parentId?: string | null;
+  animation?: SceneScriptObjectAnimation;
+  children?: Array<SceneScriptGroup | SceneScriptProp>;
 }
 
 export interface SceneScriptCamera {
@@ -77,6 +117,7 @@ export interface SceneScript {
   reset?: boolean;
   characters?: SceneScriptCharacter[];
   props?: SceneScriptProp[];
+  groups?: SceneScriptGroup[];
   camera?: SceneScriptCamera;
   cameras?: SceneScriptCamera[];
   activeCameraId?: string | null;
@@ -181,6 +222,41 @@ function applyCharacterAction(id: string, action: SceneScriptCharacter["action"]
   });
 }
 
+function normalizeObjectAnimation(
+  objectId: string,
+  objectName: string,
+  animation: SceneScriptObjectAnimation | undefined
+): ObjectAnimationTrack | null {
+  if (!animation) return null;
+  const requestedDuration = Number(animation.duration ?? 5);
+  const duration = ([5, 10, 15] as const).reduce((nearest, candidate) =>
+    Math.abs(candidate - requestedDuration) < Math.abs(nearest - requestedDuration) ? candidate : nearest
+  );
+  const playbackMode: ObjectAnimationPlaybackMode =
+    animation.playbackMode === "camera-driven" || animation.playbackMode === "recording-sync"
+      ? animation.playbackMode
+      : "normal";
+  return {
+    id: animation.id?.trim() || `object_animation_${objectId}`,
+    name: animation.name?.trim() || `${objectName}动画`,
+    duration,
+    loop: animation.loop !== false,
+    enabled: animation.enabled !== false,
+    playbackMode,
+    cameraId: typeof animation.cameraId === "string" ? animation.cameraId : null,
+    keyframes: Array.isArray(animation.keyframes) ? animation.keyframes : [],
+    path:
+      animation.path && Array.isArray(animation.path.points) && animation.path.points.length >= 2
+        ? {
+            type: animation.path.type === "linear" ? "linear" : "curve",
+            closed: Boolean(animation.path.closed),
+            orientToPath: Boolean(animation.path.orientToPath),
+            points: animation.path.points.map((point) => toTuple3(point, [0, 0, 0])),
+          }
+        : undefined,
+  };
+}
+
 export function validateScenePlan(value: unknown): { plan: ScenePlan; warnings: string[] } {
   if (!value || typeof value !== "object") throw new Error("ScenePlan 必须是对象");
   const raw = value as Partial<ScenePlan>;
@@ -204,6 +280,15 @@ export function validateScenePlan(value: unknown): { plan: ScenePlan; warnings: 
       roles,
       composition: typeof raw.composition === "string" ? raw.composition.trim() : undefined,
       environment: typeof raw.environment === "string" ? raw.environment.trim() : undefined,
+      assemblies: Array.isArray(raw.assemblies)
+        ? raw.assemblies
+            .filter((assembly) => assembly && typeof assembly.name === "string" && Array.isArray(assembly.parts))
+            .map((assembly) => ({
+              name: assembly.name.trim(),
+              parts: assembly.parts.filter((part): part is string => typeof part === "string" && Boolean(part.trim())),
+              motion: typeof assembly.motion === "string" ? assembly.motion.trim() : undefined,
+            }))
+        : undefined,
       reviewNotes: typeof raw.reviewNotes === "string" ? raw.reviewNotes.trim() : undefined,
     },
     warnings: duplicateRoleNames.length ? [`角色名称重复：${[...new Set(duplicateRoleNames)].join("、")}`] : [],
@@ -219,17 +304,56 @@ function buildScenePlanReview(plan: ScenePlan) {
     missingRoles,
     characterCount: project.objects.filter((object) => object.kind === "character").length,
     propCount: project.objects.filter((object) => object.kind === "prop" || object.kind === "scene").length,
+    groupCount: project.objects.filter((object) => object.kind === "group").length,
+    animatedObjectCount: project.objects.filter((object) => object.objectAnimationTrack?.enabled).length,
     cameraCount: project.cameras.length,
     nextStep: missingRoles.length ? "补充缺失角色后再次截图检查构图" : "查看截图，按构图与道具关系提交修正命令",
   };
 }
 
+function buildAssemblyReview() {
+  const objects = useDirectorStore
+    .getState()
+    .project.objects.filter((object) => object.kind === "prop" && object.geometryType);
+  const potentialIntersections: Array<{ parentId: string | null; objects: [string, string] }> = [];
+  for (let leftIndex = 0; leftIndex < objects.length; leftIndex += 1) {
+    const left = objects[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < objects.length; rightIndex += 1) {
+      const right = objects[rightIndex];
+      if ((left.parentId ?? null) !== (right.parentId ?? null)) continue;
+      const overlapAxes = left.transform.position.map((value, axis) => {
+        const halfExtent = (Math.abs(left.transform.scale[axis]) + Math.abs(right.transform.scale[axis])) * 0.5;
+        return halfExtent - Math.abs(value - right.transform.position[axis]);
+      });
+      const minimumScale = Math.min(
+        ...left.transform.scale.map(Math.abs),
+        ...right.transform.scale.map(Math.abs)
+      );
+      if (overlapAxes.every((overlap) => overlap > minimumScale * 0.35)) {
+        potentialIntersections.push({ parentId: left.parentId ?? null, objects: [left.name, right.name] });
+      }
+    }
+  }
+  return {
+    groupCount: useDirectorStore.getState().project.objects.filter((object) => object.kind === "group").length,
+    animatedObjectCount: useDirectorStore.getState().project.objects.filter((object) => object.objectAnimationTrack?.enabled).length,
+    potentialIntersections: potentialIntersections.slice(0, 20),
+    reviewInstruction: "结合返回截图检查轮廓、比例和部件穿插；必要时用 update_prop 提交局部坐标修正。",
+  };
+}
+
 async function captureScenePlanReview() {
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
-  });
-  const captures = await requestViewportCapture({ preset: "current", source: "capture-panel" });
-  return captures[0]?.dataUrl ?? null;
+  try {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    });
+    const captures = await requestViewportCapture({ preset: "current", source: "capture-panel" });
+    return captures[0]?.dataUrl ?? null;
+  } catch {
+    // Scene creation must not fail merely because the viewport capture bridge is
+    // still mounting after a cold start or a large asset import.
+    return null;
+  }
 }
 
 function findObject(idOrName: unknown, kind?: DirectorObject["kind"]) {
@@ -317,18 +441,43 @@ export function addProp(input: SceneScriptProp = {}) {
     rotation: normalizeRotation(input, prop.transform.rotation),
     scale: toScaleTuple(input.scale, preset?.scale ?? prop.transform.scale),
   });
+  if (input.parentId) nextState.setObjectParent(prop.id, input.parentId);
+  if (input.pivot) nextState.updateObjectPivot(prop.id, toTuple3(input.pivot, [0, 0, 0]));
+  const animation = normalizeObjectAnimation(prop.id, input.name ?? preset?.name ?? prop.name, input.animation);
+  if (animation) nextState.setObjectAnimationTrack(prop.id, animation);
 
   return { id: prop.id };
 }
 
+export function addGroup(input: SceneScriptGroup = {}) {
+  const transform: DirectorTransform = {
+    position: toTuple3(input.position, [0, 0, 0]),
+    rotation: normalizeRotation(input, [0, 0, 0]),
+    scale: toScaleTuple(input.scale, [1, 1, 1]),
+  };
+  const id = useDirectorStore.getState().addGroup({
+    name: input.name,
+    parentId: input.parentId ?? null,
+    pivot: toTuple3(input.pivot, [0, 0, 0]),
+    transform,
+  });
+  const animation = normalizeObjectAnimation(id, input.name ?? "组合", input.animation);
+  if (animation) useDirectorStore.getState().setObjectAnimationTrack(id, animation);
+  return { id };
+}
+
 export function updateProp(input: SceneScriptProp & { id?: string; name?: string; delete?: boolean }) {
-  const target = findObject(input.id ?? input.name, "prop");
-  if (!target) throw new Error("Prop not found");
+  const target = findObject(input.id ?? input.name);
+  if (!target || (target.kind !== "prop" && target.kind !== "group" && target.kind !== "scene")) throw new Error("Prop not found");
 
   const store = useDirectorStore.getState();
   if (input.name && input.name !== target.name) store.updateObjectName(target.id, input.name);
   if (input.color) store.updateObjectColor(target.id, input.color);
   store.updateObjectTransform(target.id, getTransformPatch(input, target.transform));
+  if (input.parentId !== undefined) store.setObjectParent(target.id, input.parentId);
+  if (input.pivot) store.updateObjectPivot(target.id, toTuple3(input.pivot, target.pivot ?? [0, 0, 0]));
+  const animation = normalizeObjectAnimation(target.id, input.name ?? target.name, input.animation);
+  if (animation) store.setObjectAnimationTrack(target.id, animation);
 
   return { id: target.id };
 }
@@ -376,6 +525,109 @@ export function setCameraView(input: SceneScriptCamera = {}) {
   return { id: cameraId };
 }
 
+function samplePolyline(points: NumberTuple3[], progress: number): NumberTuple3 {
+  if (points.length < 2) return points[0] ?? [0, 0, 0];
+  const scaled = Math.min(Math.max(progress, 0), 1) * (points.length - 1);
+  const index = Math.min(Math.floor(scaled), points.length - 2);
+  const local = scaled - index;
+  return points[index].map((value, axis) =>
+    Number((value + (points[index + 1][axis] - value) * local).toFixed(4))
+  ) as NumberTuple3;
+}
+
+function expandPropCopies(input: SceneScriptProp) {
+  const basePosition = toTuple3(input.position, [0, 0, 0]);
+  const baseRotation = normalizeRotation(input, [0, 0, 0]);
+  const baseScale = toScaleTuple(input.scale, [1, 1, 1]);
+  let copies: SceneScriptProp[] = [{ ...input, position: basePosition, rotation: baseRotation, scale: baseScale }];
+
+  if (input.repeat?.count && input.repeat.count > 1) {
+    const count = Math.min(Math.max(Math.round(input.repeat.count), 1), 200);
+    const offset = toTuple3(input.repeat.offset, [1, 0, 0]);
+    const rotationStep = toTuple3(input.repeat.rotationStep, [0, 0, 0]);
+    const scaleStep = toTuple3(input.repeat.scaleStep, [0, 0, 0]);
+    copies = Array.from({ length: count }, (_, index) => ({
+      ...input,
+      id: input.id ? `${input.id}_${index + 1}` : undefined,
+      name: count > 1 ? `${input.name ?? input.type ?? "部件"}${String(index + 1).padStart(2, "0")}` : input.name,
+      position: basePosition.map((value, axis) => value + offset[axis] * index),
+      rotation: baseRotation.map((value, axis) => value + rotationStep[axis] * index),
+      scale: baseScale.map((value, axis) => value + scaleStep[axis] * index),
+      repeat: undefined,
+    }));
+  }
+
+  if (input.pathCopy?.points?.length && input.pathCopy.count > 1) {
+    const points = input.pathCopy.points.map((point) => toTuple3(point, [0, 0, 0]));
+    const count = Math.min(Math.max(Math.round(input.pathCopy.count), 2), 200);
+    copies = Array.from({ length: count }, (_, index) => {
+      const position = samplePolyline(points, index / (count - 1));
+      const nextPosition = samplePolyline(points, Math.min((index + 0.01) / (count - 1), 1));
+      const rotation = [...baseRotation] as NumberTuple3;
+      if (input.pathCopy?.orientToPath) {
+        rotation[1] = Math.atan2(nextPosition[0] - position[0], nextPosition[2] - position[2]);
+      }
+      return {
+        ...input,
+        id: input.id ? `${input.id}_${index + 1}` : undefined,
+        name: `${input.name ?? input.type ?? "路径部件"}${String(index + 1).padStart(2, "0")}`,
+        position,
+        rotation,
+        scale: baseScale,
+        pathCopy: undefined,
+      };
+    });
+  }
+
+  if (input.mirror) {
+    const axes = Array.isArray(input.mirror.axis) ? input.mirror.axis : [input.mirror.axis];
+    const mirrored = copies.map((copy) => {
+      const position = toTuple3(copy.position, basePosition);
+      const rotation = normalizeRotation(copy, baseRotation);
+      const scale = toScaleTuple(copy.scale, baseScale);
+      axes.forEach((axis) => {
+        const axisIndex = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+        position[axisIndex] *= -1;
+        scale[axisIndex] *= -1;
+        rotation[(axisIndex + 1) % 3] *= -1;
+        rotation[(axisIndex + 2) % 3] *= -1;
+      });
+      const animation = copy.animation
+        ? {
+            ...copy.animation,
+            keyframes: copy.animation.keyframes?.map((keyframe) => {
+              if (!keyframe.rotation) return keyframe;
+              const mirroredRotation = [...keyframe.rotation] as NumberTuple3;
+              axes.forEach((axis) => {
+                const axisIndex = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+                mirroredRotation[(axisIndex + 1) % 3] *= -1;
+                mirroredRotation[(axisIndex + 2) % 3] *= -1;
+              });
+              return { ...keyframe, rotation: mirroredRotation };
+            }),
+          }
+        : undefined;
+      return {
+        ...copy,
+        id: copy.id ? `${copy.id}_mirror` : undefined,
+        name: `${copy.name ?? input.name ?? "部件"}镜像`,
+        position,
+        rotation,
+        scale,
+        animation,
+        mirror: undefined,
+      };
+    });
+    copies = [...copies, ...mirrored];
+  }
+
+  return copies;
+}
+
+function isSceneScriptGroup(value: SceneScriptGroup | SceneScriptProp): value is SceneScriptGroup {
+  return (value as SceneScriptGroup).kind === "group";
+}
+
 export function applySceneScript(script: SceneScript = {}) {
   const scenePlan = script.scenePlan ? validateScenePlan(script.scenePlan).plan : null;
   if (script.reset) {
@@ -405,7 +657,27 @@ export function applySceneScript(script: SceneScript = {}) {
   }
 
   const characterIds = (script.characters ?? []).map((character) => addCharacter(character).id);
-  const propIds = (script.props ?? []).map((prop) => addProp(prop).id);
+  const objectIdMap = new Map<string, string>();
+  const groupIds: string[] = [];
+  const propIds: string[] = [];
+  const createPart = (part: SceneScriptGroup | SceneScriptProp, inheritedParentId: string | null = null) => {
+    const requestedParentId = part.parentId ? objectIdMap.get(part.parentId) ?? part.parentId : inheritedParentId;
+    if (isSceneScriptGroup(part)) {
+      const id = addGroup({ ...part, parentId: requestedParentId }).id;
+      groupIds.push(id);
+      if (part.id) objectIdMap.set(part.id, id);
+      (part.children ?? []).forEach((child) => createPart(child, id));
+      return;
+    }
+    expandPropCopies({ ...part, parentId: requestedParentId }).forEach((copy) => {
+      const id = addProp(copy).id;
+      propIds.push(id);
+      if (copy.id) objectIdMap.set(copy.id, id);
+      (part.children ?? []).forEach((child) => createPart(child, id));
+    });
+  };
+  (script.groups ?? []).forEach((group) => createPart({ ...group, kind: "group" }));
+  (script.props ?? []).forEach((prop) => createPart(prop));
   const requestedCameras = [...(script.camera ? [script.camera] : []), ...(script.cameras ?? [])];
   const cameraIdMap = new Map<string, string>();
   const cameraIds = requestedCameras.map((camera) => {
@@ -427,7 +699,14 @@ export function applySceneScript(script: SceneScript = {}) {
   }
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
 
-  return { characterIds, propIds, cameraIds, scenePlan: scenePlan ? buildScenePlanReview(scenePlan) : null };
+  return {
+    characterIds,
+    groupIds,
+    propIds,
+    cameraIds,
+    scenePlan: scenePlan ? buildScenePlanReview(scenePlan) : null,
+    structureReview: buildAssemblyReview(),
+  };
 }
 
 export function exportSceneScript(): SceneScript {
@@ -454,17 +733,65 @@ export function exportSceneScript(): SceneScript {
           }
         : undefined,
     }));
-  const props: SceneScriptProp[] = project.objects
-    .filter((object) => object.kind === "prop" || object.kind === "scene")
-    .map((object) => ({
+  const childrenByParentId = new Map<string, DirectorObject[]>();
+  project.objects.forEach((object) => {
+    if (!object.parentId) return;
+    const children = childrenByParentId.get(object.parentId) ?? [];
+    children.push(object);
+    childrenByParentId.set(object.parentId, children);
+  });
+  const animationFromObject = (object: DirectorObject): SceneScriptObjectAnimation | undefined =>
+    object.objectAnimationTrack
+      ? {
+          id: object.objectAnimationTrack.id,
+          name: object.objectAnimationTrack.name,
+          duration: object.objectAnimationTrack.duration,
+          loop: object.objectAnimationTrack.loop,
+          enabled: object.objectAnimationTrack.enabled,
+          playbackMode: object.objectAnimationTrack.playbackMode,
+          cameraId: object.objectAnimationTrack.cameraId,
+          keyframes: object.objectAnimationTrack.keyframes,
+          path: object.objectAnimationTrack.path,
+        }
+      : undefined;
+  const toScenePart = (object: DirectorObject): SceneScriptGroup | SceneScriptProp => {
+    const children = (childrenByParentId.get(object.id) ?? [])
+      .filter((child) => child.kind === "group" || child.kind === "prop" || child.kind === "scene")
+      .map(toScenePart);
+    if (object.kind === "group") {
+      return {
+        kind: "group",
+        id: object.id,
+        name: object.name,
+        position: object.transform.position,
+        rotation: object.transform.rotation,
+        scale: object.transform.scale,
+        pivot: object.pivot,
+        animation: animationFromObject(object),
+        children,
+      };
+    }
+    return {
       id: object.id,
       name: object.name,
       geometryType: object.geometryType ?? "box",
       position: object.transform.position,
       rotation: object.transform.rotation,
       scale: object.transform.scale,
+      pivot: object.pivot,
       color: object.color,
-    }));
+      animation: animationFromObject(object),
+      children,
+    };
+  };
+  const topLevelParts = project.objects
+    .filter(
+      (object) =>
+        !object.parentId && (object.kind === "group" || object.kind === "prop" || object.kind === "scene")
+    )
+    .map(toScenePart);
+  const groups = topLevelParts.filter((part): part is SceneScriptGroup => isSceneScriptGroup(part));
+  const props = topLevelParts.filter((part): part is SceneScriptProp => !isSceneScriptGroup(part));
   const cameras: SceneScriptCamera[] = project.cameras.map((camera) => {
     const snapshot = getCameraViewSnapshotFromShot(camera);
     return {
@@ -480,6 +807,7 @@ export function exportSceneScript(): SceneScript {
     reset: true,
     scene: project.scene,
     characters,
+    groups,
     props,
     cameras,
     activeCameraId: project.activeCameraId,
@@ -541,6 +869,8 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       return updateCharacter(args as SceneScriptCharacter);
     case "add_prop":
       return addProp(args as SceneScriptProp);
+    case "add_group":
+      return addGroup(args as SceneScriptGroup);
     case "update_prop":
       return updateProp(args as SceneScriptProp);
     case "add_camera":

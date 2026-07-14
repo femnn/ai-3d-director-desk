@@ -86,3 +86,88 @@ it("round-trips manually edited pose controls through scene scripts", () => {
     "head.yaw": -18,
   });
 });
+
+it("creates and round-trips structured animated assemblies", () => {
+  applySceneScript({
+    reset: true,
+    groups: [
+      {
+        kind: "group",
+        id: "train",
+        name: "火车",
+        animation: {
+          duration: 10,
+          playbackMode: "recording-sync",
+          path: {
+            type: "curve",
+            closed: true,
+            orientToPath: true,
+            points: [
+              [0, 0, 0],
+              [5, 0, 0],
+              [5, 0, 5],
+              [0, 0, 5],
+            ],
+          },
+        },
+        children: [
+          { id: "body", name: "车身", geometryType: "rounded-box", scale: [3, 1, 1] },
+          {
+            id: "wheel",
+            name: "车轮",
+            geometryType: "disc",
+            position: [-1, 0, 0.55],
+            repeat: { count: 3, offset: [1, 0, 0] },
+            mirror: { axis: "z" },
+            animation: {
+              duration: 5,
+              keyframes: [
+                { time: 0, rotation: [0, 0, 0] },
+                { time: 5, rotation: [Math.PI * 2, 0, 0] },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        kind: "group",
+        id: "door-frame",
+        name: "门组",
+        children: [
+          {
+            id: "door-panel",
+            name: "门板",
+            geometryType: "box",
+            scale: [1, 2, 0.08],
+            pivot: [-0.5, 0, 0],
+            animation: {
+              duration: 5,
+              keyframes: [
+                { time: 0, rotation: [0, 0, 0] },
+                { time: 5, rotation: [0, Math.PI / 2, 0] },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  const project = useDirectorStore.getState().project;
+  const train = project.objects.find((object) => object.name === "火车");
+  const wheels = project.objects.filter((object) => object.name.includes("车轮"));
+  const door = project.objects.find((object) => object.name === "门板");
+  expect(train?.kind).toBe("group");
+  expect(train?.objectAnimationTrack?.playbackMode).toBe("recording-sync");
+  expect(wheels).toHaveLength(6);
+  expect(wheels.every((wheel) => wheel.parentId === train?.id)).toBe(true);
+  expect(door?.pivot).toEqual([-0.5, 0, 0]);
+
+  const exported = exportSceneScript();
+  applySceneScript(exported);
+  const restored = useDirectorStore.getState().project;
+  const restoredTrain = restored.objects.find((object) => object.name === "火车");
+  expect(restoredTrain?.objectAnimationTrack?.path?.closed).toBe(true);
+  expect(restored.objects.find((object) => object.name === "门板")?.pivot).toEqual([-0.5, 0, 0]);
+  expect(restored.objects.filter((object) => object.name.includes("车轮"))).toHaveLength(6);
+});

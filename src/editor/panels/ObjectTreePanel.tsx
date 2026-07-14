@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { Box, Camera, ChevronDown, ChevronRight, Eye, EyeOff, Lock, Search, Trash2, Unlock, User, Users } from "lucide-react";
+import { Box, Boxes, Camera, ChevronDown, ChevronRight, Eye, EyeOff, Lock, Search, Trash2, Unlock, User, Users } from "lucide-react";
 import type { DirectorObject, DirectorObjectKind } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 
@@ -19,7 +19,7 @@ type SceneTreeItem = {
   previewChildren?: SceneTreePreviewItem[];
 };
 
-type ObjectTreeIconKind = "character" | "crowd" | "geometry" | "model" | "camera";
+type ObjectTreeIconKind = "character" | "crowd" | "geometry" | "group" | "model" | "camera";
 
 const GROUP_LABELS: Array<{
   key: string;
@@ -40,6 +40,7 @@ function ObjectKindIcon({ icon }: { icon: ObjectTreeIconKind }) {
       {icon === "camera" ? <Camera {...iconProps} /> : null}
       {icon === "crowd" ? <Users {...iconProps} /> : null}
       {icon === "geometry" || icon === "model" ? <Box {...iconProps} /> : null}
+      {icon === "group" ? <Boxes {...iconProps} /> : null}
       {icon === "character" ? <User {...iconProps} /> : null}
     </span>
   );
@@ -133,10 +134,12 @@ export function ObjectTreePanel() {
 
       regularItems.push({
         id: object.id,
-        name: object.name,
+        name: object.parentId ? `↳ ${object.name}` : object.name,
         icon:
           object.kind === "camera"
             ? "camera"
+            : object.kind === "group"
+              ? "group"
             : object.kind === "character"
               ? "character"
               : isModelBackedObject(object)
@@ -153,7 +156,8 @@ export function ObjectTreePanel() {
       geometry: regularItems.filter(
         (item) =>
           (item.object?.kind === "scene" && !isModelBackedObject(item.object)) ||
-          (item.object?.kind === "prop" && !item.object?.assetRefId)
+          (item.object?.kind === "prop" && !item.object?.assetRefId) ||
+          item.object?.kind === "group"
       ),
       myModels: regularItems.filter((item) => isModelBackedObject(item.object)),
       cameras: regularItems.filter((item) => item.object?.kind === "camera"),

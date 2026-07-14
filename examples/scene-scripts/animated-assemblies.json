@@ -1,0 +1,140 @@
+{
+  "reset": true,
+  "scenePlan": {
+    "intent": "验证组合层级、局部旋转轴和通用物体动画",
+    "environment": "开阔的预演场地",
+    "composition": "同时看到飞龙、火车和开合门",
+    "roles": [{ "name": "比例参照角色", "purpose": "检查物体比例" }],
+    "assemblies": [
+      { "name": "飞龙", "parts": ["身体", "头部", "左右翅膀", "尾节"], "motion": "整体曲线飞行，翅膀局部扇动" },
+      { "name": "火车", "parts": ["车身", "车头", "六个车轮"], "motion": "整体沿闭合路径移动，车轮独立旋转" },
+      { "name": "门", "parts": ["门框", "门板"], "motion": "门板围绕门轴开合" }
+    ]
+  },
+  "characters": [
+    { "name": "比例参照角色", "pose": "stand", "position": [0, 0, 0] }
+  ],
+  "groups": [
+    {
+      "kind": "group",
+      "id": "dragon",
+      "name": "飞龙组合",
+      "animation": {
+        "duration": 10,
+        "playbackMode": "normal",
+        "path": {
+          "type": "curve",
+          "closed": true,
+          "orientToPath": true,
+          "points": [[-6, 4, -4], [-2, 6, -7], [3, 4.5, -5], [0, 5, -2]]
+        }
+      },
+      "children": [
+        { "id": "dragon_body", "name": "龙身", "geometryType": "capsule", "rotation": [1.5708, 0, 0], "scale": [1.1, 2.8, 1.1], "color": "#28785c" },
+        { "id": "dragon_head", "name": "龙头", "geometryType": "rounded-box", "position": [0, 0.15, 1.7], "scale": [0.9, 0.65, 0.9], "color": "#3b9b72" },
+        {
+          "id": "left_wing",
+          "name": "龙翼",
+          "geometryType": "wedge",
+          "position": [-0.55, 0.35, 0],
+          "pivot": [0.5, 0, 0],
+          "scale": [2.4, 0.12, 1.5],
+          "color": "#4aae82",
+          "mirror": { "axis": "x" },
+          "animation": {
+            "duration": 5,
+            "playbackMode": "normal",
+            "keyframes": [
+              { "time": 0, "rotation": [0, 0, -0.28] },
+              { "time": 2.5, "rotation": [0, 0, 0.55] },
+              { "time": 5, "rotation": [0, 0, -0.28] }
+            ]
+          }
+        },
+        {
+          "name": "龙尾节",
+          "geometryType": "capsule",
+          "scale": [0.32, 0.55, 0.32],
+          "rotation": [1.5708, 0, 0],
+          "color": "#24684f",
+          "pathCopy": {
+            "count": 5,
+            "orientToPath": true,
+            "points": [[0, 0, -1.4], [0.3, 0.1, -2.1], [-0.2, 0.2, -3.1]]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "group",
+      "id": "train",
+      "name": "火车组合",
+      "animation": {
+        "duration": 15,
+        "playbackMode": "recording-sync",
+        "path": {
+          "type": "curve",
+          "closed": true,
+          "orientToPath": true,
+          "points": [[-5, 0, 3], [-1, 0, 5], [5, 0, 4], [4, 0, 1]]
+        }
+      },
+      "children": [
+        { "name": "车身", "geometryType": "rounded-box", "position": [0, 0.75, 0], "scale": [3.2, 1.2, 1.3], "color": "#315f8a" },
+        { "name": "车头", "geometryType": "cylinder", "position": [0, 1.65, 0.2], "scale": [0.65, 1.2, 0.65], "color": "#263d58" },
+        {
+          "name": "车轮",
+          "geometryType": "disc",
+          "position": [-1.05, 0.42, 0.72],
+          "rotation": [1.5708, 0, 0],
+          "scale": [0.55, 0.55, 0.55],
+          "color": "#20252b",
+          "repeat": { "count": 3, "offset": [1.05, 0, 0] },
+          "mirror": { "axis": "z" },
+          "animation": {
+            "duration": 5,
+            "playbackMode": "recording-sync",
+            "keyframes": [
+              { "time": 0, "rotation": [1.5708, 0, 0] },
+              { "time": 5, "rotation": [7.854, 0, 0] }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "group",
+      "id": "door",
+      "name": "门组合",
+      "position": [5, 0, -2],
+      "children": [
+        { "name": "门框左", "geometryType": "box", "position": [-0.7, 1.2, 0], "scale": [0.18, 2.4, 0.22], "color": "#8b6547" },
+        { "name": "门框右", "geometryType": "box", "position": [0.7, 1.2, 0], "scale": [0.18, 2.4, 0.22], "color": "#8b6547" },
+        { "name": "门框顶", "geometryType": "box", "position": [0, 2.35, 0], "scale": [1.55, 0.18, 0.22], "color": "#8b6547" },
+        {
+          "name": "门板",
+          "geometryType": "rounded-box",
+          "position": [-0.58, 1.15, 0],
+          "pivot": [-0.58, 0, 0],
+          "scale": [1.18, 2.15, 0.12],
+          "color": "#b47b4f",
+          "animation": {
+            "duration": 5,
+            "playbackMode": "normal",
+            "keyframes": [
+              { "time": 0, "rotation": [0, 0, 0] },
+              { "time": 2.5, "rotation": [0, 1.35, 0] },
+              { "time": 5, "rotation": [0, 0, 0] }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "camera": {
+    "name": "组合动画总览",
+    "position": [10, 6, 13],
+    "lookAt": [0, 2, 0],
+    "fov": 48
+  }
+}

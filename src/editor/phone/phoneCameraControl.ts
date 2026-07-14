@@ -4,6 +4,11 @@ import {
   endCameraDrivenCharacterAnimations,
   reportCameraDrivenCharacterMovement,
 } from "../animation/characterAnimation";
+import {
+  beginObjectAnimationsForCamera,
+  endObjectAnimationsForCamera,
+  reportCameraDrivenObjectMovement,
+} from "../animation/objectAnimation";
 import { getCameraRigPositionFromViewSnapshot } from "../schema/cameraGeometry";
 import type {
   DirectorCameraAnimation,
@@ -451,10 +456,13 @@ function applyPhoneCameraState(state: PhoneCameraState) {
   phoneUpdateTimestampByCameraId.set(cameraId, updatedAt);
   if (state.recording) {
     beginCameraDrivenCharacterAnimations(cameraId, getCameraDrivenCharacterIds(cameraId));
+    beginObjectAnimationsForCamera(cameraId, useDirectorStore.getState().project.objects);
     reportCameraDrivenCharacterMovement(cameraId, { position, target, fov, time: updatedAt });
+    reportCameraDrivenObjectMovement(cameraId, { position, target, fov, time: updatedAt });
     appendPathPoint(cameraId, position);
   } else {
     endCameraDrivenCharacterAnimations(cameraId);
+    endObjectAnimationsForCamera(cameraId);
   }
   updateRecording(
     cameraId,
@@ -546,6 +554,7 @@ export function playCameraAnimation(animation: DirectorCameraAnimation) {
   const playbackDuration = getCameraAnimationPlaybackDuration(animation);
   useDirectorStore.getState().setActiveCamera(animation.cameraId);
   beginCameraDrivenCharacterAnimations(animation.cameraId, getCameraDrivenCharacterIds(animation.cameraId));
+  beginObjectAnimationsForCamera(animation.cameraId, useDirectorStore.getState().project.objects);
 
   function tick(now: number) {
     const playbackElapsed = Math.min(now - startedAt, playbackDuration);
@@ -580,11 +589,13 @@ export function playCameraAnimation(animation: DirectorCameraAnimation) {
       transform,
     });
     reportCameraDrivenCharacterMovement(animation.cameraId, { position, target, fov, time: now });
+    reportCameraDrivenObjectMovement(animation.cameraId, { position, target, fov, time: now });
     if (playbackElapsed < playbackDuration) {
       activePlaybackId = window.requestAnimationFrame(tick);
     } else {
       activePlaybackId = null;
       endCameraDrivenCharacterAnimations(animation.cameraId);
+      endObjectAnimationsForCamera(animation.cameraId);
       useDirectorStore.getState().saveLatestSnapshot();
     }
   }

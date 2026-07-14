@@ -470,6 +470,51 @@ it("resets the director desk to one character and its required default camera", 
   expect(project.cameras).toHaveLength(1);
 });
 
+it("groups selected props in local coordinates and deletes the whole hierarchy", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+  const store = useDirectorStore.getState();
+  store.addGeometryPrimitive("box");
+  const firstId = useDirectorStore.getState().selectedObjectId!;
+  store.addGeometryPrimitive("capsule");
+  const secondId = useDirectorStore.getState().selectedObjectId!;
+
+  const groupId = useDirectorStore.getState().groupObjects([firstId, secondId], "测试组合");
+  expect(groupId).toBeTruthy();
+  const grouped = useDirectorStore.getState().project.objects.filter((object) => object.parentId === groupId);
+  expect(grouped.map((object) => object.id).sort()).toEqual([firstId, secondId].sort());
+  expect(useDirectorStore.getState().project.objects.find((object) => object.id === groupId)?.kind).toBe("group");
+
+  useDirectorStore.getState().selectObject(groupId);
+  useDirectorStore.getState().deleteSelectedObject();
+  const remainingIds = new Set(useDirectorStore.getState().project.objects.map((object) => object.id));
+  expect(remainingIds.has(groupId!)).toBe(false);
+  expect(remainingIds.has(firstId)).toBe(false);
+  expect(remainingIds.has(secondId)).toBe(false);
+});
+
+it("drops malformed saved animation data instead of breaking scene recovery", () => {
+  const project = createDefaultDirectorProject();
+  project.objects[0] = {
+    ...project.objects[0],
+    objectAnimationTrack: {
+      id: "broken",
+      name: "损坏动画",
+      duration: 12 as 5,
+      loop: true,
+      enabled: true,
+      playbackMode: "normal",
+      keyframes: [{ time: Number.NaN, position: [0, 0, 0] }],
+      path: { type: "curve", closed: true, points: [[0, 0, Number.NaN]] },
+    },
+  };
+
+  useDirectorStore.getState().replaceProject(project);
+  const restored = useDirectorStore.getState().project.objects[0];
+  expect(restored.objectAnimationTrack?.duration).toBe(10);
+  expect(restored.objectAnimationTrack?.keyframes).toEqual([]);
+  expect(restored.objectAnimationTrack?.path).toBeUndefined();
+});
+
 it("keeps imported model object ids unique after deleting an earlier model", () => {
   useDirectorStore.setState(createInitialDirectorState());
 

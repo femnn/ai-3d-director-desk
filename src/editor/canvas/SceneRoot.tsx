@@ -1,7 +1,7 @@
-import { Html, Line, TransformControls, type TransformControlsProps } from "@react-three/drei";
+import { Html, Line, RoundedBox, TransformControls, type TransformControlsProps } from "@react-three/drei";
 import { useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import { AnimationMixer, Box3, Matrix4, Plane, Quaternion, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
+import { AnimationMixer, Box3, DoubleSide, ExtrudeGeometry, Matrix4, Plane, Quaternion, Shape, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
 import type { TransformControls as TransformControlsImpl } from "three-stdlib";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -29,6 +29,7 @@ import { getGroundedLabelY } from "../runtime/mannequin/bodyTypes";
 import { getUE4GroundedLabelY } from "../runtime/ue4Mannequin/ue4MannequinRig";
 import { getEffectiveGroundOpacity } from "./panoramaMath";
 import { getCrowdAnchorTransform } from "../store/directorStore";
+import { getObjectAnimationElapsed, sampleObjectAnimation } from "../animation/objectAnimation";
 
 export { getEffectiveGroundOpacity, getPanoramaRotationRadians } from "./panoramaMath";
 
@@ -557,10 +558,36 @@ function GeometryPrimitiveModel({
 }) {
   const material = <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} />;
 
+  if (geometryType === "rounded-box") {
+    return (
+      <RoundedBox args={[1, 1, 1]} position={[0, 0.5, 0]} radius={0.12} smoothness={4} name="geometry-rounded-box">
+        {material}
+      </RoundedBox>
+    );
+  }
+
   if (geometryType === "sphere") {
     return (
       <mesh name="geometry-sphere" position={[0, 0.55, 0]}>
         <sphereGeometry args={[0.55, 32, 16]} />
+        {material}
+      </mesh>
+    );
+  }
+
+  if (geometryType === "hemisphere") {
+    return (
+      <mesh name="geometry-hemisphere" position={[0, 0, 0]}>
+        <sphereGeometry args={[0.55, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        {material}
+      </mesh>
+    );
+  }
+
+  if (geometryType === "capsule") {
+    return (
+      <mesh name="geometry-capsule" position={[0, 0.8, 0]}>
+        <capsuleGeometry args={[0.35, 0.9, 8, 24]} />
         {material}
       </mesh>
     );
@@ -573,6 +600,37 @@ function GeometryPrimitiveModel({
         {material}
       </mesh>
     );
+  }
+
+  if (geometryType === "pipe") {
+    return (
+      <mesh name="geometry-pipe" position={[0, 0.6, 0]}>
+        <cylinderGeometry args={[0.5, 0.5, 1.2, 32, 1, true]} />
+        <meshStandardMaterial color={color} metalness={0.08} roughness={0.58} side={DoubleSide} />
+      </mesh>
+    );
+  }
+
+  if (geometryType === "disc") {
+    return (
+      <mesh name="geometry-disc" position={[0, 0.04, 0]}>
+        <cylinderGeometry args={[0.55, 0.55, 0.08, 32]} />
+        {material}
+      </mesh>
+    );
+  }
+
+  if (geometryType === "plane") {
+    return (
+      <mesh name="geometry-plane" position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} side={DoubleSide} />
+      </mesh>
+    );
+  }
+
+  if (geometryType === "wedge") {
+    return <WedgeModel color={color} />;
   }
 
   if (geometryType === "torus") {
@@ -606,6 +664,25 @@ function GeometryPrimitiveModel({
     <mesh name="geometry-box" position={[0, 0.5, 0]}>
       <boxGeometry args={[1, 1, 1]} />
       {material}
+    </mesh>
+  );
+}
+
+function WedgeModel({ color }: { color: string }) {
+  const geometry = useMemo(() => {
+    const shape = new Shape();
+    shape.moveTo(-0.5, 0);
+    shape.lineTo(0.5, 0);
+    shape.lineTo(-0.5, 1);
+    shape.closePath();
+    const result = new ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false });
+    result.translate(0, 0, -0.5);
+    return result;
+  }, []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh name="geometry-wedge" geometry={geometry}>
+      <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} />
     </mesh>
   );
 }
@@ -1000,6 +1077,7 @@ function ObjectSceneNode({
   onSelect,
   onPoseControlChange,
   poseHandleInteractionMode,
+  children,
 }: {
   asset?: DirectorAssetRef;
   item: DirectorObject;
@@ -1011,6 +1089,7 @@ function ObjectSceneNode({
   onSelect?: (item: DirectorObject) => void;
   onPoseControlChange?: (characterId: string, controls: Record<string, number>) => void;
   poseHandleInteractionMode: "persistent" | "hold";
+  children?: ReactNode;
 }) {
   const groupRef = useRef<Group>(null!);
   const [measuredCharacterLabel, setMeasuredCharacterLabel] = useState<{
@@ -1074,6 +1153,7 @@ function ObjectSceneNode({
     });
   }
 
+  const pivot = item.pivot ?? [0, 0, 0];
   const node = (
     <group
       ref={groupRef}
@@ -1092,6 +1172,8 @@ function ObjectSceneNode({
         onSelect?.(item);
       }}
     >
+      {item.objectAnimationTrack?.enabled ? <ObjectAnimationRig item={item} targetRef={groupRef} /> : null}
+      <group position={[-pivot[0], -pivot[1], -pivot[2]]}>
       {isImportedModel && asset ? (
         <ImportedModelBoundary key={`${asset.id}:${asset.url}`} fallback={<ImportedModelFallback color={item.color} />}>
           <Suspense fallback={<ImportedModelFallback color={item.color} />}>
@@ -1135,6 +1217,8 @@ function ObjectSceneNode({
       ) : item.kind === "prop" && item.geometryType ? (
         <GeometryPrimitiveModel color={item.color} geometryType={item.geometryType} />
       ) : null}
+      </group>
+      {children}
     </group>
   );
 
@@ -1151,6 +1235,18 @@ function ObjectSceneNode({
       />
     </>
   );
+}
+
+function ObjectAnimationRig({ item, targetRef }: { item: DirectorObject; targetRef: MutableRefObject<Group> }) {
+  useFrame(() => {
+    const group = targetRef.current;
+    if (!item.objectAnimationTrack?.enabled || !group) return;
+    const sampled = sampleObjectAnimation(item.objectAnimationTrack, getObjectAnimationElapsed(item), item.transform);
+    group.position.set(...sampled.position);
+    group.rotation.set(...sampled.rotation);
+    group.scale.set(...sampled.scale);
+  });
+  return null;
 }
 
 function CrowdTransformRig({
@@ -1391,6 +1487,16 @@ export function SceneRoot({
 
     return result;
   }, [objects]);
+  const childObjectsByParentId = useMemo(() => {
+    const result = new Map<string, DirectorObject[]>();
+    objects.forEach((item) => {
+      if (!item.parentId || item.kind === "camera") return;
+      const children = result.get(item.parentId) ?? [];
+      children.push(item);
+      result.set(item.parentId, children);
+    });
+    return result;
+  }, [objects]);
 
   function handleObjectSelect(item: DirectorObject) {
     if (item.kind === "character" && item.crowdId) {
@@ -1400,6 +1506,41 @@ export function SceneRoot({
 
     selectObject(item.id);
   }
+
+  function renderObjectNode(item: DirectorObject, ancestors = new Set<string>()): ReactNode {
+    if (!item.visible || item.kind === "camera" || ancestors.has(item.id)) return null;
+    if (showOnlyCharacters && item.kind !== "character") return null;
+    if (focusCharacterId && item.id !== focusCharacterId) return null;
+    const asset = item.assetRefId ? assetsById.get(item.assetRefId) : undefined;
+    const nextAncestors = new Set(ancestors);
+    nextAncestors.add(item.id);
+    const children = childObjectsByParentId.get(item.id) ?? [];
+
+    return (
+      <ObjectSceneNode
+        key={item.id}
+        asset={asset}
+        item={item}
+        selected={item.crowdId ? false : item.id === selectedObjectId}
+        showLabels={scene.showLabels}
+        transformMode={transformMode}
+        transformable={!item.locked}
+        translationSnap={translationSnap}
+        onSelect={handleObjectSelect}
+        onPoseControlChange={onPoseControlChange}
+        poseHandleInteractionMode={poseHandleInteractionMode}
+      >
+        {children.map((child) => renderObjectNode(child, nextAncestors))}
+      </ObjectSceneNode>
+    );
+  }
+
+  const renderableObjects = objects.filter(
+    (item) => item.kind !== "camera" && (!item.parentId || !objects.some((candidate) => candidate.id === item.parentId))
+  );
+  const isolatedCharacterObjects = objects.filter(
+    (item) => item.kind === "character" && (!focusCharacterId || item.id === focusCharacterId)
+  );
 
   return (
     <group
@@ -1420,33 +1561,9 @@ export function SceneRoot({
           />
         </mesh>
       ) : null}
-      {objects
-        .filter(
-          (item) =>
-            item.visible &&
-            item.kind !== "camera" &&
-            (!showOnlyCharacters || item.kind === "character") &&
-            (!focusCharacterId || item.id === focusCharacterId)
-        )
-        .map((item) => {
-          const asset = item.assetRefId ? assetsById.get(item.assetRefId) : undefined;
-
-          return (
-            <ObjectSceneNode
-              key={item.id}
-              asset={asset}
-              item={item}
-              selected={item.crowdId ? false : item.id === selectedObjectId}
-              showLabels={scene.showLabels}
-              transformMode={transformMode}
-              transformable={!item.locked}
-              translationSnap={translationSnap}
-              onSelect={handleObjectSelect}
-              onPoseControlChange={onPoseControlChange}
-              poseHandleInteractionMode={poseHandleInteractionMode}
-            />
-          );
-        })}
+      {(showOnlyCharacters || focusCharacterId ? isolatedCharacterObjects : renderableObjects).map((item) =>
+        renderObjectNode(item)
+      )}
       {Array.from(new Set(objects.map((item) => item.crowdId).filter((item): item is string => typeof item === "string"))).map(
         (crowdId) => (
           <CrowdTransformRig
