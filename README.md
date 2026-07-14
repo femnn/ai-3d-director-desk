@@ -51,6 +51,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **角色姿势与动画**：提供循环动作、镜头移动驱动动作、视频动作提取、图片姿势提取、骨骼编辑和 AnimoFlow 文字动作入口。
 - **AI 快速布景**：Agent 通过白名单 JSON 命令创建角色、道具、站位和机位，不执行任意脚本。
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
+- **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **多人多机位**：多台手机同时加入时分别控制独立机位，机位不足时自动创建。
 
 ### 快速开始
@@ -85,6 +86,7 @@ npm run dev
 6. 使用“导出工程”保存全部资产，或导出“布景命令”供 Agent 快速恢复和修改。
 
 完整说明见 [中文使用指南](docs/USER_GUIDE.md)。
+需要让其他 AI 生成可导入 JSON 时，直接使用 [导演台 JSON 生成指南](docs/AI_SCENE_SCRIPT_GUIDE.md)。
 
 ### Agent 布景接口
 
@@ -98,6 +100,7 @@ npm run dev
 - `add_group` / `update_prop`（父子层级、局部旋转轴和通用物体动画）
 - `capture_shot` / `screenshot`
 - `export_scene_script` / `import_scene_script`
+- `export_character` / `import_character`
 - `record_camera_animation` / `play_camera_animation`
 
 布景命令使用固定 JSON schema，不接受任意 JavaScript。
@@ -120,6 +123,7 @@ npm run dev
 - **Character posing and animation**: looping presets, camera-motion-driven playback, video motion extraction, image pose extraction, direct rig editing, and an AnimoFlow text-to-motion entry point.
 - **Agent-assisted scene building**: a local agent creates characters, props, blocking, and cameras through a strict JSON tool whitelist.
 - **Save and restore**: export complete project JSON or reusable scene commands, including imported assets, edited poses, cameras, and camera animations.
+- **Grouped prop animation**: group props manually, edit keyframes and numbered path points, and animate assemblies or child parts independently.
 - **Multi-phone production**: multiple phones can join simultaneously and control separate cameras; missing cameras are created automatically.
 
 ### Quick Start

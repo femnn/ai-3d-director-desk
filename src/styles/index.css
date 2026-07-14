@@ -1518,6 +1518,21 @@ textarea:focus-visible {
   box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.45);
 }
 
+.object-tree-group-selection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.55);
+  border-radius: 6px;
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--accent-rgb) / 0.14);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .left-sidebar .object-tree-panel .object-search-field input.ui-field:not([type="range"]):not([type="checkbox"]):not([type="color"]):focus,
 .left-sidebar .object-tree-panel .object-search-field input.ui-field:not([type="range"]):not([type="checkbox"]):not([type="color"]):focus-visible {
   outline: none;
@@ -3921,6 +3936,102 @@ body.phone-immersive .phone-action-grid button {
 .inspector-action-row button:focus-visible {
   border-color: rgb(var(--accent-rgb) / 0.72);
   color: rgb(var(--text-rgb));
+}
+
+.object-animation-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.object-animation-primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.55);
+  border-radius: 6px;
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--accent-rgb) / 0.14);
+  font-size: 12px;
+}
+
+.object-animation-item-list,
+.object-animation-path-points {
+  display: grid;
+  gap: 6px;
+}
+
+.object-animation-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.object-animation-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  border: 1px solid rgb(var(--border-rgb) / 0.36);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: rgb(var(--text-rgb) / 0.9);
+  background: rgb(var(--surface-rgb) / 0.5);
+  font-size: 12px;
+}
+
+.object-animation-item-main small {
+  color: rgb(var(--text-muted-rgb));
+}
+
+.object-animation-item-delete,
+.object-animation-path-point-header button {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  border: 1px solid rgb(var(--border-rgb) / 0.36);
+  border-radius: 6px;
+  color: rgb(var(--text-muted-rgb));
+  background: rgb(var(--surface-rgb) / 0.5);
+}
+
+.object-animation-path-point {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgb(var(--border-rgb) / 0.3);
+  border-radius: 6px;
+  background: rgb(var(--surface-rgb) / 0.36);
+}
+
+.object-animation-path-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  color: rgb(var(--text-rgb) / 0.86);
+  font-size: 12px;
+}
+
+.character-json-controls .inspector-action-row {
+  margin-top: 4px;
+}
+
+.character-json-controls .inspector-action-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.character-json-status {
+  margin: 7px 0 0;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .inspector-help-text {

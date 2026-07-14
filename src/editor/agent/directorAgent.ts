@@ -12,6 +12,10 @@ import type {
   CharacterActionId,
   CharacterActionPlaybackMode,
   CharacterBodyType,
+  CharacterMotionFrame,
+  CharacterMotionSource,
+  CharacterRigType,
+  DirectorAssetSource,
   DirectorCameraAnimation,
   DirectorObject,
   DirectorProject,
@@ -32,6 +36,8 @@ export interface SceneScriptCharacter {
   name?: string;
   type?: CharacterBodyType | "builtIn";
   bodyType?: CharacterBodyType;
+  color?: string;
+  rigType?: CharacterRigType;
   pose?: string;
   poseControls?: Record<string, number>;
   position?: number[];
@@ -44,7 +50,31 @@ export interface SceneScriptCharacter {
     playbackMode?: CharacterActionPlaybackMode;
     cameraId?: string | null;
     enabled?: boolean;
+    source?: CharacterMotionSource;
+    motionClipId?: string | null;
   };
+  motionClip?: SceneScriptCharacterMotionClip;
+  asset?: SceneScriptCharacterAsset | null;
+}
+
+export interface SceneScriptCharacterMotionClip {
+  name?: string;
+  duration?: number;
+  frames?: CharacterMotionFrame[];
+}
+
+export interface SceneScriptCharacterAsset {
+  name?: string;
+  fileName: string;
+  url: string;
+  assetSource?: DirectorAssetSource;
+  animated?: boolean;
+}
+
+export interface CharacterPackage {
+  format: "storyai-character";
+  version: 1;
+  character: SceneScriptCharacter;
 }
 
 export interface SceneScriptProp {
@@ -210,7 +240,7 @@ function normalizeActionId(value: unknown): CharacterActionId {
   return "idle";
 }
 
-function applyCharacterAction(id: string, action: SceneScriptCharacter["action"]) {
+function applyCharacterAction(id: string, action: SceneScriptCharacter["action"], motionClipId?: string | null) {
   if (!action) return;
   useDirectorStore.getState().setCharacterActionTrack(id, {
     actionId: normalizeActionId(action.id),
@@ -219,6 +249,29 @@ function applyCharacterAction(id: string, action: SceneScriptCharacter["action"]
     playbackMode: action.playbackMode === "camera-driven" ? "camera-driven" : "normal",
     cameraId: typeof action.cameraId === "string" ? action.cameraId : null,
     enabled: action.enabled !== false,
+    source: action.source === "video" || action.source === "mocap" ? action.source : "built-in",
+    motionClipId: motionClipId ?? (typeof action.motionClipId === "string" ? action.motionClipId : null),
+  });
+}
+
+function importCharacterMotionClip(characterId: string, input: SceneScriptCharacterMotionClip | undefined) {
+  if (!input || !Array.isArray(input.frames) || input.frames.length === 0) return null;
+  const frames = input.frames
+    .filter((frame) => frame && Number.isFinite(frame.time) && frame.controls && typeof frame.controls === "object")
+    .map((frame) => ({
+      time: Math.max(0, Number(frame.time)),
+      controls: Object.fromEntries(
+        Object.entries(frame.controls).filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+      ),
+    }))
+    .sort((a, b) => a.time - b.time);
+  if (!frames.length) return null;
+  const requestedDuration = Number(input.duration ?? frames[frames.length - 1]?.time ?? 5);
+  return useDirectorStore.getState().addCharacterMotionClip({
+    characterId,
+    name: input.name?.trim() || "导入角色动作",
+    duration: Math.max(requestedDuration, 0.1),
+    frames,
   });
 }
 
@@ -394,13 +447,29 @@ export function addCharacter(input: SceneScriptCharacter = {}) {
   if (!character) throw new Error("Character was not created");
 
   if (input.name) nextState.updateObjectName(character.id, input.name);
+  if (typeof input.color === "string" && input.color.trim()) nextState.updateObjectColor(character.id, input.color.trim());
   nextState.updateObjectTransform(character.id, getTransformPatch(input, character.transform));
 
   const poseId = normalizePoseId(input.pose);
   if (poseId) nextState.applyPosePreset(character.id, poseId);
   const poseControls = normalizePoseControls(input.poseControls);
   if (poseControls) nextState.replacePoseControls(character.id, poseControls);
-  applyCharacterAction(character.id, input.action);
+  if (input.asset?.fileName && input.asset.url) {
+    useDirectorStore.getState().attachImportedAssetToCharacter(character.id, {
+      kind: "character",
+      name: input.asset.name?.trim() || input.name?.trim() || character.name,
+      fileName: input.asset.fileName,
+      url: input.asset.url,
+      assetSource: input.asset.assetSource,
+      animated: input.asset.animated,
+    });
+  }
+  const motionClipId = importCharacterMotionClip(character.id, input.motionClip);
+  applyCharacterAction(
+    character.id,
+    input.action ?? (motionClipId ? { id: "idle", source: "video", enabled: true } : undefined),
+    motionClipId
+  );
 
   return { id: character.id };
 }
@@ -411,6 +480,7 @@ export function updateCharacter(input: SceneScriptCharacter & { id?: string; nam
 
   const store = useDirectorStore.getState();
   if (input.name && input.name !== target.name) store.updateObjectName(target.id, input.name);
+  if (typeof input.color === "string" && input.color.trim()) store.updateObjectColor(target.id, input.color.trim());
   if (input.bodyType || input.type) store.updateCharacterBodyType(target.id, normalizeBodyType(input.bodyType ?? input.type));
   store.updateObjectTransform(target.id, getTransformPatch(input, target.transform));
 
@@ -418,7 +488,12 @@ export function updateCharacter(input: SceneScriptCharacter & { id?: string; nam
   if (poseId) store.applyPosePreset(target.id, poseId);
   const poseControls = normalizePoseControls(input.poseControls);
   if (poseControls) store.replacePoseControls(target.id, poseControls);
-  applyCharacterAction(target.id, input.action);
+  const motionClipId = importCharacterMotionClip(target.id, input.motionClip);
+  applyCharacterAction(
+    target.id,
+    input.action ?? (motionClipId ? { id: "idle", source: "video", enabled: true } : undefined),
+    motionClipId
+  );
 
   return { id: target.id };
 }
@@ -714,25 +789,47 @@ export function exportSceneScript(): SceneScript {
   const panoramaAsset = project.assets.find((asset) => asset.id === project.panoramaAssetId && asset.kind === "panorama");
   const characters: SceneScriptCharacter[] = project.objects
     .filter((object) => object.kind === "character")
-    .map((object) => ({
-      id: object.id,
-      name: object.name,
-      bodyType: object.bodyType,
-      pose: object.characterRig?.posePresetId ?? undefined,
-      poseControls: object.characterRig?.controls,
-      position: object.transform.position,
-      rotation: object.transform.rotation,
-      scale: object.transform.scale,
-      action: object.characterActionTrack
-        ? {
-            id: object.characterActionTrack.actionId,
-            duration: object.characterActionTrack.duration,
-            playbackMode: object.characterActionTrack.playbackMode,
-            cameraId: object.characterActionTrack.cameraId,
-            enabled: object.characterActionTrack.enabled,
-          }
-        : undefined,
-    }));
+    .map((object) => {
+      const asset = object.assetRefId ? project.assets.find((candidate) => candidate.id === object.assetRefId) : undefined;
+      const motionClip = object.characterActionTrack?.motionClipId
+        ? (project.characterMotionClips ?? []).find((clip) => clip.id === object.characterActionTrack?.motionClipId)
+        : undefined;
+      return {
+        id: object.id,
+        name: object.name,
+        bodyType: object.bodyType,
+        color: object.color,
+        rigType: object.characterRig?.rigType,
+        pose: object.characterRig?.posePresetId ?? undefined,
+        poseControls: object.characterRig?.controls,
+        position: object.transform.position,
+        rotation: object.transform.rotation,
+        scale: object.transform.scale,
+        action: object.characterActionTrack
+          ? {
+              id: object.characterActionTrack.actionId,
+              duration: object.characterActionTrack.duration,
+              playbackMode: object.characterActionTrack.playbackMode,
+              cameraId: object.characterActionTrack.cameraId,
+              enabled: object.characterActionTrack.enabled,
+              source: object.characterActionTrack.source,
+              motionClipId: object.characterActionTrack.motionClipId,
+            }
+          : undefined,
+        motionClip: motionClip
+          ? { name: motionClip.name, duration: motionClip.duration, frames: motionClip.frames }
+          : undefined,
+        asset: asset?.sourceType === "model"
+          ? {
+              name: asset.name,
+              fileName: asset.fileName,
+              url: asset.url,
+              assetSource: asset.assetSource,
+              animated: asset.animated,
+            }
+          : undefined,
+      };
+    });
   const childrenByParentId = new Map<string, DirectorObject[]>();
   project.objects.forEach((object) => {
     if (!object.parentId) return;
@@ -824,6 +921,24 @@ export function exportSceneScript(): SceneScript {
   };
 }
 
+export function exportCharacterPackage(characterId: string): CharacterPackage {
+  const character = exportSceneScript().characters?.find((item) => item.id === characterId);
+  if (!character) throw new Error("Character not found");
+  return {
+    format: "storyai-character",
+    version: 1,
+    character,
+  };
+}
+
+export function importCharacterPackage(value: unknown) {
+  if (!value || typeof value !== "object") throw new Error("Invalid character JSON");
+  const candidate = value as Partial<CharacterPackage> & SceneScriptCharacter;
+  const character = candidate.format === "storyai-character" ? candidate.character : candidate;
+  if (!character || typeof character !== "object") throw new Error("Character JSON is missing character data");
+  return addCharacter(character);
+}
+
 export function deleteObject(input: { id?: string; name?: string }) {
   const target = findObject(input.id ?? input.name);
   if (!target) throw new Error("Object not found");
@@ -861,6 +976,14 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       return { scenePlan: useDirectorStore.getState().project.scenePlan ?? null };
     case "export_scene_script":
       return { script: exportSceneScript() };
+    case "export_character": {
+      const input = args as { id?: string; name?: string };
+      const target = findObject(input.id ?? input.name, "character");
+      if (!target) throw new Error("Character not found");
+      return { characterPackage: exportCharacterPackage(target.id) };
+    }
+    case "import_character":
+      return importCharacterPackage(args);
     case "delete_object":
       return deleteObject(args as { id?: string; name?: string });
     case "add_character":

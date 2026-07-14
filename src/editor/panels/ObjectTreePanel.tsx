@@ -67,6 +67,7 @@ export function ObjectTreePanel() {
   const toggleObjectVisible = useDirectorStore((state) => state.toggleObjectVisible);
   const toggleObjectLocked = useDirectorStore((state) => state.toggleObjectLocked);
   const deleteSelectedObject = useDirectorStore((state) => state.deleteSelectedObject);
+  const groupObjects = useDirectorStore((state) => state.groupObjects);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -203,6 +204,10 @@ export function ObjectTreePanel() {
     };
   }).filter((group) => group.items.length > 0);
   const hasEmptySearchResult = query.trim().length > 0 && filteredGroups.length === 0;
+  const groupableSelectedIds = selectedObjectIds.filter((id) => {
+    const object = objects.find((item) => item.id === id);
+    return object && !object.parentId && (object.kind === "prop" || object.kind === "scene" || object.kind === "group");
+  });
 
   function selectTreeItem(item: SceneTreeItem, event: MouseEvent<HTMLElement>) {
     if (item.crowdId) {
@@ -311,6 +316,16 @@ export function ObjectTreePanel() {
           placeholder="请输入搜索内容"
         />
       </label>
+      {groupableSelectedIds.length > 1 ? (
+        <button
+          className="object-tree-group-selection"
+          type="button"
+          onClick={() => groupObjects(groupableSelectedIds)}
+        >
+          <Boxes aria-hidden="true" size={15} />
+          组合 {groupableSelectedIds.length} 个所选道具
+        </button>
+      ) : null}
       {hasEmptySearchResult ? (
         <div className="object-search-empty-state" role="status" aria-label="未搜索到内容">
           <span className="object-search-empty-icon" data-testid="object-search-empty-icon">

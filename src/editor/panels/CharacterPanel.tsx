@@ -15,6 +15,7 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { AnimoFlowActionGenerator } from "../animation/AnimoFlowActionGenerator";
+import { CharacterJsonControls } from "./CharacterJsonControls";
 import { PoseImageImporter, PoseVideoImporter } from "../mocap/PoseMediaImporter";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
 import type { CharacterActionTrack } from "../schema/directorProject";
@@ -395,6 +396,7 @@ export function CharacterPanel() {
               isCrowd && selection.crowdId ? updateCrowdColor(selection.crowdId, value) : updateObjectColor(role.id, value)
             }
           />
+          {!isCrowd ? <CharacterJsonControls characterId={role.id} characterName={role.name} /> : null}
         </>
       ) : activeTab === "pose" ? (
         <InspectorSection title="姿势预设" className="pose-preset-section">

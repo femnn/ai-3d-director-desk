@@ -325,6 +325,23 @@ it("supports shift-click multi-select in the left object list", async () => {
   expect(useDirectorStore.getState().selectedObjectIds).toEqual(["char_default_a", "char_preset_2"]);
 });
 
+it("groups multiple selected props from the object tree", async () => {
+  const user = userEvent.setup();
+  useDirectorStore.getState().addGeometryPrimitive("box");
+  const firstId = useDirectorStore.getState().selectedObjectId!;
+  useDirectorStore.getState().addGeometryPrimitive("capsule");
+  const secondId = useDirectorStore.getState().selectedObjectId!;
+  useDirectorStore.getState().selectObject(firstId);
+  useDirectorStore.getState().toggleObjectSelection(secondId);
+  render(<ObjectTreePanel />);
+
+  await user.click(screen.getByRole("button", { name: "组合 2 个所选道具" }));
+
+  const group = useDirectorStore.getState().project.objects.find((object) => object.kind === "group");
+  expect(group).toBeTruthy();
+  expect(useDirectorStore.getState().project.objects.filter((object) => object.parentId === group?.id)).toHaveLength(2);
+});
+
 it("deletes all selected rows when users press the keyboard delete key", async () => {
   const user = userEvent.setup();
   useDirectorStore.getState().addPresetCharacter("female");

@@ -26,6 +26,8 @@ const tools = [
   "capture_shot",
   "export_project",
   "export_scene_script",
+  "export_character",
+  "import_character",
   "import_scene_script",
   "record_camera_animation",
   "play_camera_animation",

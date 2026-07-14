@@ -70,3 +70,28 @@ it("updates the selected prop name, uniform scale, and color", async () => {
   expect(prop?.transform.scale).toEqual([1.4, 1.4, 1.4]);
   expect(prop?.color).toBe("#aaccee");
 });
+
+it("records manual keyframes and numbered path points from the current prop transform", async () => {
+  const user = userEvent.setup();
+  useDirectorStore.getState().setObjectAnimationTrack("prop_model_1", {
+    id: "object_animation_prop_model_1",
+    name: "ATM 动画",
+    duration: 5,
+    loop: true,
+    enabled: false,
+    playbackMode: "normal",
+    keyframes: [],
+    path: { type: "linear", closed: false, orientToPath: false, points: [[0, 0, 0]] },
+  });
+  render(<PropPanel />);
+
+  expect(screen.getByLabelText("路径点 1 X")).toHaveValue(0);
+  await user.click(screen.getByRole("button", { name: "记录当前位置 / 旋转 / 缩放" }));
+  await user.click(screen.getByRole("button", { name: "把当前物体位置添加为路径点" }));
+
+  const track = useDirectorStore.getState().project.objects.find((item) => item.id === "prop_model_1")?.objectAnimationTrack;
+  expect(track?.keyframes).toHaveLength(1);
+  expect(track?.keyframes[0]?.time).toBe(0);
+  expect(track?.path?.points).toHaveLength(2);
+  expect(screen.getByText("路径点 2")).toBeInTheDocument();
+});

@@ -1,4 +1,5 @@
-import { Boxes, MapPinPlus, Play, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Boxes, KeyRound, MapPinPlus, Play, Trash2, X } from "lucide-react";
 import {
   InspectorAxisGroup,
   InspectorColorField,
@@ -16,6 +17,7 @@ function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: nu
 }
 
 export function PropPanel() {
+  const [keyframeTime, setKeyframeTime] = useState(0);
   const objects = useDirectorStore((state) => state.project.objects);
   const cameras = useDirectorStore((state) => state.project.cameras);
   const selectedObjectIds = useDirectorStore((state) => state.selectedObjectIds);
@@ -59,6 +61,26 @@ export function PropPanel() {
   const parentOptions = objects.filter(
     (item) => item.id !== prop.id && item.kind !== "camera" && item.parentId !== prop.id
   );
+
+  const recordKeyframe = () => {
+    const nextFrame = {
+      time: Number(keyframeTime.toFixed(3)),
+      position: [...prop.transform.position] as [number, number, number],
+      rotation: [...prop.transform.rotation] as [number, number, number],
+      scale: [...prop.transform.scale] as [number, number, number],
+    };
+    const keyframes = [...animationTrack.keyframes.filter((frame) => Math.abs(frame.time - keyframeTime) > 0.001), nextFrame]
+      .sort((a, b) => a.time - b.time);
+    updateAnimation({ keyframes });
+  };
+
+  const updatePathPoint = (pointIndex: number, axis: 0 | 1 | 2, value: number) => {
+    if (!animationTrack.path) return;
+    const points = animationTrack.path.points.map((point, index) =>
+      index === pointIndex ? replaceAxis(point, axis, value) : point
+    );
+    updateAnimation({ path: { ...animationTrack.path, points } });
+  };
 
   return (
     <InspectorPanel title="模型" ariaLabel="模型右侧属性面板" className="prop-inspector">
@@ -180,7 +202,7 @@ export function PropPanel() {
           </button>
         </div>
       ) : null}
-      <InspectorSection title="物体动画">
+      <InspectorSection title="动画设置">
         <InspectorSelectField
           label="播放方式"
           ariaLabel="物体动画播放方式"
@@ -209,76 +231,141 @@ export function PropPanel() {
           ariaLabel="物体动画循环时长"
           value={String(animationTrack.duration)}
           options={[5, 10, 15].map((duration) => ({ value: String(duration), label: `${duration}秒` }))}
-          onChange={(value) => updateAnimation({ duration: Number(value) as 5 | 10 | 15 })}
+          onChange={(value) => {
+            const duration = Number(value) as 5 | 10 | 15;
+            setKeyframeTime((current) => Math.min(current, duration));
+            updateAnimation({ duration });
+          }}
         />
+        <div className="inspector-action-row" role="group" aria-label="物体动画操作">
+          <button type="button" onClick={() => updateAnimation({ enabled: !animationTrack.enabled })}>
+            <Play aria-hidden="true" size={14} />
+            {animationTrack.enabled ? "暂停" : "播放"}
+          </button>
+          <button type="button" onClick={() => setObjectAnimationTrack(prop.id, null)}>
+            <Trash2 aria-hidden="true" size={14} />
+            清除
+          </button>
+        </div>
+      </InspectorSection>
+      <InspectorSection title="关键帧动画" className="object-animation-editor">
+        <InspectorRangeNumberField
+          label="记录时间"
+          rangeAriaLabel="关键帧记录时间滑杆"
+          numberAriaLabel="关键帧记录时间"
+          min="0"
+          max={animationTrack.duration}
+          step="0.1"
+          value={keyframeTime}
+          onValueChange={(value) => setKeyframeTime(Math.min(animationTrack.duration, Math.max(0, Number(value))))}
+        />
+        <button className="object-animation-primary-action" type="button" onClick={recordKeyframe}>
+          <KeyRound aria-hidden="true" size={14} />
+          记录当前位置 / 旋转 / 缩放
+        </button>
+        <div className="object-animation-item-list" aria-label="物体动画关键帧列表">
+          {[...animationTrack.keyframes].sort((a, b) => a.time - b.time).map((frame, index) => (
+            <div className="object-animation-list-item" key={`${frame.time}-${index}`}>
+              <button type="button" className="object-animation-item-main" onClick={() => setKeyframeTime(frame.time)}>
+                <span>关键帧 {index + 1}</span>
+                <small>{frame.time.toFixed(1)}秒</small>
+              </button>
+              <button
+                type="button"
+                className="object-animation-item-delete"
+                aria-label={`删除关键帧 ${index + 1}`}
+                onClick={() => updateAnimation({ keyframes: animationTrack.keyframes.filter((candidate) => candidate !== frame) })}
+              >
+                <X aria-hidden="true" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </InspectorSection>
+      <InspectorSection title="路径点动画" className="object-animation-editor">
         <InspectorSelectField
-          label="路径"
+          label="路径类型"
           ariaLabel="物体动画路径类型"
           value={animationTrack.path?.type ?? "none"}
           options={[
-            { value: "none", label: "仅关键帧" },
-            { value: "linear", label: "直线路径" },
-            { value: "curve", label: "曲线路径" },
+            { value: "none", label: "不使用路径" },
+            { value: "linear", label: "直线连接路径点" },
+            { value: "curve", label: "平滑曲线连接路径点" },
           ]}
           onChange={(value) =>
             updateAnimation({
-              path:
-                value === "none"
-                  ? undefined
-                  : {
-                      type: value as "linear" | "curve",
-                      closed: animationTrack.path?.closed ?? false,
-                      orientToPath: animationTrack.path?.orientToPath ?? false,
-                      points: animationTrack.path?.points ?? [prop.transform.position],
-                    },
+              path: value === "none"
+                ? undefined
+                : {
+                    type: value as "linear" | "curve",
+                    closed: animationTrack.path?.closed ?? false,
+                    orientToPath: animationTrack.path?.orientToPath ?? false,
+                    points: animationTrack.path?.points ?? [[...prop.transform.position]],
+                  },
             })
           }
         />
         {animationTrack.path ? (
           <>
             <InspectorSelectField
-              label="路径循环"
+              label="首尾连接"
               ariaLabel="物体动画路径是否闭合"
               value={animationTrack.path.closed ? "closed" : "open"}
               options={[
                 { value: "open", label: "开放路径" },
-                { value: "closed", label: "闭合路径" },
+                { value: "closed", label: "闭合循环路径" },
               ]}
               onChange={(value) => updateAnimation({ path: { ...animationTrack.path!, closed: value === "closed" } })}
             />
             <InspectorSelectField
-              label="移动朝向"
+              label="物体朝向"
               ariaLabel="物体动画是否跟随路径朝向"
               value={animationTrack.path.orientToPath ? "follow" : "fixed"}
               options={[
                 { value: "fixed", label: "保持原朝向" },
-                { value: "follow", label: "跟随路径" },
+                { value: "follow", label: "沿移动方向转向" },
               ]}
               onChange={(value) => updateAnimation({ path: { ...animationTrack.path!, orientToPath: value === "follow" } })}
             />
-          </>
-        ) : null}
-        <div className="inspector-action-row" role="group" aria-label="物体动画操作">
-          <button type="button" onClick={() => updateAnimation({ enabled: !animationTrack.enabled })}>
-            <Play aria-hidden="true" size={14} />
-            {animationTrack.enabled ? "暂停" : "播放"}
-          </button>
-          {animationTrack.path ? (
             <button
+              className="object-animation-primary-action"
               type="button"
-              onClick={() =>
-                updateAnimation({ path: { ...animationTrack.path!, points: [...animationTrack.path!.points, prop.transform.position] } })
-              }
+              onClick={() => updateAnimation({
+                path: { ...animationTrack.path!, points: [...animationTrack.path!.points, [...prop.transform.position]] },
+              })}
             >
               <MapPinPlus aria-hidden="true" size={14} />
-              添加路径点
+              把当前物体位置添加为路径点
             </button>
-          ) : null}
-          <button type="button" onClick={() => setObjectAnimationTrack(prop.id, null)}>
-            <Trash2 aria-hidden="true" size={14} />
-            清除
-          </button>
-        </div>
+            <div className="object-animation-path-points" aria-label="物体动画路径点列表">
+              {animationTrack.path.points.map((point, pointIndex) => (
+                <div className="object-animation-path-point" key={pointIndex}>
+                  <div className="object-animation-path-point-header">
+                    <strong>路径点 {pointIndex + 1}</strong>
+                    <button
+                      type="button"
+                      aria-label={`删除路径点 ${pointIndex + 1}`}
+                      onClick={() => updateAnimation({
+                        path: { ...animationTrack.path!, points: animationTrack.path!.points.filter((_, index) => index !== pointIndex) },
+                      })}
+                    >
+                      <Trash2 aria-hidden="true" size={13} />
+                    </button>
+                  </div>
+                  <InspectorAxisGroup
+                    label="坐标"
+                    axes={([0, 1, 2] as const).map((axis) => ({
+                      axis: (["X", "Y", "Z"] as const)[axis],
+                      ariaLabel: `路径点 ${pointIndex + 1} ${(["X", "Y", "Z"] as const)[axis]}`,
+                      value: point[axis],
+                      onChange: (value) => updatePathPoint(pointIndex, axis, Number(value)),
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </InspectorSection>
     </InspectorPanel>
   );

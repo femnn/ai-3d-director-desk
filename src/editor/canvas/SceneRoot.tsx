@@ -1,7 +1,7 @@
 import { Html, Line, RoundedBox, TransformControls, type TransformControlsProps } from "@react-three/drei";
 import { useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import { AnimationMixer, Box3, DoubleSide, ExtrudeGeometry, Matrix4, Plane, Quaternion, Shape, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
+import { Component, Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { AnimationMixer, Box3, CatmullRomCurve3, DoubleSide, ExtrudeGeometry, Matrix4, Plane, Quaternion, Shape, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
 import type { TransformControls as TransformControlsImpl } from "three-stdlib";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -1515,23 +1515,50 @@ export function SceneRoot({
     const nextAncestors = new Set(ancestors);
     nextAncestors.add(item.id);
     const children = childObjectsByParentId.get(item.id) ?? [];
+    const selected = item.crowdId ? false : item.id === selectedObjectId;
+    const path = item.objectAnimationTrack?.path;
+    let pathPreviewPoints: Array<[number, number, number]> = [];
+    if (path && path.points.length >= 2) {
+      if (path.type === "curve") {
+        pathPreviewPoints = new CatmullRomCurve3(
+          path.points.map((point) => new Vector3(...point)),
+          path.closed,
+          "centripetal"
+        ).getPoints(48).map((point) => [point.x, point.y, point.z]);
+      } else {
+        pathPreviewPoints = path.closed ? [...path.points, path.points[0]] : path.points;
+      }
+    }
 
     return (
-      <ObjectSceneNode
-        key={item.id}
-        asset={asset}
-        item={item}
-        selected={item.crowdId ? false : item.id === selectedObjectId}
-        showLabels={scene.showLabels}
-        transformMode={transformMode}
-        transformable={!item.locked}
-        translationSnap={translationSnap}
-        onSelect={handleObjectSelect}
-        onPoseControlChange={onPoseControlChange}
-        poseHandleInteractionMode={poseHandleInteractionMode}
-      >
-        {children.map((child) => renderObjectNode(child, nextAncestors))}
-      </ObjectSceneNode>
+      <Fragment key={item.id}>
+        {showCameraRigs && viewMode === "director" && selected && pathPreviewPoints.length >= 2 ? (
+          <Line
+            color="#25B7FF"
+            dashed
+            dashScale={5}
+            lineWidth={2}
+            opacity={0.9}
+            points={pathPreviewPoints}
+            transparent
+            userData={{ [HIDE_FROM_VIEWPORT_CAPTURE_KEY]: true }}
+          />
+        ) : null}
+        <ObjectSceneNode
+          asset={asset}
+          item={item}
+          selected={selected}
+          showLabels={scene.showLabels}
+          transformMode={transformMode}
+          transformable={!item.locked}
+          translationSnap={translationSnap}
+          onSelect={handleObjectSelect}
+          onPoseControlChange={onPoseControlChange}
+          poseHandleInteractionMode={poseHandleInteractionMode}
+        >
+          {children.map((child) => renderObjectNode(child, nextAncestors))}
+        </ObjectSceneNode>
+      </Fragment>
     );
   }
 

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
-import { applySceneScript, exportSceneScript } from "./directorAgent";
+import { applySceneScript, exportCharacterPackage, exportSceneScript, importCharacterPackage } from "./directorAgent";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 
 beforeEach(() => {
@@ -85,6 +85,43 @@ it("round-trips manually edited pose controls through scene scripts", () => {
     "rightElbow.bend": 64,
     "head.yaw": -18,
   });
+});
+
+it("round-trips a reusable character package with color, pose, and video motion frames", () => {
+  applySceneScript({
+    reset: true,
+    characters: [
+      {
+        name: "可复用女主",
+        bodyType: "female",
+        color: "#d94c73",
+        poseControls: { "head.yaw": 16, "leftElbow.bend": 42 },
+        action: { id: "idle", duration: 5, source: "video", enabled: true },
+        motionClip: {
+          name: "挥手视频动作",
+          duration: 5,
+          frames: [
+            { time: 0, controls: { "rightShoulder.pitch": 10 } },
+            { time: 5, controls: { "rightShoulder.pitch": 65 } },
+          ],
+        },
+      },
+    ],
+  });
+
+  const original = useDirectorStore.getState().project.objects.find((object) => object.name === "可复用女主")!;
+  const characterPackage = exportCharacterPackage(original.id);
+  useDirectorStore.getState().resetDirectorDesk();
+  const result = importCharacterPackage(characterPackage);
+
+  const project = useDirectorStore.getState().project;
+  const imported = project.objects.find((object) => object.id === result.id)!;
+  const clip = project.characterMotionClips?.find((candidate) => candidate.id === imported.characterActionTrack?.motionClipId);
+  expect(imported.color).toBe("#d94c73");
+  expect(imported.characterRig?.controls).toMatchObject({ "head.yaw": 16, "leftElbow.bend": 42 });
+  expect(imported.characterActionTrack?.source).toBe("video");
+  expect(clip?.name).toBe("挥手视频动作");
+  expect(clip?.frames).toHaveLength(2);
 });
 
 it("creates and round-trips structured animated assemblies", () => {
