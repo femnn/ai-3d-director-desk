@@ -17,6 +17,30 @@ A local-first AI previs and virtual cinematography tool. Build 3D scenes on a co
 
 ![手机虚拟摄影机 / Phone virtual camera](images/08-phone-camera.jpg)
 
+## 功能演示 / Feature Demos
+
+点击封面播放 MP4。视频分别展示手机操控镜头与电脑导演台同步、手机机位录制结果，以及 AI 布景、布景命令导入导出、快速摆姿和 AnimoFlow 提示词生成角色动画。
+
+Click a poster to play the MP4. The demos cover synchronized phone camera control and desktop monitoring, the recorded phone-camera shot, AI scene building and scene-command round trips, fast character posing, and AnimoFlow prompt-to-animation.
+
+### 手机操控与导演台同步 / Phone Control + Director Desk
+
+[![手机操控镜头与导演台同步 / Phone-controlled camera synchronized with the director desk](docs/media/phone-camera-control.jpg)](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/phone-camera-control.mp4)
+
+[播放视频 / Play video](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/phone-camera-control.mp4)
+
+### 手机机位录制成片 / Recorded Phone-Camera Shot
+
+[![手机机位录制画面 / Recorded phone-camera shot](docs/media/phone-recorded-shot.jpg)](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/phone-recorded-shot.mp4)
+
+[播放视频 / Play video](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/phone-recorded-shot.mp4)
+
+### AI 布景、角色动画与快速摆姿 / AI Scene, Animation + Fast Posing
+
+[![AI 布景、角色动画与快速摆姿 / AI scene building, character animation, and fast posing](docs/media/ai-scene-animation-pose.jpg)](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/ai-scene-animation-pose.mp4)
+
+[播放视频 / Play video](https://github.com/femnn/ai-3d-director-desk/releases/download/v0.0.1/ai-scene-animation-pose.mp4)
+
 ## 中文
 
 ### 特色功能
