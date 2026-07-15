@@ -23,6 +23,7 @@ import type { DirectorObject, DirectorTransform, SceneSettings } from "../schema
 import { getGroundedLabelY } from "../runtime/mannequin/bodyTypes";
 import { getUE4GroundedLabelY } from "../runtime/ue4Mannequin/ue4MannequinRig";
 import { SceneRoot } from "./SceneRoot";
+import { StudioSceneLights } from "./StudioSceneLights";
 import { ViewportAspectOverlay } from "./ViewportAspectOverlay";
 import { ViewportBackground } from "./ViewportBackground";
 import { ViewportToolbar } from "./ViewportToolbar";
@@ -700,6 +701,17 @@ export function DirectorCanvas() {
     );
   }
 
+  useEffect(() => {
+    const handleDirectorView = (event: Event) => {
+      const snapshot = (event as CustomEvent<CameraShotSnapshot>).detail;
+      if (!snapshot?.position || !snapshot?.target || !Number.isFinite(snapshot.fov)) return;
+      if (viewMode !== "director") setViewMode("director");
+      updateDirectorViewSnapshot(snapshot);
+    };
+    window.addEventListener("storyai:director-view", handleDirectorView);
+    return () => window.removeEventListener("storyai:director-view", handleDirectorView);
+  }, [viewMode, setViewMode]);
+
   function updateViewportGizmoSnapshot(snapshot: CameraShotSnapshot) {
     if (poseEditCharacter) {
       setPoseEditorViewSnapshot(snapshot);
@@ -746,8 +758,7 @@ export function DirectorCanvas() {
             panoramaRadius={sceneSettings.panoramaRadius}
             panoramaYaw={sceneSettings.panoramaYaw}
           />
-          <ambientLight intensity={1.15} />
-          <directionalLight intensity={1.2} position={[8, 10, 6]} />
+          <StudioSceneLights />
           {showViewportGrid && !poseEditCharacter ? (
             <Grid
               cellThickness={0}

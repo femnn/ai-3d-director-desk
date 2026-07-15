@@ -27,7 +27,11 @@ import type {
   PanoramaProjectionMode,
   ScenePlan,
 } from "../schema/directorProject";
-import { convertObjectSculptSpecToSceneScript, isObjectSculptSpec } from "./objectSculptorAdapter";
+import {
+  convertObjectSculptSpecToSceneScript,
+  isObjectSculptSpec,
+  type ObjectSculptSpec,
+} from "./objectSculptorAdapter";
 import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
@@ -95,6 +99,7 @@ export interface SceneScriptProp {
   scale?: number | number[];
   color?: string;
   geometryAnchor?: "base" | "center";
+  geometrySize?: number[];
   material?: DirectorMaterialSettings;
   parentId?: string | null;
   pivot?: number[];
@@ -132,6 +137,7 @@ export interface SceneScriptGroup {
   scale?: number | number[];
   pivot?: number[];
   parentId?: string | null;
+  selectionMode?: "whole" | "parts";
   animation?: SceneScriptObjectAnimation;
   children?: Array<SceneScriptGroup | SceneScriptProp>;
 }
@@ -157,8 +163,10 @@ export interface SceneScript {
   characters?: SceneScriptCharacter[];
   props?: SceneScriptProp[];
   groups?: SceneScriptGroup[];
+  proceduralObjects?: ObjectSculptSpec[];
   camera?: SceneScriptCamera;
   cameras?: SceneScriptCamera[];
+  directorView?: SceneScriptCamera;
   activeCameraId?: string | null;
   cameraAnimations?: DirectorCameraAnimation[];
   panorama?: SceneScriptPanorama | null;
@@ -537,6 +545,7 @@ export function addProp(input: SceneScriptProp = {}) {
   if (input.color ?? preset?.color) nextState.updateObjectColor(prop.id, input.color ?? preset?.color ?? prop.color ?? "#d7e7ff");
   if (input.material) nextState.updateObjectMaterial(prop.id, input.material);
   if (input.geometryAnchor) nextState.updateObjectGeometryAnchor(prop.id, input.geometryAnchor);
+  if (input.geometrySize) nextState.updateObjectGeometrySize(prop.id, toScaleTuple(input.geometrySize, [1, 1, 1]));
   nextState.updateObjectTransform(prop.id, {
     position: toTuple3(input.position, prop.transform.position),
     rotation: normalizeRotation(input, prop.transform.rotation),
@@ -561,6 +570,7 @@ export function addGroup(input: SceneScriptGroup = {}) {
     parentId: input.parentId ?? null,
     pivot: toTuple3(input.pivot, [0, 0, 0]),
     transform,
+    assemblySelectionMode: input.selectionMode,
   });
   const animation = normalizeObjectAnimation(id, input.name ?? "组合", input.animation);
   if (animation) useDirectorStore.getState().setObjectAnimationTrack(id, animation);
@@ -576,6 +586,7 @@ export function updateProp(input: SceneScriptProp & { id?: string; name?: string
   if (input.color) store.updateObjectColor(target.id, input.color);
   if (input.material) store.updateObjectMaterial(target.id, input.material);
   if (input.geometryAnchor) store.updateObjectGeometryAnchor(target.id, input.geometryAnchor);
+  if (input.geometrySize) store.updateObjectGeometrySize(target.id, toScaleTuple(input.geometrySize, target.geometrySize ?? [1, 1, 1]));
   store.updateObjectTransform(target.id, getTransformPatch(input, target.transform));
   if (input.parentId !== undefined) store.setObjectParent(target.id, input.parentId);
   if (input.pivot) store.updateObjectPivot(target.id, toTuple3(input.pivot, target.pivot ?? [0, 0, 0]));
@@ -733,6 +744,9 @@ function isSceneScriptGroup(value: SceneScriptGroup | SceneScriptProp): value is
 
 export function applySceneScript(script: SceneScript = {}) {
   const scenePlan = script.scenePlan ? validateScenePlan(script.scenePlan).plan : null;
+  const proceduralConversions = (script.proceduralObjects ?? []).map(convertObjectSculptSpecToSceneScript);
+  const proceduralGroups = proceduralConversions.flatMap((conversion) => conversion.script.groups ?? []);
+  const proceduralWarnings = proceduralConversions.flatMap((conversion) => conversion.warnings);
   if (script.reset) {
     const project = createDefaultDirectorProject({ includePersistedLocalAssets: true });
     useDirectorStore.getState().replaceProject({
@@ -763,23 +777,37 @@ export function applySceneScript(script: SceneScript = {}) {
   const objectIdMap = new Map<string, string>();
   const groupIds: string[] = [];
   const propIds: string[] = [];
-  const createPart = (part: SceneScriptGroup | SceneScriptProp, inheritedParentId: string | null = null) => {
+  const createPart = (
+    part: SceneScriptGroup | SceneScriptProp,
+    inheritedParentId: string | null = null,
+    inheritedAssemblyRootId: string | null = null
+  ) => {
     const requestedParentId = part.parentId ? objectIdMap.get(part.parentId) ?? part.parentId : inheritedParentId;
     if (isSceneScriptGroup(part)) {
       const id = addGroup({ ...part, parentId: requestedParentId }).id;
       groupIds.push(id);
       if (part.id) objectIdMap.set(part.id, id);
-      (part.children ?? []).forEach((child) => createPart(child, id));
+      const assemblyRootId = part.selectionMode === "whole" ? id : inheritedAssemblyRootId;
+      if (assemblyRootId) {
+        useDirectorStore.getState().setObjectAssemblyMetadata(id, {
+          assemblyRootId,
+          assemblySelectionMode: part.selectionMode,
+        });
+      }
+      (part.children ?? []).forEach((child) => createPart(child, id, assemblyRootId));
       return;
     }
     expandPropCopies({ ...part, parentId: requestedParentId }).forEach((copy) => {
       const id = addProp(copy).id;
       propIds.push(id);
       if (copy.id) objectIdMap.set(copy.id, id);
-      (part.children ?? []).forEach((child) => createPart(child, id));
+      if (inheritedAssemblyRootId) {
+        useDirectorStore.getState().setObjectAssemblyMetadata(id, { assemblyRootId: inheritedAssemblyRootId });
+      }
+      (part.children ?? []).forEach((child) => createPart(child, id, inheritedAssemblyRootId));
     });
   };
-  (script.groups ?? []).forEach((group) => createPart({ ...group, kind: "group" }));
+  [...(script.groups ?? []), ...proceduralGroups].forEach((group) => createPart({ ...group, kind: "group" }));
   (script.props ?? []).forEach((prop) => createPart(prop));
   const requestedCameras = [...(script.camera ? [script.camera] : []), ...(script.cameras ?? [])];
   const cameraIdMap = new Map<string, string>();
@@ -800,6 +828,11 @@ export function applySceneScript(script: SceneScript = {}) {
   if (activeCameraId && useDirectorStore.getState().project.cameras.some((camera) => camera.id === activeCameraId)) {
     useDirectorStore.getState().setActiveCamera(activeCameraId);
   }
+  if (script.directorView && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("storyai:director-view", {
+      detail: cameraSnapshotFromInput(script.directorView),
+    }));
+  }
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
   syncImportedNormalCharacterAnimations();
 
@@ -810,6 +843,7 @@ export function applySceneScript(script: SceneScript = {}) {
     cameraIds,
     scenePlan: scenePlan ? buildScenePlanReview(scenePlan) : null,
     structureReview: buildAssemblyReview(),
+    proceduralWarnings,
   };
 }
 
@@ -893,6 +927,7 @@ export function exportSceneScript(): SceneScript {
         rotation: object.transform.rotation,
         scale: object.transform.scale,
         pivot: object.pivot,
+        selectionMode: object.assemblySelectionMode,
         animation: animationFromObject(object),
         children,
       };
@@ -907,6 +942,7 @@ export function exportSceneScript(): SceneScript {
       pivot: object.pivot,
       color: object.color,
       geometryAnchor: object.geometryAnchor,
+      geometrySize: object.geometrySize,
       material: object.material,
       animation: animationFromObject(object),
       children,

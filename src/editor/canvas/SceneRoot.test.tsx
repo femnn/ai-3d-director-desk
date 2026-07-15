@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Box3, Vector3 } from "three";
 import { afterEach, beforeEach, vi } from "vitest";
 import { VIEWPORT_CAMERA_VISUAL_SCALE } from "../schema/cameraGeometry";
+import type { DirectorObject } from "../schema/directorProject";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
-import { getImportedModelNormalization, SceneRoot } from "./SceneRoot";
+import { getImportedModelNormalization, getViewportSelectionObject, SceneRoot } from "./SceneRoot";
 
 const mockCharacterModelShouldSuspend = vi.hoisted(() => ({ current: false }));
 
@@ -562,4 +563,32 @@ it("uses the built-in UE4 mannequin rig for default generated characters", () =>
   render(<SceneRoot />);
 
   expect(screen.getByTestId("mock-character-model")).toHaveAttribute("data-rig-type", "ue4-mannequin");
+});
+
+it("resolves viewport part clicks to a whole procedural assembly root", () => {
+  const transform = { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] } as const;
+  const root: DirectorObject = {
+    id: "assembly_car",
+    name: "汽车总成",
+    kind: "group",
+    visible: true,
+    locked: false,
+    transform: { position: [...transform.position], rotation: [...transform.rotation], scale: [...transform.scale] },
+    assemblyRootId: "assembly_car",
+    assemblySelectionMode: "whole",
+  };
+  const wheel: DirectorObject = {
+    id: "wheel_front",
+    name: "前轮",
+    kind: "prop",
+    visible: true,
+    locked: false,
+    transform: { position: [...transform.position], rotation: [...transform.rotation], scale: [...transform.scale] },
+    parentId: root.id,
+    assemblyRootId: root.id,
+    geometryType: "torus",
+  };
+
+  expect(getViewportSelectionObject(wheel, [root, wheel])).toBe(root);
+  expect(getViewportSelectionObject({ ...wheel, assemblyRootId: null }, [root, wheel]).id).toBe(wheel.id);
 });

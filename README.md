@@ -50,7 +50,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **机位监看与视频录制**：手机和电脑显示同一实时机位画面，支持 5 / 10 / 15 秒轨迹录制与 MP4 导出。
 - **角色姿势与动画**：提供循环动作、镜头移动驱动动作、视频动作提取、图片姿势提取、骨骼编辑和 AnimoFlow 文字动作入口。
 - **AI 快速布景**：Agent 通过白名单 JSON 命令创建角色、道具、站位和机位，不执行任意脚本。
-- **参考图程序化道具**：兼容 ObjectSculptSpec，把 AI 从参考图拆出的部件树导入为可编辑、可分层、可动画的导演台道具，并保留金属度、粗糙度和透明度。
+- **参考图程序化场景**：兼容 ObjectSculptSpec，AI 可在同一布景命令中生成汽车、火车、飞机或建筑总成；画面点击整体移动，对象树展开后精修零件，并保留材质与动画。
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
 - **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **多人多机位**：多台手机同时加入时分别控制独立机位，机位不足时自动创建。
@@ -107,9 +107,9 @@ npm run dev
 
 布景命令使用固定 JSON schema，不接受任意 JavaScript。
 
-`apply_scene_script` 支持递归 `groups[].children` 部件树，以及 `repeat`、`mirror`、`pathCopy`。几何体支持立方体、圆角盒、球体、椭球体、半球、胶囊体、圆柱体、管道、圆盘、水平面、竖直卡片、楔形、环状体、圆锥和棱锥。任意组合或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
+`apply_scene_script` 直接支持 `proceduralObjects`，也支持递归 `groups[].children`，以及 `repeat`、`mirror`、`pathCopy`。程序化总成使用独立网格尺寸，车身不会再次拉伸车轮或车窗；任意整体或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
 
-参考图生成复杂道具时，可让 Codex 按 [ObjectSculptSpec 导入指南](docs/AI_SCENE_SCRIPT_GUIDE.md#从参考图生成更真实的程序化道具) 输出 JSON，再在 AI 布景面板直接导入。导演台只解析白名单结构，不执行 AI 生成的任意 JavaScript。
+参考图生成复杂场景时，可让 Codex 按 [ObjectSculptSpec 导入指南](docs/AI_SCENE_SCRIPT_GUIDE.md#从参考图生成更真实的程序化道具) 输出 `proceduralObjects`，再在 AI 布景面板直接导入。汽车和列车验收示例见 [`procedural-vehicle-yard.json`](examples/scene-scripts/procedural-vehicle-yard.json)。导演台只解析白名单结构，不执行 AI 生成的任意 JavaScript。
 
 ### 致谢与来源
 

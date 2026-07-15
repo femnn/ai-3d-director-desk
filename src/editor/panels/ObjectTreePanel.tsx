@@ -7,6 +7,7 @@ type SceneTreePreviewItem = {
   id: string;
   name: string;
   icon: ObjectTreeIconKind;
+  object?: DirectorObject;
 };
 
 type SceneTreeItem = {
@@ -54,7 +55,7 @@ function isEditableKeyboardTarget(target: EventTarget | null) {
 
 export function ObjectTreePanel() {
   const [query, setQuery] = useState("");
-  const [expandedCrowdIds, setExpandedCrowdIds] = useState<string[]>([]);
+  const [expandedItemIds, setExpandedItemIds] = useState<string[]>([]);
   const assets = useDirectorStore((state) => state.project.assets);
   const objects = useDirectorStore((state) => state.project.objects);
   const selectedObjectId = useDirectorStore((state) => state.selectedObjectId);
@@ -99,6 +100,13 @@ export function ObjectTreePanel() {
   const groupedItems = useMemo(() => {
     const crowdItems = new Map<string, SceneTreeItem>();
     const regularItems: SceneTreeItem[] = [];
+    const assemblyMembersByRootId = new Map<string, DirectorObject[]>();
+    objects.forEach((object) => {
+      if (!object.assemblyRootId || object.assemblyRootId === object.id) return;
+      const members = assemblyMembersByRootId.get(object.assemblyRootId) ?? [];
+      members.push(object);
+      assemblyMembersByRootId.set(object.assemblyRootId, members);
+    });
 
     objects.forEach((object) => {
       if (object.kind === "character" && object.crowdId && object.crowdLabel) {
@@ -133,6 +141,8 @@ export function ObjectTreePanel() {
         return;
       }
 
+      if (object.assemblyRootId && object.assemblyRootId !== object.id) return;
+
       regularItems.push({
         id: object.id,
         name: object.parentId ? `↳ ${object.name}` : object.name,
@@ -148,6 +158,14 @@ export function ObjectTreePanel() {
                 : "geometry",
         object,
         objectIds: [object.id],
+        previewChildren: object.assemblySelectionMode === "whole"
+          ? (assemblyMembersByRootId.get(object.id) ?? []).map((member) => ({
+              id: member.id,
+              name: member.name,
+              icon: member.kind === "group" ? "group" : member.assetRefId ? "model" : "geometry",
+              object: member,
+            }))
+          : undefined,
       });
     });
 
@@ -166,9 +184,13 @@ export function ObjectTreePanel() {
   }, [objects, assetsById]);
 
   useEffect(() => {
-    const crowdIds = new Set(groupedItems.crowd.map((item) => item.id));
-    setExpandedCrowdIds((current) => current.filter((crowdId) => crowdIds.has(crowdId)));
-  }, [groupedItems.crowd]);
+    const expandableIds = new Set(
+      [...groupedItems.crowd, ...groupedItems.geometry, ...groupedItems.myModels]
+        .filter((item) => item.previewChildren?.length)
+        .map((item) => item.id)
+    );
+    setExpandedItemIds((current) => current.filter((id) => expandableIds.has(id)));
+  }, [groupedItems.crowd, groupedItems.geometry, groupedItems.myModels]);
 
   const filteredGroups = GROUP_LABELS.map((group) => {
     const itemsByGroup =
@@ -278,9 +300,9 @@ export function ObjectTreePanel() {
     selectObject(item.id);
   }
 
-  function toggleCrowdExpanded(crowdId: string) {
-    setExpandedCrowdIds((current) =>
-      current.includes(crowdId) ? current.filter((item) => item !== crowdId) : [...current, crowdId]
+  function toggleItemExpanded(itemId: string) {
+    setExpandedItemIds((current) =>
+      current.includes(itemId) ? current.filter((item) => item !== itemId) : [...current, itemId]
     );
   }
 
@@ -347,7 +369,7 @@ export function ObjectTreePanel() {
                       : selectedObjectIds.length
                         ? selectedObjectIds.includes(item.id)
                         : item.id === selectedObjectId;
-                  const expanded = item.crowdId ? expandedCrowdIds.includes(item.crowdId) : false;
+                  const expanded = Boolean(item.previewChildren?.length && expandedItemIds.includes(item.id));
 
                   return (
                     <li key={item.id} className="object-list-item">
@@ -359,14 +381,14 @@ export function ObjectTreePanel() {
                         onClick={(event) => selectTreeItem(item, event)}
                       >
                         <div className="object-row-main">
-                          {item.crowdId ? (
+                          {item.previewChildren?.length ? (
                             <button
                               aria-label={`${expanded ? "收起" : "展开"} ${item.name}`}
                               className="object-row-toggle-button"
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                toggleCrowdExpanded(item.crowdId as string);
+                                toggleItemExpanded(item.id);
                               }}
                             >
                               {expanded ? (
@@ -427,17 +449,24 @@ export function ObjectTreePanel() {
                           <Trash2 aria-hidden="true" size={15} strokeWidth={1.8} />
                         </button>
                       </div>
-                      {item.crowdId && expanded && item.previewChildren?.length ? (
-                        <ul className="object-crowd-preview-list" aria-label={`${item.name} 成员预览`}>
+                      {expanded && item.previewChildren?.length ? (
+                        <ul className="object-crowd-preview-list" aria-label={`${item.name} 部件预览`}>
                           {item.previewChildren.map((child) => (
                             <li key={child.id}>
-                              <div className={`object-row object-row-preview${selected ? " is-selected" : ""}`}>
+                              <div className={`object-row object-row-preview${selectedObjectId === child.id ? " is-selected" : ""}`}>
                                 <span className="object-row-preview-spacer" aria-hidden="true" />
                                 <div className="object-row-main">
                                   <button
                                     className="object-select-button"
                                     type="button"
-                                    onClick={(event) => selectTreeItem(item, event)}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (item.crowdId) {
+                                        selectTreeItem(item, event);
+                                      } else {
+                                        selectObject(child.id);
+                                      }
+                                    }}
                                   >
                                     <ObjectKindIcon icon={child.icon} />
                                     <span>{child.name}</span>

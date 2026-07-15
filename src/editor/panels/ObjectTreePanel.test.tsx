@@ -342,6 +342,29 @@ it("groups multiple selected props from the object tree", async () => {
   expect(useDirectorStore.getState().project.objects.filter((object) => object.parentId === group?.id)).toHaveLength(2);
 });
 
+it("collapses generated assemblies while keeping their parts directly editable", async () => {
+  const user = userEvent.setup();
+  const store = useDirectorStore.getState();
+  const rootId = store.addGroup({ name: "测试汽车", assemblySelectionMode: "whole" });
+  useDirectorStore.getState().setObjectAssemblyMetadata(rootId, {
+    assemblyRootId: rootId,
+    assemblySelectionMode: "whole",
+  });
+  useDirectorStore.getState().addGeometryPrimitive("rounded-box");
+  const bodyId = useDirectorStore.getState().selectedObjectId!;
+  useDirectorStore.getState().updateObjectName(bodyId, "车身");
+  useDirectorStore.getState().setObjectParent(bodyId, rootId);
+  useDirectorStore.getState().setObjectAssemblyMetadata(bodyId, { assemblyRootId: rootId });
+
+  render(<ObjectTreePanel />);
+
+  expect(screen.getByRole("button", { name: "测试汽车" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "车身" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "展开 测试汽车" }));
+  await user.click(screen.getByRole("button", { name: "车身" }));
+  expect(useDirectorStore.getState().selectedObjectId).toBe(bodyId);
+});
+
 it("deletes all selected rows when users press the keyboard delete key", async () => {
   const user = userEvent.setup();
   useDirectorStore.getState().addPresetCharacter("female");

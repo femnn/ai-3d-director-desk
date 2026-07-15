@@ -126,6 +126,11 @@ export interface DirectorActions {
   updateObjectColor: (id: string, color: string) => void;
   updateObjectMaterial: (id: string, material: DirectorMaterialSettings) => void;
   updateObjectGeometryAnchor: (id: string, anchor: "base" | "center") => void;
+  updateObjectGeometrySize: (id: string, size: [number, number, number]) => void;
+  setObjectAssemblyMetadata: (
+    id: string,
+    metadata: { assemblyRootId?: string | null; assemblySelectionMode?: "whole" | "parts" }
+  ) => void;
   updateCrowdColor: (crowdId: string, color: string) => void;
   updateCharacterBodyType: (id: string, bodyType: CharacterBodyType) => void;
   updateUniformScale: (id: string, scale: number) => void;
@@ -137,7 +142,13 @@ export interface DirectorActions {
   addPresetCharacter: (bodyType?: CharacterBodyType) => void;
   addCrowdCharacters: (input: CrowdCharactersInput) => string[];
   addGeometryPrimitive: (geometryType: GeometryPrimitiveType) => void;
-  addGroup: (input?: { name?: string; parentId?: string | null; transform?: Partial<DirectorTransform>; pivot?: [number, number, number] }) => string;
+  addGroup: (input?: {
+    name?: string;
+    parentId?: string | null;
+    transform?: Partial<DirectorTransform>;
+    pivot?: [number, number, number];
+    assemblySelectionMode?: "whole" | "parts";
+  }) => string;
   groupObjects: (objectIds?: string[], name?: string) => string | null;
   setObjectAnimationTrack: (id: string, track: ObjectAnimationTrack | null) => void;
   addCameraShot: (snapshot?: CameraShotSnapshot) => string;
@@ -1687,6 +1698,22 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, geometryAnchor })),
         },
       })),
+    updateObjectGeometrySize: (id, geometrySize) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, geometrySize })),
+        },
+      })),
+    setObjectAssemblyMetadata: (id, metadata) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, ...metadata })),
+        },
+      })),
     updateCrowdColor: (crowdId, color) =>
       commitMutation((state) => ({
         ...state,
@@ -2059,6 +2086,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           locked: false,
           parentId: input.parentId ?? null,
           pivot: input.pivot ?? [0, 0, 0],
+          assemblySelectionMode: input.assemblySelectionMode,
           transform: {
             position: input.transform?.position ?? [0, 0, 0],
             rotation: input.transform?.rotation ?? [0, 0, 0],
@@ -2101,6 +2129,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           locked: false,
           transform: createTransform(center),
           pivot: [0, 0, 0],
+          assemblyRootId: groupId,
+          assemblySelectionMode: "whole",
         };
         const selectedIds = new Set(selected.map((item) => item.id));
         const objects = state.project.objects.map((item) =>
@@ -2108,6 +2138,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             ? {
                 ...item,
                 parentId: groupId,
+                assemblyRootId: groupId,
                 transform: {
                   ...item.transform,
                   position: item.transform.position.map((value, axis) => Number((value - center[axis]).toFixed(4))) as [number, number, number],

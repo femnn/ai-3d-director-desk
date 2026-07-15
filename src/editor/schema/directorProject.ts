@@ -188,7 +188,12 @@ export interface DirectorObject {
   geometryType?: GeometryPrimitiveType;
   /** Procedural parts use centered unit geometry so local component transforms stay predictable. */
   geometryAnchor?: "base" | "center";
+  /** Visual mesh dimensions, intentionally separate from the node transform inherited by children. */
+  geometrySize?: [number, number, number];
   material?: DirectorMaterialSettings;
+  /** Viewport clicks resolve to this root so a generated vehicle or building moves as one assembly. */
+  assemblyRootId?: string | null;
+  assemblySelectionMode?: "whole" | "parts";
   crowdId?: string;
   crowdLabel?: string;
   linkedCameraId?: string | null;

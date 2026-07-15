@@ -10,17 +10,17 @@ apply_scene_script 直接导入的 JSON 对象。
 
 硬性规则：
 1. 只输出 JSON，不输出 Markdown、解释或注释。
-2. 根对象使用 reset、scenePlan、characters、groups、props、cameras、activeCameraId。
+2. 根对象使用 reset、scenePlan、characters、proceduralObjects、groups、props、cameras、directorView、activeCameraId。
 3. 坐标单位为米，Y 轴向上；rotation 使用弧度；比例必须是 [x,y,z]。
-4. 复杂道具必须使用 groups[].children 的部件树，不要输出互不关联的散乱几何体。
-5. 子部件 position/rotation/scale 是相对父级的局部坐标。
-6. 门、翅膀、车轮等旋转部件必须设置 pivot，并把动画放在该子部件上。
-7. 整体移动动画放在最外层 group；局部动作放在对应 child。
+4. 汽车、火车、飞机、建筑、龙等可识别整体必须使用 proceduralObjects；groups 只用于简单手工组合。
+5. 子部件 dimensions 是可见尺寸，position/rotation 是相对父级的局部坐标；通常保持 transform.scale=[1,1,1]。
+6. 门、翅膀、车轮等旋转部件必须设置 actionProfile.pivot.localPosition，并把动画放在该子部件上。
+7. 整体移动动画放在 proceduralObjects[].directorAnimation；局部动作放在对应 componentTree[] 部件。
 8. 动画 duration 只能是 5、10 或 15；默认 loop=true。
 9. 路径至少提供 2 个点；飞行和转弯使用 curve，机械直线运动使用 linear。
 10. characters 必须明确 name、bodyType、color、pose/poseControls、position、rotation、scale 和 action。
 11. 相对站位要留出人体和道具尺寸，避免角色、桌椅、墙体互相穿插。
-12. 至少创建一个 cameras 条目，position 与 lookAt 必须构成可见构图。
+12. 至少创建一个 cameras 条目，并提供 directorView；position 与 lookAt 必须能完整看见所有主体。
 
 生成前先在 scenePlan 中写清楚意图、角色关系、环境、组合物体及动作；再输出具体部件。
 输出前自检：层级正确、ID 唯一、父子局部坐标合理、路径点数量足够、机位能看见主体。
@@ -39,75 +39,56 @@ apply_scene_script 直接导入的 JSON 对象。
 ```json
 {
   "reset": true,
-  "scenePlan": {
-    "intent": "一列火车从画面左侧驶向右侧",
-    "roles": [],
-    "environment": "简化站台",
-    "composition": "三分构图，机位正侧面观察",
-    "assemblies": [
-      { "name": "火车", "parts": ["车身", "车轮"], "motion": "整体直线移动，车轮循环旋转" }
-    ]
-  },
   "characters": [],
-  "groups": [
+  "proceduralObjects": [
     {
-      "id": "train",
-      "kind": "group",
-      "name": "火车",
-      "position": [-4, 0.8, 0],
-      "rotation": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "animation": {
-        "duration": 10,
+      "targetName": "红色轿车",
+      "directorPlacement": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "directorAnimation": {
+        "duration": 15,
         "loop": true,
         "enabled": true,
         "playbackMode": "normal",
         "path": {
           "type": "linear",
-          "closed": false,
+          "closed": true,
           "orientToPath": false,
-          "points": [[-4, 0.8, 0], [4, 0.8, 0]]
+          "points": [[-3, 0, 0], [3, 0, 0]]
         }
       },
-      "children": [
+      "materials": [
+        { "id": "paint", "baseColor": "#d83b32", "roughness": 0.26, "metalness": 0.48 },
+        { "id": "tire", "baseColor": "#24282d", "roughness": 0.88, "metalness": 0.02 }
+      ],
+      "componentTree": [
         {
-          "id": "train_body",
+          "id": "body",
           "name": "车身",
-          "geometryType": "rounded-box",
-          "position": [0, 0, 0],
-          "rotation": [0, 0, 0],
-          "scale": [3, 1, 1],
-          "color": "#B53A32"
+          "primitive": "box",
+          "parent": null,
+          "material": "paint",
+          "dimensions": { "width": 4.2, "height": 0.8, "depth": 1.8 },
+          "transform": { "position": [0, 0.85, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "bevelRadius": 0.14 } }
         },
         {
-          "id": "train_wheel",
-          "name": "车轮",
-          "geometryType": "disc",
-          "position": [-1, -0.65, 0.55],
-          "rotation": [0, 0, 0],
-          "scale": [0.4, 0.4, 0.2],
-          "color": "#20252C",
-          "repeat": { "count": 3, "offset": [1, 0, 0] },
-          "mirror": { "axis": "z" },
-          "animation": {
-            "duration": 5,
-            "loop": true,
-            "enabled": true,
-            "playbackMode": "normal",
-            "keyframes": [
-              { "time": 0, "rotation": [0, 0, 0] },
-              { "time": 5, "rotation": [6.2832, 0, 0] }
-            ]
-          }
+          "id": "front-wheel",
+          "name": "前轮",
+          "primitive": "torus",
+          "parent": null,
+          "material": "tire",
+          "dimensions": { "width": 0.78, "height": 0.78, "depth": 0.28 },
+          "transform": { "position": [1.3, 0.48, 0.94], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
         }
       ]
     }
   ],
-  "props": [],
   "cameras": [
-    { "id": "cam_train", "name": "火车侧面机位", "position": [0, 2.3, 8], "lookAt": [0, 1, 0], "fov": 42 }
+    { "id": "cam-car", "name": "车辆展示机位", "position": [7, 4, 9], "lookAt": [0, 1, 0], "fov": 45 }
   ],
-  "activeCameraId": "cam_train"
+  "directorView": { "position": [7, 4, 9], "lookAt": [0, 1, 0], "fov": 45 },
+  "activeCameraId": "cam-car"
 }
 ```
 
@@ -194,6 +175,8 @@ apply_scene_script 直接导入的 JSON 对象。
 - `componentTree[]`：每个部件的 `id`、`name`、`parent`、`primitive`、`dimensions`、`transform`、`material`。
 - `actionProfile.pivot.localPosition`：门轴、轮轴、翼根等局部旋转轴。
 - `directorPlacement`：整个道具导入导演台时的位置、旋转和缩放。
+- `directorAnimation`：整个汽车、火车、飞机或其他总成的 5 / 10 / 15 秒运动。
+- `repeat` / `mirror`：阵列和镜像车轮、车窗、栏杆、灯具等重复部件。
 
 推荐直接把下面的指令和物体参考图交给 Codex：
 
@@ -202,7 +185,7 @@ apply_scene_script 直接导入的 JSON 对象。
 
 要求：
 1. 只输出合法 JSON，不输出 Markdown、解释、注释或 JavaScript。
-2. 顶层必须包含 targetName、materials、componentTree，可选 directorPlacement。
+2. 顶层必须包含 targetName、materials、componentTree，可选 directorPlacement、directorAnimation。
 3. 坐标单位按米估算，Y 轴向上，rotation 使用弧度。
 4. 先匹配主体轮廓、长宽高比例、负空间和最有辨识度的部件，再添加小细节。
 5. 每个部件必须有唯一 id；parent 必须引用已有部件 id 或为 null；所有变换均为相对父级的局部坐标。
@@ -211,10 +194,14 @@ apply_scene_script 直接导入的 JSON 对象。
 8. 材质必须明确 baseColor、roughness、metalness；玻璃或半透明部件再填写 opacity。
 9. 门、轮、把手、翅膀等可动部件必须单独建节点，并设置 actionProfile.pivot.localPosition。
 10. 不要把整件物体写成一个部件；宏观主体、结构部件和高辨识度细节要分层。
-11. componentTree 最多 500 个部件，优先用少量有效部件表达轮廓，避免无意义高密度小球。
+11. 重复部件优先使用 repeat 和 mirror；componentTree 最多 500 个部件，避免无意义高密度小球。
 12. 输出前检查 ID 唯一、父级存在、没有循环层级、比例合理、部件没有明显穿插。
 ```
 
-导入后，每个部件都会转换为导演台原生对象：可以单独选择、改颜色和材质、调整父子层级与旋转轴，也可以给整体或局部添加 5 / 10 / 15 秒动画。`tube`、`lathe`、`extrude` 等当前没有完全对应的基础体时会使用安全近似并返回提示，不会执行生成代码。
+导入后，每个部件都会转换为导演台原生对象。画面中点击任意部件默认选中整个总成，可以整体移动、缩放、删除和添加路径动画；在对象树展开总成后仍可选择单独部件，调整尺寸、颜色、材质、父子层级与旋转轴。`tube`、`lathe`、`extrude` 等当前没有完全对应的基础体时会使用安全近似并返回提示，不会执行生成代码。
+
+新版程序化部件使用独立 `geometrySize` 保存可见尺寸，不再把车身尺寸写进会传递给子节点的 `transform.scale`。AI 在 ObjectSculptSpec 中继续填写 `dimensions` 即可，导演台导入时会自动转换。
 
 示例文件：[`examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json`](../examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json)。
+
+大型场景验收文件：[`examples/scene-scripts/procedural-vehicle-yard.json`](../examples/scene-scripts/procedural-vehicle-yard.json)。该文件在一个 `apply_scene_script` 中同时生成可整体移动的轿车、带循环路径动画的旅客列车、展示机位和导演视角。

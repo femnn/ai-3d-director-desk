@@ -1,0 +1,353 @@
+{
+  "reset": true,
+  "scene": {
+    "backgroundColor": "#26323d",
+    "showGrid": true,
+    "showGround": true,
+    "groundOpacity": 0.72,
+    "groundHeight": 0
+  },
+  "proceduralObjects": [
+    {
+      "targetName": "红色运动轿车",
+      "directorPlacement": {
+        "position": [-3.2, 0, 2.2],
+        "rotation": [0, 0.18, 0],
+        "scale": [1, 1, 1]
+      },
+      "materials": [
+        { "id": "red-paint", "baseColor": "#d83b32", "roughness": 0.26, "metalness": 0.48 },
+        { "id": "dark-glass", "baseColor": "#79b7cf", "roughness": 0.12, "metalness": 0.08, "opacity": 0.72 },
+        { "id": "tire", "baseColor": "#24282d", "roughness": 0.88, "metalness": 0.02 },
+        { "id": "alloy", "baseColor": "#cbd2d9", "roughness": 0.2, "metalness": 0.9 },
+        { "id": "light", "baseColor": "#fff1b8", "roughness": 0.12, "metalness": 0.05, "emissive": "#ffd36b", "emissiveIntensity": 1.2 }
+      ],
+      "componentTree": [
+        {
+          "id": "car-lower-body",
+          "name": "车身主体",
+          "primitive": "box",
+          "parent": null,
+          "material": "red-paint",
+          "dimensions": { "width": 4.3, "height": 0.72, "depth": 1.82 },
+          "transform": { "position": [0, 0.82, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.15, "segments": 5 } }
+        },
+        {
+          "id": "car-hood",
+          "name": "引擎盖",
+          "primitive": "box",
+          "parent": null,
+          "material": "red-paint",
+          "dimensions": { "width": 1.42, "height": 0.34, "depth": 1.7 },
+          "transform": { "position": [1.28, 1.26, 0], "rotation": [0, 0, -0.08], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.1, "segments": 4 } }
+        },
+        {
+          "id": "car-cabin",
+          "name": "驾驶舱",
+          "primitive": "box",
+          "parent": null,
+          "material": "red-paint",
+          "dimensions": { "width": 1.9, "height": 0.78, "depth": 1.58 },
+          "transform": { "position": [-0.48, 1.48, 0], "rotation": [0, 0, 0.02], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.18, "segments": 6 } }
+        },
+        {
+          "id": "car-roof",
+          "name": "车顶",
+          "primitive": "box",
+          "parent": null,
+          "material": "red-paint",
+          "dimensions": { "width": 1.42, "height": 0.16, "depth": 1.5 },
+          "transform": { "position": [-0.55, 1.94, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.07, "segments": 4 } }
+        },
+        {
+          "id": "car-side-window-front",
+          "name": "前侧窗",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "dark-glass",
+          "dimensions": { "width": 0.76, "height": 0.52, "depth": 0.02 },
+          "transform": { "position": [-0.02, 1.58, 0.798], "rotation": [0, 0, 0.02], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-side-window-rear",
+          "name": "后侧窗",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "dark-glass",
+          "dimensions": { "width": 0.7, "height": 0.5, "depth": 0.02 },
+          "transform": { "position": [-0.83, 1.58, 0.798], "rotation": [0, 0, 0.02], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-front-wheel",
+          "name": "前轮胎",
+          "primitive": "torus",
+          "parent": null,
+          "material": "tire",
+          "dimensions": { "width": 0.78, "height": 0.78, "depth": 0.28 },
+          "transform": { "position": [1.28, 0.48, 0.94], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-rear-wheel",
+          "name": "后轮胎",
+          "primitive": "torus",
+          "parent": null,
+          "material": "tire",
+          "dimensions": { "width": 0.78, "height": 0.78, "depth": 0.28 },
+          "transform": { "position": [-1.35, 0.48, 0.94], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-front-rim",
+          "name": "前轮毂",
+          "primitive": "cylinder",
+          "parent": null,
+          "material": "alloy",
+          "dimensions": { "width": 0.42, "height": 0.16, "depth": 0.42 },
+          "transform": { "position": [1.28, 0.48, 0.965], "rotation": [1.5708, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-rear-rim",
+          "name": "后轮毂",
+          "primitive": "cylinder",
+          "parent": null,
+          "material": "alloy",
+          "dimensions": { "width": 0.42, "height": 0.16, "depth": 0.42 },
+          "transform": { "position": [-1.35, 0.48, 0.965], "rotation": [1.5708, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-headlight",
+          "name": "前灯",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "light",
+          "dimensions": { "width": 0.4, "height": 0.22, "depth": 0.02 },
+          "transform": { "position": [2.16, 1.08, 0.52], "rotation": [0, 1.5708, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "car-bumper",
+          "name": "前保险杠",
+          "primitive": "box",
+          "parent": null,
+          "material": "alloy",
+          "dimensions": { "width": 0.18, "height": 0.16, "depth": 1.56 },
+          "transform": { "position": [2.2, 0.62, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.04, "segments": 3 } }
+        }
+      ]
+    },
+    {
+      "targetName": "红色旅客列车",
+      "directorPlacement": {
+        "position": [-1.2, 0, -4.2],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "directorAnimation": {
+        "duration": 15,
+        "loop": true,
+        "enabled": true,
+        "playbackMode": "normal",
+        "path": {
+          "type": "linear",
+          "closed": true,
+          "orientToPath": false,
+          "points": [[-1.2, 0, -4.2], [2.8, 0, -4.2]]
+        }
+      },
+      "materials": [
+        { "id": "train-red", "baseColor": "#b92f32", "roughness": 0.34, "metalness": 0.36 },
+        { "id": "train-cream", "baseColor": "#e6d6b6", "roughness": 0.5, "metalness": 0.08 },
+        { "id": "train-dark", "baseColor": "#2d343c", "roughness": 0.62, "metalness": 0.42 },
+        { "id": "train-steel", "baseColor": "#aab3bd", "roughness": 0.25, "metalness": 0.88 },
+        { "id": "train-window", "baseColor": "#72aec2", "roughness": 0.15, "metalness": 0.1, "opacity": 0.76 }
+      ],
+      "componentTree": [
+        {
+          "id": "train-frame",
+          "name": "列车底盘",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-dark",
+          "dimensions": { "width": 13.4, "height": 0.36, "depth": 2.05 },
+          "transform": { "position": [0, 0.68, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.06, "segments": 3 } }
+        },
+        {
+          "id": "locomotive-boiler",
+          "name": "机车锅炉",
+          "primitive": "cylinder",
+          "parent": null,
+          "material": "train-red",
+          "dimensions": { "width": 1.55, "height": 3.25, "depth": 1.55 },
+          "transform": { "position": [-4.75, 1.65, 0], "rotation": [0, 0, -1.5708], "scale": [1, 1, 1] }
+        },
+        {
+          "id": "locomotive-cab",
+          "name": "机车驾驶室",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-red",
+          "dimensions": { "width": 1.65, "height": 2.25, "depth": 1.92 },
+          "transform": { "position": [-6.05, 1.68, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.09, "segments": 4 } }
+        },
+        {
+          "id": "locomotive-roof",
+          "name": "机车顶棚",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-cream",
+          "dimensions": { "width": 1.9, "height": 0.18, "depth": 2.12 },
+          "transform": { "position": [-6.05, 2.9, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.08, "segments": 4 } }
+        },
+        {
+          "id": "smoke-stack",
+          "name": "烟囱",
+          "primitive": "cylinder",
+          "parent": null,
+          "material": "train-dark",
+          "dimensions": { "width": 0.62, "height": 1.22, "depth": 0.62 },
+          "transform": { "position": [-3.62, 2.72, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
+        },
+        {
+          "id": "smoke-stack-cap",
+          "name": "烟囱帽",
+          "primitive": "cone",
+          "parent": null,
+          "material": "train-dark",
+          "dimensions": { "width": 0.9, "height": 0.52, "depth": 0.9 },
+          "transform": { "position": [-3.62, 3.46, 0], "rotation": [3.1416, 0, 0], "scale": [1, 1, 1] }
+        },
+        {
+          "id": "coach-a",
+          "name": "一号车厢",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-cream",
+          "dimensions": { "width": 3.65, "height": 2.15, "depth": 1.9 },
+          "transform": { "position": [-0.85, 1.65, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.11, "segments": 5 } }
+        },
+        {
+          "id": "coach-b",
+          "name": "二号车厢",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-cream",
+          "dimensions": { "width": 3.65, "height": 2.15, "depth": 1.9 },
+          "transform": { "position": [3.25, 1.65, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.11, "segments": 5 } }
+        },
+        {
+          "id": "coach-roof-a",
+          "name": "一号车顶",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-red",
+          "dimensions": { "width": 3.85, "height": 0.2, "depth": 2.05 },
+          "transform": { "position": [-0.85, 2.82, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.08, "segments": 4 } }
+        },
+        {
+          "id": "coach-roof-b",
+          "name": "二号车顶",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-red",
+          "dimensions": { "width": 3.85, "height": 0.2, "depth": 2.05 },
+          "transform": { "position": [3.25, 2.82, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.08, "segments": 4 } }
+        },
+        {
+          "id": "train-wheel",
+          "name": "列车车轮",
+          "primitive": "torus",
+          "parent": null,
+          "material": "train-dark",
+          "dimensions": { "width": 0.7, "height": 0.7, "depth": 0.22 },
+          "transform": { "position": [-5.65, 0.48, 1.03], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "repeat": { "count": 9, "offset": [1.35, 0, 0] },
+          "mirror": { "axis": "z" },
+          "animation": {
+            "duration": 5,
+            "loop": true,
+            "enabled": true,
+            "playbackMode": "normal",
+            "keyframes": [
+              { "time": 0, "rotation": [0, 0, 0] },
+              { "time": 5, "rotation": [0, 0, 6.2832] }
+            ]
+          }
+        },
+        {
+          "id": "coach-window-a",
+          "name": "一号车窗",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "train-window",
+          "dimensions": { "width": 0.58, "height": 0.72, "depth": 0.02 },
+          "transform": { "position": [-2.15, 1.82, 0.956], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "repeat": { "count": 4, "offset": [0.86, 0, 0] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "coach-window-b",
+          "name": "二号车窗",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "train-window",
+          "dimensions": { "width": 0.58, "height": 0.72, "depth": 0.02 },
+          "transform": { "position": [1.95, 1.82, 0.956], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "repeat": { "count": 4, "offset": [0.86, 0, 0] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "cab-window",
+          "name": "驾驶室窗",
+          "primitive": "plane-card",
+          "parent": null,
+          "material": "train-window",
+          "dimensions": { "width": 0.7, "height": 0.78, "depth": 0.02 },
+          "transform": { "position": [-6.05, 1.9, 0.966], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "mirror": { "axis": "z" }
+        },
+        {
+          "id": "front-buffer",
+          "name": "机车前保险杠",
+          "primitive": "box",
+          "parent": null,
+          "material": "train-steel",
+          "dimensions": { "width": 0.22, "height": 0.24, "depth": 1.72 },
+          "transform": { "position": [-6.82, 0.7, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+          "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.04, "segments": 3 } }
+        }
+      ]
+    }
+  ],
+  "cameras": [
+    {
+      "id": "vehicle-yard-camera",
+      "name": "车辆展示机位",
+      "position": [10.5, 6.8, 15.5],
+      "lookAt": [-0.5, 1.25, -1.2],
+      "fov": 48
+    }
+  ],
+  "directorView": {
+    "position": [10.5, 6.8, 15.5],
+    "lookAt": [-0.5, 1.25, -1.2],
+    "fov": 48
+  },
+  "activeCameraId": "vehicle-yard-camera"
+}

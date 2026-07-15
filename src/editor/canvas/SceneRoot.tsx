@@ -34,6 +34,12 @@ import { getObjectAnimationElapsed, sampleObjectAnimation } from "../animation/o
 
 export { getEffectiveGroundOpacity, getPanoramaRotationRadians } from "./panoramaMath";
 
+export function getViewportSelectionObject(item: DirectorObject, objects: DirectorObject[]) {
+  if (!item.assemblyRootId) return item;
+  const root = objects.find((candidate) => candidate.id === item.assemblyRootId);
+  return root?.assemblySelectionMode === "whole" ? root : item;
+}
+
 const VIEWPORT_CAMERA_LINE = "#A9D8FF";
 const VIEWPORT_CAMERA_LINE_OPACITY = 0.92;
 const VIEWPORT_CAMERA_HIT_PADDING = 0.06;
@@ -1268,7 +1274,14 @@ function ObjectSceneNode({
           ) : null}
         </>
       ) : item.kind === "prop" && item.geometryType ? (
-        <GeometryPrimitiveModel color={item.color} geometryAnchor={item.geometryAnchor} geometryType={item.geometryType} materialSettings={item.material} />
+        <group scale={item.geometrySize ?? [1, 1, 1]}>
+          <GeometryPrimitiveModel
+            color={item.color}
+            geometryAnchor={item.geometryAnchor}
+            geometryType={item.geometryType}
+            materialSettings={item.material}
+          />
+        </group>
       ) : null}
       </group>
       {children}
@@ -1557,7 +1570,7 @@ export function SceneRoot({
       return;
     }
 
-    selectObject(item.id);
+    selectObject(getViewportSelectionObject(item, objects).id);
   }
 
   function renderObjectNode(item: DirectorObject, ancestors = new Set<string>()): ReactNode {

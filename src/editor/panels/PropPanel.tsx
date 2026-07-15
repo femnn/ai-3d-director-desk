@@ -38,6 +38,7 @@ export function PropPanel() {
   const updateUniformScale = useDirectorStore((state) => state.updateUniformScale);
   const updateObjectColor = useDirectorStore((state) => state.updateObjectColor);
   const updateObjectMaterial = useDirectorStore((state) => state.updateObjectMaterial);
+  const updateObjectGeometrySize = useDirectorStore((state) => state.updateObjectGeometrySize);
   const updateObjectPivot = useDirectorStore((state) => state.updateObjectPivot);
   const setObjectParent = useDirectorStore((state) => state.setObjectParent);
   const groupObjects = useDirectorStore((state) => state.groupObjects);
@@ -177,6 +178,21 @@ export function PropPanel() {
           },
         ]}
       />
+      {prop.geometrySize ? (
+        <InspectorAxisGroup
+          label="部件尺寸"
+          axes={([0, 1, 2] as const).map((axis) => ({
+            axis: (["X", "Y", "Z"] as const)[axis],
+            ariaLabel: `模型部件尺寸 ${(["X", "Y", "Z"] as const)[axis]}`,
+            step: "0.01",
+            value: prop.geometrySize![axis],
+            onChange: (value) => updateObjectGeometrySize(
+              prop.id,
+              replaceAxis(prop.geometrySize!, axis, Math.max(0.001, Number(value)))
+            ),
+          }))}
+        />
+      ) : null}
       <InspectorRangeNumberField
         label="统一缩放"
         rangeAriaLabel="模型统一缩放滑杆"

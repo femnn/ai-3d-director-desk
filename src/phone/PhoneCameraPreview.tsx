@@ -4,6 +4,7 @@ import { Suspense, type RefObject } from "react";
 import type { CameraViewSnapshot } from "../editor/schema/cameraGeometry";
 import { useDirectorStore } from "../editor/store/directorStore";
 import { SceneRoot } from "../editor/canvas/SceneRoot";
+import { StudioSceneLights } from "../editor/canvas/StudioSceneLights";
 import { ViewportBackground } from "../editor/canvas/ViewportBackground";
 
 export type PhoneCameraPreviewOption = {
@@ -72,8 +73,7 @@ export function PhoneCameraPreview({
             panoramaRadius={scene.panoramaRadius}
             panoramaYaw={scene.panoramaYaw}
           />
-          <ambientLight intensity={1.15} />
-          <directionalLight intensity={1.2} position={[8, 10, 6]} />
+          <StudioSceneLights />
           {scene.showGrid ? (
             <Grid
               cellThickness={0}

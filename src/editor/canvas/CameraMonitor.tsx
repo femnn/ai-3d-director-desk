@@ -7,6 +7,7 @@ import { getCameraViewSnapshotFromShot, type CameraViewSnapshot } from "../schem
 import { getViewportAspectRatioValue } from "../schema/viewportAspectRatio";
 import { useDirectorStore } from "../store/directorStore";
 import { SceneRoot } from "./SceneRoot";
+import { StudioSceneLights } from "./StudioSceneLights";
 import { ViewportBackground } from "./ViewportBackground";
 import {
   registerCameraMonitorCanvas,
@@ -107,8 +108,11 @@ export function CameraMonitor() {
             object.assetRefId,
             object.geometryType,
             object.geometryAnchor,
+            object.geometrySize,
             object.color,
             object.material,
+            object.assemblyRootId,
+            object.assemblySelectionMode,
             object.visible,
             object.transform,
           ]),
@@ -263,8 +267,7 @@ export function CameraMonitor() {
           panoramaRadius={sceneSettings.panoramaRadius}
           panoramaYaw={sceneSettings.panoramaYaw}
         />
-        <ambientLight intensity={1.15} />
-        <directionalLight intensity={1.2} position={[8, 10, 6]} />
+        <StudioSceneLights />
         {sceneSettings.showGrid ? (
           <Grid
             cellThickness={0}

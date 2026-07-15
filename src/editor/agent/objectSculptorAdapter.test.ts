@@ -46,12 +46,14 @@ it("recognizes and converts an ObjectSculptSpec into an editable local hierarchy
     id: "body",
     geometryType: "rounded-box",
     geometryAnchor: "center",
-    scale: [1.2, 0.8, 0.7],
+    scale: [1, 1, 1],
+    geometrySize: [1.2, 0.8, 0.7],
     color: "#25282d",
     material: { roughness: 0.24, metalness: 0.82, opacity: 1 },
     pivot: [0, 0, -0.3],
   });
   expect(lens).toMatchObject({ id: "lens", geometryType: "cylinder", color: "#f4d38a", material: { opacity: 0.72 } });
+  expect(root).toMatchObject({ selectionMode: "whole" });
 });
 
 it("rejects invalid parent references instead of creating detached parts", () => {

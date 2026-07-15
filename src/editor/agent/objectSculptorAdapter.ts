@@ -27,6 +27,9 @@ type ObjectSculptComponent = {
   geometryDescriptor?: unknown;
   actionProfile?: unknown;
   attachment?: unknown;
+  repeat?: unknown;
+  mirror?: unknown;
+  animation?: unknown;
 };
 
 export type ObjectSculptSpec = {
@@ -38,6 +41,7 @@ export type ObjectSculptSpec = {
     rotation?: number[];
     scale?: number[];
   };
+  directorAnimation?: SceneScriptGroup["animation"];
 };
 
 const MAX_COMPONENTS = 500;
@@ -87,7 +91,7 @@ function getTransform(component: ObjectSculptComponent) {
   return {
     position: toVec3(transform.position, [0, 0, 0]),
     rotation: toVec3(transform.rotation, [0, 0, 0]),
-    scale: dimensions.map((value, axis) => Math.max(0.001, value * Math.abs(authoredScale[axis]))) as Vec3,
+    geometrySize: dimensions.map((value, axis) => Math.max(0.001, value * Math.abs(authoredScale[axis]))) as Vec3,
   };
 }
 
@@ -110,8 +114,28 @@ function getEndpointTransform(component: ObjectSculptComponent) {
   return {
     position: midpoint,
     rotation: [euler.x, euler.y, euler.z] as Vec3,
-    scale: [Math.max(baseRadius, endRadius) * 2, length, Math.max(baseRadius, endRadius) * 2] as Vec3,
+    geometrySize: [Math.max(baseRadius, endRadius) * 2, length, Math.max(baseRadius, endRadius) * 2] as Vec3,
   };
+}
+
+function normalizeRepeat(value: unknown): SceneScriptProp["repeat"] {
+  if (!isRecord(value)) return undefined;
+  const count = Math.min(200, Math.max(1, Math.round(toFiniteNumber(value.count, 1))));
+  if (count <= 1) return undefined;
+  return {
+    count,
+    offset: toVec3(value.offset, [1, 0, 0]),
+    rotationStep: toVec3(value.rotationStep, [0, 0, 0]),
+    scaleStep: toVec3(value.scaleStep, [0, 0, 0]),
+  };
+}
+
+function normalizeMirror(value: unknown): SceneScriptProp["mirror"] {
+  if (!isRecord(value)) return undefined;
+  const axes = (Array.isArray(value.axis) ? value.axis : [value.axis])
+    .filter((axis): axis is "x" | "y" | "z" => axis === "x" || axis === "y" || axis === "z");
+  if (!axes.length) return undefined;
+  return { axis: axes.length === 1 ? axes[0] : axes };
 }
 
 function mapPrimitive(component: ObjectSculptComponent, warnings: string[]): GeometryPrimitiveType {
@@ -248,8 +272,12 @@ export function convertObjectSculptSpecToSceneScript(spec: ObjectSculptSpec): {
       material: material.settings,
       position: transform.position,
       rotation: transform.rotation,
-      scale: transform.scale,
+      scale: [1, 1, 1],
+      geometrySize: transform.geometrySize,
       pivot: getPivot(component),
+      repeat: normalizeRepeat(component.repeat),
+      mirror: normalizeMirror(component.mirror),
+      animation: isRecord(component.animation) ? component.animation as SceneScriptProp["animation"] : undefined,
       children: (childrenByParent.get(component.id) ?? []).map((child) => buildPart(child, nextAncestry)),
     };
   };
@@ -262,6 +290,8 @@ export function convertObjectSculptSpecToSceneScript(spec: ObjectSculptSpec): {
     position: toVec3(placement.position, [0, 0, 0]),
     rotation: toVec3(placement.rotation, [0, 0, 0]),
     scale: toVec3(placement.scale, [1, 1, 1]),
+    selectionMode: "whole",
+    animation: spec.directorAnimation,
     children: (childrenByParent.get(null) ?? []).map((component) => buildPart(component, new Set())),
   };
   if (!root.children?.length) throw new Error("ObjectSculptSpec 没有可作为根节点的部件，请检查 parent 层级");

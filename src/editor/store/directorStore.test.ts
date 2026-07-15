@@ -481,6 +481,9 @@ it("groups selected props in local coordinates and deletes the whole hierarchy",
   const groupId = useDirectorStore.getState().groupObjects([firstId, secondId], "测试组合");
   expect(groupId).toBeTruthy();
   const grouped = useDirectorStore.getState().project.objects.filter((object) => object.parentId === groupId);
+  const group = useDirectorStore.getState().project.objects.find((object) => object.id === groupId);
+  expect(group).toMatchObject({ assemblyRootId: groupId, assemblySelectionMode: "whole" });
+  expect(grouped.every((object) => object.assemblyRootId === groupId)).toBe(true);
   expect(grouped.map((object) => object.id).sort()).toEqual([firstId, secondId].sort());
   expect(useDirectorStore.getState().project.objects.find((object) => object.id === groupId)?.kind).toBe("group");
 

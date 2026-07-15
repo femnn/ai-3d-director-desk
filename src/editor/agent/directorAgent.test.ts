@@ -261,3 +261,70 @@ it("creates and round-trips structured animated assemblies", () => {
   expect(restored.objects.find((object) => object.name === "门板")?.pivot).toEqual([-0.5, 0, 0]);
   expect(restored.objects.filter((object) => object.name.includes("车轮"))).toHaveLength(6);
 });
+
+it("builds procedural objects as whole movable assemblies without inheriting part dimensions", () => {
+  const result = applySceneScript({
+    reset: true,
+    proceduralObjects: [
+      {
+        targetName: "测试汽车",
+        directorPlacement: { position: [3, 0, -2] },
+        directorAnimation: {
+          duration: 15,
+          enabled: true,
+          playbackMode: "normal",
+          path: { type: "linear", closed: true, points: [[3, 0, -2], [6, 0, -2]] },
+        },
+        materials: [{ id: "paint", baseColor: "#d23b32", roughness: 0.28, metalness: 0.42 }],
+        componentTree: [
+          {
+            id: "body",
+            name: "车身",
+            primitive: "box",
+            parent: null,
+            material: "paint",
+            dimensions: { width: 4.2, height: 0.8, depth: 1.8 },
+            transform: { position: [0, 0.8, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+          },
+          {
+            id: "wheel",
+            name: "车轮",
+            primitive: "torus",
+            parent: null,
+            material: "paint",
+            dimensions: { width: 0.72, height: 0.72, depth: 0.24 },
+            transform: { position: [-1.35, 0.42, 0.92], rotation: [0, 0, 0], scale: [1, 1, 1] },
+          },
+        ],
+      },
+    ],
+  });
+
+  const project = useDirectorStore.getState().project;
+  const root = project.objects.find((object) => object.name === "测试汽车")!;
+  const body = project.objects.find((object) => object.name === "车身")!;
+  const wheel = project.objects.find((object) => object.name === "车轮")!;
+  expect(result.proceduralWarnings).toEqual([]);
+  expect(root).toMatchObject({
+    kind: "group",
+    transform: { position: [3, 0, -2] },
+    assemblyRootId: root.id,
+    assemblySelectionMode: "whole",
+    objectAnimationTrack: { duration: 15, enabled: true, playbackMode: "normal" },
+  });
+  expect(body).toMatchObject({
+    parentId: root.id,
+    assemblyRootId: root.id,
+    geometrySize: [4.2, 0.8, 1.8],
+    transform: { scale: [1, 1, 1] },
+  });
+  expect(wheel.assemblyRootId).toBe(root.id);
+
+  const exported = exportSceneScript();
+  applySceneScript(exported);
+  const restored = useDirectorStore.getState().project;
+  const restoredRoot = restored.objects.find((object) => object.name === "测试汽车")!;
+  expect(restoredRoot.assemblySelectionMode).toBe("whole");
+  expect(restored.objects.find((object) => object.name === "车身")?.geometrySize).toEqual([4.2, 0.8, 1.8]);
+  expect(restored.objects.find((object) => object.name === "车轮")?.assemblyRootId).toBe(restoredRoot.id);
+});

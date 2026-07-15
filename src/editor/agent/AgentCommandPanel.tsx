@@ -40,7 +40,7 @@ export function AgentCommandPanel() {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
     const candidate = payload as Record<string, unknown>;
     if (candidate.format === "storyai-character") return true;
-    const sceneKeys = ["characters", "props", "groups", "camera", "cameras", "scene", "panorama", "scenePlan"];
+    const sceneKeys = ["characters", "props", "groups", "proceduralObjects", "camera", "cameras", "directorView", "scene", "panorama", "scenePlan"];
     return !sceneKeys.some((key) => key in candidate) && ("bodyType" in candidate || "type" in candidate) && "action" in candidate;
   }
 
@@ -69,9 +69,16 @@ export function AgentCommandPanel() {
       return;
     }
     const result = await executeDirectorAgentTool("apply_scene_script", payload);
-    const summary = result && typeof result === "object" ? result as { characterIds?: string[]; groupIds?: string[]; propIds?: string[]; cameraIds?: string[]; scenePlan?: unknown } : {};
+    const summary = result && typeof result === "object" ? result as {
+      characterIds?: string[];
+      groupIds?: string[];
+      propIds?: string[];
+      cameraIds?: string[];
+      scenePlan?: unknown;
+      proceduralWarnings?: string[];
+    } : {};
     setStatus(
-      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位。普通循环动作已自动播放。`
+      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}。普通循环动作已自动播放。`
     );
   }
 
