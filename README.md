@@ -54,7 +54,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
 - **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **统一 AI 动画时间轴**：用同一时钟驱动角色、组合道具和局部部件，支持手动播放、录制时播放和随镜头运动。
-- **外部 AI 动画包**：导入 `storyai-animation-sequence` JSON，编排特定舞姿、双人打斗、汽车飞跃火车和部件抛飞。
+- **外部 AI 动画包**：导入 `storyai-character-animation` 可向当前布景追加舞者或格斗角色；导入 `storyai-animation-sequence` 可绑定已有对象，编排特定舞姿、双人打斗、汽车飞跃火车和部件抛飞。
 - **多人多机位**：多台手机同时加入时分别控制独立机位，机位不足时自动创建。
 
 ### 快速开始

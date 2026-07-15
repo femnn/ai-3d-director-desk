@@ -83,7 +83,13 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
             <select
               aria-label="动画播放模式"
               value={sequence.playbackMode}
-              onChange={(event) => updateSequence(sequence.id, { playbackMode: event.currentTarget.value as AnimationSequencePlaybackMode })}
+              onChange={(event) => {
+                const playbackMode = event.currentTarget.value as AnimationSequencePlaybackMode;
+                updateSequence(sequence.id, {
+                  playbackMode,
+                  ...(playbackMode === "manual" ? { loop: true } : {}),
+                });
+              }}
             >
               {MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>

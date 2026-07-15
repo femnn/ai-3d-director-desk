@@ -79,6 +79,28 @@ describe("unified animation sequence clock", () => {
     expect(getAnimationSequenceRuntimeSnapshot().playing).toBe(false);
   });
 
+  it("uses an eligible recording sequence when the selected sequence is manual and restarts at capture start", () => {
+    const manualSequence = { ...sequence, id: "manual_selected", playbackMode: "manual" as const };
+    const recordingSequence = { ...sequence, id: "recording_fallback", playbackMode: "recording" as const };
+    beginAnimationSequenceRecording("cam_1", [manualSequence, recordingSequence], manualSequence.id);
+    step(16);
+    step(50);
+    expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({
+      sequenceId: recordingSequence.id,
+      recording: true,
+      playing: true,
+    });
+    expect(getAnimationSequenceRuntimeSnapshot().elapsed).toBeGreaterThan(0);
+
+    beginAnimationSequenceRecording("cam_1", [manualSequence, recordingSequence], manualSequence.id, { restart: true });
+    expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({
+      sequenceId: recordingSequence.id,
+      elapsed: 0,
+      recording: true,
+      playing: true,
+    });
+  });
+
   it("holds camera-motion sequences until movement crosses the jitter threshold", () => {
     const drivenSequence = { ...sequence, playbackMode: "camera-motion" as const };
     beginAnimationSequenceRecording("cam_1", [drivenSequence], drivenSequence.id);

@@ -155,7 +155,7 @@ apply_scene_script 直接导入的 JSON 对象。
 
 ## 导入与修正流程
 
-1. 文件方式：在 AI 布景面板点击“导入并执行”，可选择完整布景、`storyai-character` 独立角色或 `storyai-animation-sequence` 动画 JSON。动画序列会先预览摘要并要求确认。
+1. 文件方式：在 AI 布景面板点击“导入并执行”，可选择完整布景、`storyai-character` 独立角色、`storyai-character-animation` 角色动画包或 `storyai-animation-sequence` 动画 JSON。完整布景会替换当前导演台；角色动画包只追加角色和动画，不修改已有场景、道具和机位。动画序列会先预览摘要并要求确认。
 2. 文本方式：将场景 JSON 粘贴到 AI 布景面板后点击“执行布景”，或调用 `apply_scene_script`。
 3. 调用 `screenshot` 获取导演视角截图。
 4. 对照原始意图检查轮廓、尺寸、穿插、朝向和机位构图。
@@ -216,7 +216,41 @@ apply_scene_script 直接导入的 JSON 对象。
 - 物体轨使用 `type: "object"`；组合根负责整体运动，子部件只写局部坐标。
 - 外部角色动作帧可包含 `controls`、`rootOffset` 和 `rootRotation`。
 - 导入前调用 `review_animation_sequence`，修复缺失绑定、超出时长和突然大位移。
+- `manual` 手动播放默认填写 `"loop": true`；只有确实需要停在最后一帧时才填写 `false`。
 
-Agent 工具：`create_animation_sequence`、`update_animation_sequence`、`delete_animation_sequence`、`play_animation_sequence`、`pause_animation_sequence`、`scrub_animation_sequence`、`export_animation_sequence`、`import_animation_sequence`、`review_animation_sequence`。
+只包含角色及其动作的舞蹈、对打、表演使用增量角色动画包，不要填写 `reset`、场景、道具或机位：
+
+```json
+{
+  "format": "storyai-character-animation",
+  "version": 1,
+  "name": "双人对打",
+  "characters": [
+    { "id": "fighter_a", "name": "格斗者A", "position": [-1.4, 0, 0] },
+    { "id": "fighter_b", "name": "格斗者B", "position": [1.4, 0, 0] }
+  ],
+  "animationSequences": [
+    {
+      "format": "storyai-animation-sequence",
+      "version": 1,
+      "sequence": {
+        "id": "fight_sequence",
+        "name": "双人对打",
+        "duration": 10,
+        "playbackMode": "manual",
+        "loop": true,
+        "enabled": true,
+        "cameraId": null,
+        "bindings": [],
+        "tracks": []
+      }
+    }
+  ]
+}
+```
+
+完整场景、车辆特技和包含环境道具的事件继续使用 `apply_scene_script`，文件导入时会清空并替换当前布景。只给已有对象增加动画时使用独立 `storyai-animation-sequence`，对象绑定必须能在当前场景中找到。
+
+Agent 工具：`create_animation_sequence`、`update_animation_sequence`、`delete_animation_sequence`、`play_animation_sequence`、`pause_animation_sequence`、`scrub_animation_sequence`、`export_animation_sequence`、`import_animation_sequence`、`import_character_animation`、`review_animation_sequence`。
 
 验收示例：[`AI 15 秒舞蹈`](../examples/animation-sequences/ai-dance-15s.json)、[`10 秒双人打斗`](../examples/animation-sequences/two-person-fight-10s.json)、[`汽车飞跃火车并部件抛飞`](../examples/animation-sequences/car-jump-train-breakup-10s.json)。

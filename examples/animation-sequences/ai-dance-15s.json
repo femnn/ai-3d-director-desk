@@ -1,11 +1,7 @@
 {
-  "reset": true,
-  "scene": {
-    "backgroundColor": "#171d24",
-    "showGrid": true,
-    "showGround": true,
-    "groundOpacity": 0.72
-  },
+  "format": "storyai-character-animation",
+  "version": 1,
+  "name": "AI特定舞姿15秒",
   "characters": [
     {
       "id": "ai_dancer",
@@ -21,34 +17,6 @@
       "pose": "stand"
     }
   ],
-  "camera": {
-    "id": "dance_camera",
-    "name": "舞蹈全景",
-    "position": [
-      0,
-      1.8,
-      6.8
-    ],
-    "lookAt": [
-      0,
-      1.1,
-      0
-    ],
-    "fov": 38
-  },
-  "directorView": {
-    "position": [
-      6.8,
-      4.8,
-      8.5
-    ],
-    "lookAt": [
-      0,
-      1,
-      0
-    ],
-    "fov": 44
-  },
   "animationSequences": [
     {
       "format": "storyai-animation-sequence",

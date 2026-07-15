@@ -334,6 +334,13 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     // Flush once per second so 10/15-second recordings do not build one growing
     // encoder buffer. This is infrequent enough to stay off the render hot path.
     recorder.start(1000);
+    const project = useDirectorStore.getState().project;
+    beginAnimationSequenceRecording(
+      cameraId,
+      project.animationSequences ?? [],
+      project.activeAnimationSequenceId,
+      { restart: true }
+    );
     emitLiveVideoChange();
   } catch (error) {
     requestedLiveVideoCameraIds.delete(cameraId);

@@ -54,7 +54,34 @@ it("imports and immediately executes a scene script JSON", async () => {
   fireEvent.change(input, { target: { files: [file] } });
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("apply_scene_script", payload));
-  expect(screen.getByText(/已完成：1 个角色/)).toBeInTheDocument();
+  expect(screen.getByText(/已替换为导入布景：1 个角色/)).toBeInTheDocument();
+});
+
+it("replaces a scene file but appends a character animation package", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<AgentCommandPanel />);
+  await user.click(screen.getByRole("button", { name: "打开AI布景面板" }));
+  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+  const scene = { reset: false, props: [{ name: "新布景" }] };
+  const sceneFile = new File([JSON.stringify(scene)], "scene.json", { type: "application/json" });
+  Object.defineProperty(sceneFile, "text", { value: async () => JSON.stringify(scene) });
+  mockExecuteDirectorAgentTool.mockResolvedValueOnce({ propIds: ["prop_1"] });
+  fireEvent.change(input, { target: { files: [sceneFile] } });
+  await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("apply_scene_script", { ...scene, reset: true }));
+
+  const characterAnimation = {
+    format: "storyai-character-animation",
+    version: 1,
+    characters: [{ id: "fighter", name: "格斗者" }],
+    animationSequences: [{ id: "fight", bindings: [], tracks: [] }],
+  };
+  const animationFile = new File([JSON.stringify(characterAnimation)], "fight.json", { type: "application/json" });
+  Object.defineProperty(animationFile, "text", { value: async () => JSON.stringify(characterAnimation) });
+  mockExecuteDirectorAgentTool.mockResolvedValueOnce({ characterIds: ["fighter_1"], animationSequenceReviews: [{ autoPlaying: true }] });
+  fireEvent.change(input, { target: { files: [animationFile] } });
+  await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("import_character_animation", characterAnimation));
+  expect(screen.getByText(/角色动画已追加到当前布景/)).toBeInTheDocument();
 });
 
 it("previews an animation package and confirms that it starts playing", async () => {

@@ -167,17 +167,22 @@ export function syncAnimationSequenceRuntimeDefinition(sequence: DirectorAnimati
 export function beginAnimationSequenceRecording(
   cameraId: string,
   sequences: DirectorAnimationSequence[],
-  activeSequenceId?: string | null
+  activeSequenceId?: string | null,
+  options: { restart?: boolean } = {}
 ) {
-  const sequence = sequences.find((candidate) => candidate.id === activeSequenceId)
-    ?? sequences.find(
+  const selectedSequence = sequences.find((candidate) => candidate.id === activeSequenceId);
+  const canRecord = (candidate: DirectorAnimationSequence) =>
+    candidate.enabled &&
+    candidate.playbackMode !== "manual" &&
+    (!candidate.cameraId || candidate.cameraId === cameraId);
+  const sequence = selectedSequence && canRecord(selectedSequence)
+    ? selectedSequence
+    : sequences.find(
       (candidate) =>
-        candidate.enabled &&
-        candidate.playbackMode !== "manual" &&
-        (!candidate.cameraId || candidate.cameraId === cameraId)
+        canRecord(candidate)
     );
-  if (!sequence || sequence.playbackMode === "manual") return;
-  if (runtime.recording && runtime.cameraId === cameraId && runtime.sequenceId === sequence.id) return;
+  if (!sequence) return;
+  if (!options.restart && runtime.recording && runtime.cameraId === cameraId && runtime.sequenceId === sequence.id) return;
   activeSequence = sequence;
   manualPreview = false;
   lastCameraSample = null;

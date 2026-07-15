@@ -71,7 +71,10 @@ Keep the director desk visible while recording so the browser or operating syste
 
 - **Project JSON**: complete backup for scene assets, edited poses, animations, cameras, and imported files.
 - **Scene Command JSON**: agent-friendly representation for fast scene reconstruction and revision.
+- **Character Animation JSON**: `storyai-character-animation` adds dancers or fighters and their animation to the current scene without replacing existing props, cameras, or environment.
 - **Reset Director Desk**: restore one default character and one basic camera without deleting exported files.
+
+Importing a complete scene command replaces the current director desk. Manual sequences loop by default; recording sequences start from frame zero when monitor capture actually begins.
 
 Wait for imported assets to finish loading before starting phone recording.
 

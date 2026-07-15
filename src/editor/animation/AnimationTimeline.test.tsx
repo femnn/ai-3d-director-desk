@@ -38,6 +38,10 @@ it("shows the unified tracks and exposes only the three user-facing playback mod
   ]);
   fireEvent.change(mode, { target: { value: "camera-motion" } });
   expect(useDirectorStore.getState().project.animationSequences?.[0]?.playbackMode).toBe("camera-motion");
+  fireEvent.click(screen.getByLabelText("循环播放"));
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.loop).toBe(false);
+  fireEvent.change(mode, { target: { value: "manual" } });
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ playbackMode: "manual", loop: true });
 });
 
 it("updates duration and loop independently", () => {

@@ -60,7 +60,7 @@
         "name": "汽车飞跃火车并解体",
         "duration": 10,
         "playbackMode": "manual",
-        "loop": false,
+        "loop": true,
         "enabled": true,
         "cameraId": "stunt_camera",
         "bindings": [

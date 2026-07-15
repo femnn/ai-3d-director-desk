@@ -5,6 +5,7 @@ import {
   exportCharacterPackage,
   exportSceneScript,
   importAnimationSequencePackage,
+  importCharacterAnimationPackage,
   importCharacterPackage,
   reviewAnimationSequence,
 } from "./directorAgent";
@@ -396,22 +397,26 @@ it("imports an external multi-object animation package and round-trips its bindi
 });
 
 it("applies the shipped dance, fight, and car stunt animation examples", () => {
-  applySceneScript(danceExample as never);
-  expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(1);
-  expect(useDirectorStore.getState().project.objects.find((item) => item.kind === "character")?.name).toBe("AI舞者");
-  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, playbackMode: "manual" });
+  const originalObjectIds = useDirectorStore.getState().project.objects.map((item) => item.id);
+  importCharacterAnimationPackage(danceExample);
+  const danceSequence = useDirectorStore.getState().project.animationSequences?.slice(-1)[0];
+  expect(originalObjectIds.every((id) => useDirectorStore.getState().project.objects.some((item) => item.id === id))).toBe(true);
+  expect(useDirectorStore.getState().project.objects.find((item) => item.name === "AI舞者")).toBeDefined();
+  expect(danceSequence).toMatchObject({ duration: 15, playbackMode: "manual", loop: true });
   expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({
-    sequenceId: useDirectorStore.getState().project.animationSequences?.[0]?.id,
+    sequenceId: danceSequence?.id,
     playing: true,
   });
 
-  applySceneScript(fightExample as never);
-  expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(2);
-  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({
+  importCharacterAnimationPackage(fightExample);
+  const fightSequence = useDirectorStore.getState().project.animationSequences?.slice(-1)[0];
+  expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(4);
+  expect(fightSequence).toMatchObject({
     duration: 10,
     playbackMode: "manual",
+    loop: true,
   });
-  expect(useDirectorStore.getState().project.animationSequences?.[0]?.tracks).toHaveLength(2);
+  expect(fightSequence?.tracks).toHaveLength(2);
   expect(getAnimationSequenceRuntimeSnapshot().playing).toBe(true);
 
   applySceneScript(carJumpExample as never);
@@ -420,7 +425,7 @@ it("applies the shipped dance, fight, and car stunt animation examples", () => {
   expect(carSequence).toMatchObject({
     duration: 10,
     playbackMode: "manual",
-    loop: false,
+    loop: true,
   });
   expect(carSequence?.bindings).toHaveLength(7);
   expect(carSequence?.tracks).toHaveLength(7);

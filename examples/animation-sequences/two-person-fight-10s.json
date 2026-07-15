@@ -1,10 +1,11 @@
 {
-  "reset": true,
+  "format": "storyai-character-animation",
+  "version": 1,
+  "name": "双人攻防10秒",
   "characters": [
     { "id": "fighter_a", "name": "格斗者A", "bodyType": "broad", "color": "#d94b45", "position": [-1.4, 0, 0], "rotationY": 1.5708, "pose": "fight" },
     { "id": "fighter_b", "name": "格斗者B", "bodyType": "slim", "color": "#3d8ee8", "position": [1.4, 0, 0], "rotationY": -1.5708, "pose": "fight" }
   ],
-  "camera": { "id": "fight_camera", "name": "格斗全景", "position": [0, 2.2, 7.5], "lookAt": [0, 1.1, 0], "fov": 42 },
   "animationSequences": [
     {
       "format": "storyai-animation-sequence",
@@ -16,7 +17,7 @@
         "playbackMode": "manual",
         "loop": true,
         "enabled": true,
-        "cameraId": "fight_camera",
+        "cameraId": null,
         "bindings": [
           { "alias": "attacker", "objectId": "fighter_a", "objectName": "格斗者A" },
           { "alias": "defender", "objectId": "fighter_b", "objectName": "格斗者B" }

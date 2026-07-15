@@ -59,7 +59,24 @@ export function AgentCommandPanel() {
     );
   }
 
-  async function executePayload(payload: unknown) {
+  function isCharacterAnimationJson(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    const candidate = payload as Record<string, unknown>;
+    return candidate.format === "storyai-character-animation" &&
+      Array.isArray(candidate.characters) && Array.isArray(candidate.animationSequences);
+  }
+
+  async function executePayload(payload: unknown, options: { importedFile?: boolean } = {}) {
+    if (isCharacterAnimationJson(payload)) {
+      const result = await executeDirectorAgentTool("import_character_animation", payload) as {
+        characterIds?: string[];
+        animationSequenceReviews?: Array<{ autoPlaying?: boolean }>;
+      };
+      setStatus(
+        `角色动画已追加到当前布景：新增 ${result.characterIds?.length ?? 0} 个角色、${result.animationSequenceReviews?.length ?? 0} 段动画${result.animationSequenceReviews?.some((review) => review.autoPlaying) ? "，已循环播放" : "，等待录制触发"}。`
+      );
+      return;
+    }
     if (isAnimationSequenceJson(payload)) {
       const result = await executeDirectorAgentTool("import_animation_sequence", payload) as {
         name?: string;
@@ -88,7 +105,10 @@ export function AgentCommandPanel() {
       setStatus(`角色已导入并开始播放${result.id ? `（${result.id}）` : ""}`);
       return;
     }
-    const result = await executeDirectorAgentTool("apply_scene_script", payload);
+    const scenePayload = options.importedFile && payload && typeof payload === "object" && !Array.isArray(payload)
+      ? { ...(payload as Record<string, unknown>), reset: true }
+      : payload;
+    const result = await executeDirectorAgentTool("apply_scene_script", scenePayload);
     const summary = result && typeof result === "object" ? result as {
       characterIds?: string[];
       groupIds?: string[];
@@ -102,7 +122,7 @@ export function AgentCommandPanel() {
       ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列${summary.animationSequenceReviews.some((review) => review.autoPlaying) ? "并开始播放" : "，等待录制触发"}`
       : "";
     setStatus(
-      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}${sequenceMessage}。`
+      `${options.importedFile ? "已替换为导入布景" : "已完成"}：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}${sequenceMessage}。`
     );
   }
 
@@ -201,7 +221,7 @@ export function AgentCommandPanel() {
                         const candidate = wrapper.sequence ?? payload as { name?: string; duration?: number; tracks?: unknown[] };
                         setStatus(`待确认：${candidate.name ?? "未命名动画"}，${candidate.duration ?? 0}秒，${candidate.tracks?.length ?? 0}条轨道。`);
                       } else {
-                        await executePayload(payload);
+                        await executePayload(payload, { importedFile: true });
                       }
                     } catch (error) {
                       setStatus(error instanceof Error ? error.message : "导入执行失败");

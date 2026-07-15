@@ -193,6 +193,14 @@ export interface AnimationSequencePackage {
   motionClips?: AnimationSequenceMotionClipInput[];
 }
 
+export interface CharacterAnimationPackage {
+  format: "storyai-character-animation";
+  version: 1;
+  name?: string;
+  characters: SceneScriptCharacter[];
+  animationSequences: Array<DirectorAnimationSequence | AnimationSequencePackage>;
+}
+
 type AgentToolResult = Record<string, unknown> | string;
 
 const BODY_TYPES: CharacterBodyType[] = [
@@ -1120,6 +1128,23 @@ export function importAnimationSequencePackage(
   }
 }
 
+export function importCharacterAnimationPackage(value: unknown) {
+  if (!value || typeof value !== "object") throw new Error("角色动画包格式无效");
+  const animationPackage = value as Partial<CharacterAnimationPackage>;
+  if (animationPackage.format !== "storyai-character-animation") throw new Error("不是角色动画包");
+  if (!Array.isArray(animationPackage.characters) || !animationPackage.characters.length) {
+    throw new Error("角色动画包没有包含角色");
+  }
+  if (!Array.isArray(animationPackage.animationSequences) || !animationPackage.animationSequences.length) {
+    throw new Error("角色动画包没有包含动画序列");
+  }
+  return applySceneScript({
+    reset: false,
+    characters: animationPackage.characters,
+    animationSequences: animationPackage.animationSequences,
+  });
+}
+
 export function exportAnimationSequencePackage(sequenceId?: string): AnimationSequencePackage {
   const project = useDirectorStore.getState().project;
   const sequence = (project.animationSequences ?? []).find((item) => item.id === (sequenceId ?? project.activeAnimationSequenceId));
@@ -1218,6 +1243,10 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
     case "create_animation_sequence":
     case "import_animation_sequence":
       return importAnimationSequencePackage(args as DirectorAnimationSequence | AnimationSequencePackage);
+    case "import_character_animation": {
+      const result = importCharacterAnimationPackage(args);
+      return { ...result, screenshot: await captureScenePlanReview() };
+    }
     case "update_animation_sequence": {
       const input = args as { id?: string; patch?: Partial<DirectorAnimationSequence> } & Partial<DirectorAnimationSequence>;
       const id = input.id ?? useDirectorStore.getState().project.activeAnimationSequenceId;
