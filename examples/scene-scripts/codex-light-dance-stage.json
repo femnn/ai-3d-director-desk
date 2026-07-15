@@ -1,7 +1,7 @@
 {
   "reset": true,
   "scenePlan": {
-    "intent": "展示 Codex 通过文字编排生成的五秒轻快舞循环",
+    "intent": "展示 Codex 通过文字编排生成的十五秒连续轻快舞循环",
     "roles": [
       {
         "name": "舞者",
@@ -22,7 +22,7 @@
       "scale": [1, 1, 1],
       "action": {
         "id": "light-dance",
-        "duration": 5,
+        "duration": 15,
         "playbackMode": "normal",
         "enabled": true,
         "source": "built-in"

@@ -88,6 +88,19 @@ it("keeps the AnimoFlow prompt visible before the built-in action controls", asy
   expect(generator.compareDocumentPosition(actionControl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
+it("selects the Codex light dance as a fixed fifteen-second action", async () => {
+  const user = userEvent.setup();
+  render(<CharacterPanel />);
+
+  await user.click(screen.getByRole("button", { name: "动作" }));
+  await user.click(screen.getByRole("button", { name: "角色动作" }));
+  await user.click(screen.getByRole("option", { name: "Codex 轻快舞（15秒）" }));
+
+  const role = useDirectorStore.getState().project.objects.find((item) => item.id === "char_default_a");
+  expect(role?.characterActionTrack?.duration).toBe(15);
+  expect(screen.getByLabelText("角色动作时长")).toHaveValue(15);
+});
+
 it("adjusts axis values by dragging the gray XYZ prefix handles", () => {
   render(<CharacterPanel />);
 

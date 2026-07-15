@@ -42,7 +42,7 @@ describe("character action timeline", () => {
     expect(character.characterRig?.controls).toEqual({});
   });
 
-  it("keeps every built-in preset action dynamic over its five-second loop", () => {
+  it("keeps every built-in preset action dynamic over its configured loop", () => {
     const actionIds = [
       "idle", "sit", "drink-tea", "talk", "walk", "run", "turn", "look", "wave", "bow", "think", "reach", "push", "fight", "dance", "light-dance", "phone",
     ] as const;
@@ -58,7 +58,7 @@ describe("character action timeline", () => {
     });
   });
 
-  it("plays the Codex light dance as a continuous five-second choreography", () => {
+  it("plays the Codex light dance as a continuous fifteen-second choreography", () => {
     const dancingCharacter = {
       ...character,
       characterActionTrack: {
@@ -69,18 +69,52 @@ describe("character action timeline", () => {
       },
     };
     const opening = getCharacterActionRigState(dancingCharacter, 0)?.controls ?? {};
-    const kneeLift = getCharacterActionRigState(dancingCharacter, 1)?.controls ?? {};
-    const overhead = getCharacterActionRigState(dancingCharacter, 2)?.controls ?? {};
-    const crouch = getCharacterActionRigState(dancingCharacter, 2.5)?.controls ?? {};
-    const looped = getCharacterActionRigState(dancingCharacter, 5)?.controls ?? {};
+    const overhead = getCharacterActionRigState(dancingCharacter, 4)?.controls ?? {};
+    const crouch = getCharacterActionRigState(dancingCharacter, 5)?.controls ?? {};
+    const kick = getCharacterActionRigState(dancingCharacter, 9.5)?.controls ?? {};
+    const looped = getCharacterActionRigState(dancingCharacter, 15)?.controls ?? {};
 
-    expect(kneeLift["leftKnee.bend"]).toBeGreaterThan(60);
-    expect(overhead["leftShoulder.pitch"]).toBeGreaterThan(70);
-    expect(overhead["rightShoulder.pitch"]).toBeGreaterThan(70);
-    expect(crouch["body.offsetY"]).toBeLessThan(-0.25);
+    expect(getActionTrackDuration(dancingCharacter.characterActionTrack)).toBe(15);
+    expect(overhead["leftShoulder.pitch"]).toBeGreaterThan(100);
+    expect(overhead["rightShoulder.pitch"]).toBeGreaterThan(100);
+    expect(crouch["body.offsetY"]).toBeLessThan(-0.3);
+    expect(kick["rightHip.pitch"]).toBeGreaterThan(55);
     expect(looped).toEqual(opening);
-    expect(getCharacterActionRootOffset(dancingCharacter, 1.25)[0]).toBeGreaterThan(0.1);
-    expect(getCharacterActionRootOffset(dancingCharacter, 5)).toEqual([0, 0, 0]);
+    expect(getCharacterActionRootOffset(dancingCharacter, 1)[0]).toBeGreaterThan(0.1);
+    expect(getCharacterActionRootOffset(dancingCharacter, 15)).toEqual(getCharacterActionRootOffset(dancingCharacter, 0));
+  });
+
+  it("keeps the fifteen-second dance within smooth per-frame joint changes", () => {
+    const dancingCharacter = {
+      ...character,
+      characterActionTrack: {
+        ...character.characterActionTrack!,
+        actionId: "light-dance" as const,
+        duration: 15,
+        playbackMode: "normal" as const,
+      },
+    };
+    let previous = getCharacterActionRigState(dancingCharacter, 0)?.controls ?? {};
+    let previousRoot = getCharacterActionRootOffset(dancingCharacter, 0);
+    let maximumJointDelta = 0;
+    let maximumRootDelta = 0;
+    for (let frame = 1; frame <= 15 * 30; frame += 1) {
+      const elapsed = frame / 30;
+      const current = getCharacterActionRigState(dancingCharacter, elapsed)?.controls ?? {};
+      const currentRoot = getCharacterActionRootOffset(dancingCharacter, elapsed);
+      Object.keys(current).forEach((key) => {
+        maximumJointDelta = Math.max(maximumJointDelta, Math.abs((current[key] ?? 0) - (previous[key] ?? 0)));
+      });
+      maximumRootDelta = Math.max(
+        maximumRootDelta,
+        Math.hypot(currentRoot[0] - previousRoot[0], currentRoot[1] - previousRoot[1], currentRoot[2] - previousRoot[2])
+      );
+      previous = current;
+      previousRoot = currentRoot;
+    }
+
+    expect(maximumJointDelta).toBeLessThan(18);
+    expect(maximumRootDelta).toBeLessThan(0.04);
   });
 
   it("advances camera-driven actions only after the camera has moved", () => {

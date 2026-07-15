@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { DirectorObject } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
-import { MIN_CHARACTER_ACTION_DURATION, playNormalCharacterAnimations } from "./characterAnimation";
+import { getDefaultCharacterActionDuration, playNormalCharacterAnimations } from "./characterAnimation";
 import type { CharacterActionId } from "../schema/directorProject";
 
 type AnimoFlowJob = {
@@ -73,6 +73,8 @@ export function AnimoFlowActionGenerator({ character }: { character: DirectorObj
     setGenerating(true);
     setStatus("正在提交 AnimoFlow 动作生成");
     try {
+      const previewActionId = getPreviewActionId(text);
+      const requestedDuration = getDefaultCharacterActionDuration(previewActionId);
       const created = await readJson(
         await fetch("/api/animoflow/jobs", {
           method: "POST",
@@ -81,7 +83,7 @@ export function AnimoFlowActionGenerator({ character }: { character: DirectorObj
             input: { type: "text", prompt: text },
             model: "mdm",
             character: "Y_bot",
-            duration: 5,
+            duration: requestedDuration,
           }),
         })
       );
@@ -116,8 +118,8 @@ export function AnimoFlowActionGenerator({ character }: { character: DirectorObj
       if (!attached) throw new Error("原角色已不存在，无法附加生成动作");
       const updatedStore = useDirectorStore.getState();
       updatedStore.setCharacterActionTrack(original.id, {
-        actionId: getPreviewActionId(text),
-        duration: MIN_CHARACTER_ACTION_DURATION,
+        actionId: previewActionId,
+        duration: requestedDuration,
         loop: true,
         playbackMode: "normal",
         cameraId: null,

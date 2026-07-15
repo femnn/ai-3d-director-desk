@@ -27,7 +27,7 @@ it("imports and immediately executes a standalone character animation JSON", asy
     character: {
       name: "Codex轻快舞角色",
       bodyType: "female",
-      action: { id: "light-dance", duration: 5, playbackMode: "normal", enabled: true },
+      action: { id: "light-dance", duration: 15, playbackMode: "normal", enabled: true },
     },
   };
   const file = new File([JSON.stringify(payload)], "codex-light-dance.character.json", { type: "application/json" });

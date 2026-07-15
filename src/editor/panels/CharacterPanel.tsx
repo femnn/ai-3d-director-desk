@@ -11,6 +11,8 @@ import {
 import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
+  getActionTrackDuration,
+  getDefaultCharacterActionDuration,
   playNormalCharacterAnimations,
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
@@ -472,6 +474,7 @@ export function CharacterPanel() {
             onChange={(value) =>
               updateActionTrack({
                 actionId: value as typeof actionTrack.actionId,
+                duration: getDefaultCharacterActionDuration(value as typeof actionTrack.actionId),
                 source: "built-in",
                 motionClipId: null,
               })
@@ -481,10 +484,10 @@ export function CharacterPanel() {
             label="动作时长"
             rangeAriaLabel="角色动作时长滑杆"
             numberAriaLabel="角色动作时长"
-            min={MIN_CHARACTER_ACTION_DURATION}
+            min={getDefaultCharacterActionDuration(actionTrack.actionId)}
             max="15"
             step="1"
-            value={actionTrack.duration}
+            value={getActionTrackDuration(actionTrack)}
             onValueChange={(value) => updateActionTrack({ duration: Number(value) })}
           />
           <InspectorSelectField

@@ -29,6 +29,7 @@ import type {
 import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
+  getDefaultCharacterActionDuration,
   syncNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import type { PosePresetId } from "../schema/poseSchema";
@@ -246,9 +247,11 @@ function normalizeActionId(value: unknown): CharacterActionId {
 
 function applyCharacterAction(id: string, action: SceneScriptCharacter["action"], motionClipId?: string | null) {
   if (!action) return;
+  const actionId = normalizeActionId(action.id);
+  const minimumDuration = getDefaultCharacterActionDuration(actionId);
   useDirectorStore.getState().setCharacterActionTrack(id, {
-    actionId: normalizeActionId(action.id),
-    duration: Math.max(Number(action.duration ?? MIN_CHARACTER_ACTION_DURATION), MIN_CHARACTER_ACTION_DURATION),
+    actionId,
+    duration: Math.max(Number(action.duration ?? minimumDuration), minimumDuration),
     loop: true,
     playbackMode: action.playbackMode === "camera-driven" ? "camera-driven" : "normal",
     cameraId: typeof action.cameraId === "string" ? action.cameraId : null,

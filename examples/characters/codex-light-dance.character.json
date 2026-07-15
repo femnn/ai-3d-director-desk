@@ -11,7 +11,7 @@
     "scale": [1, 1, 1],
     "action": {
       "id": "light-dance",
-      "duration": 5,
+      "duration": 15,
       "playbackMode": "normal",
       "enabled": true,
       "source": "built-in"

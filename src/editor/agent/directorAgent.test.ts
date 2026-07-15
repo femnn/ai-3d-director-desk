@@ -110,7 +110,7 @@ it("round-trips a reusable character package with color, pose, and video motion 
         action: { id: "idle", duration: 5, source: "video", enabled: true },
         motionClip: {
           name: "挥手视频动作",
-          duration: 5,
+          duration: 15,
           frames: [
             { time: 0, controls: { "rightShoulder.pitch": 10 } },
             { time: 5, controls: { "rightShoulder.pitch": 65 } },
@@ -156,7 +156,7 @@ it("creates, starts, and round-trips the Codex light dance through scene scripts
   const original = useDirectorStore.getState().project.objects.find((object) => object.name === "轻快舞者");
   expect(original?.characterActionTrack).toMatchObject({
     actionId: "light-dance",
-    duration: 5,
+    duration: 15,
     playbackMode: "normal",
     enabled: true,
   });
@@ -167,7 +167,7 @@ it("creates, starts, and round-trips the Codex light dance through scene scripts
   const exported = exportSceneScript();
   expect(exported.characters?.[0]?.action).toMatchObject({
     id: "light-dance",
-    duration: 5,
+    duration: 15,
     playbackMode: "normal",
     enabled: true,
   });
