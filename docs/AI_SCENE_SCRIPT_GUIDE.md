@@ -30,7 +30,7 @@ apply_scene_script 直接导入的 JSON 对象。
 
 - 坐标：`[x, y, z]`，Y 轴向上，常用人物脚底高度为 `y=0`。
 - 旋转：弧度，90 度为 `1.5708`，180 度为 `3.1416`，一圈为 `6.2832`。
-- 基础体：`box`、`rounded-box`、`sphere`、`hemisphere`、`capsule`、`cylinder`、`pipe`、`disc`、`plane`、`wedge`、`torus`、`cone`、`pyramid`。
+- 基础体：`box`、`rounded-box`、`sphere`、`ellipsoid`、`hemisphere`、`capsule`、`cylinder`、`pipe`、`disc`、`plane`、`plane-card`、`wedge`、`torus`、`cone`、`pyramid`。
 - 角色体型：`mannequin`、`female`、`broad`、`muscular`、`slim`、`teen`、`child`、`chibi`。
 - 角色动作：`still`、`idle`、`sit`、`drink-tea`、`talk`、`walk`、`run`、`turn`、`look`、`wave`、`bow`、`think`、`reach`、`push`、`fight`、`dance`、`light-dance`、`phone`。其中 `light-dance` 是带交叉步、抬腿、连续蹲跳、摆臂和过头动作的 15 秒编舞，不能压缩为 5 秒。
 
@@ -182,3 +182,39 @@ apply_scene_script 直接导入的 JSON 对象。
 4. 对照原始意图检查轮廓、尺寸、穿插、朝向和机位构图。
 5. 使用 `update_prop`、`update_character`、`set_camera_view` 修正，不要每次重置整个场景。
 6. 调用 `export_scene_script` 保存可复用命令；单个角色使用 `export_character`。
+
+## 从参考图生成更真实的程序化道具
+
+导演台兼容 [Three.js Object Sculptor](https://github.com/vinhhien112/Three.js-Object-Sculptor-Codex-Plugin) 的安全 `ObjectSculptSpec` 子集。它适合把一张主体清晰的物体参考图拆成可编辑部件树，而不是生成一个无法修改的整体网格。
+
+在 AI 布景面板选择“导入 JSON 并执行”，或调用 `import_object_sculpt_spec`，可直接导入包含以下字段的 JSON：
+
+- `targetName`：道具名称。
+- `materials[]`：`id`、`baseColor`、`roughness`、`metalness`、`opacity`。
+- `componentTree[]`：每个部件的 `id`、`name`、`parent`、`primitive`、`dimensions`、`transform`、`material`。
+- `actionProfile.pivot.localPosition`：门轴、轮轴、翼根等局部旋转轴。
+- `directorPlacement`：整个道具导入导演台时的位置、旋转和缩放。
+
+推荐直接把下面的指令和物体参考图交给 Codex：
+
+```text
+请根据我附加的物体参考图生成一个可导入 AI 影视导演台的 ObjectSculptSpec JSON。
+
+要求：
+1. 只输出合法 JSON，不输出 Markdown、解释、注释或 JavaScript。
+2. 顶层必须包含 targetName、materials、componentTree，可选 directorPlacement。
+3. 坐标单位按米估算，Y 轴向上，rotation 使用弧度。
+4. 先匹配主体轮廓、长宽高比例、负空间和最有辨识度的部件，再添加小细节。
+5. 每个部件必须有唯一 id；parent 必须引用已有部件 id 或为 null；所有变换均为相对父级的局部坐标。
+6. primitive 只能使用 box、sphere、ellipsoid、cylinder、cone、capsule、torus、plane-card、tube、lathe、extrude、curve-sweep、instanced-cluster。
+7. box 需要圆角时，在 geometryDescriptor.edgeTreatment.bevelRadius 中填写大于 0 的值。
+8. 材质必须明确 baseColor、roughness、metalness；玻璃或半透明部件再填写 opacity。
+9. 门、轮、把手、翅膀等可动部件必须单独建节点，并设置 actionProfile.pivot.localPosition。
+10. 不要把整件物体写成一个部件；宏观主体、结构部件和高辨识度细节要分层。
+11. componentTree 最多 500 个部件，优先用少量有效部件表达轮廓，避免无意义高密度小球。
+12. 输出前检查 ID 唯一、父级存在、没有循环层级、比例合理、部件没有明显穿插。
+```
+
+导入后，每个部件都会转换为导演台原生对象：可以单独选择、改颜色和材质、调整父子层级与旋转轴，也可以给整体或局部添加 5 / 10 / 15 秒动画。`tube`、`lathe`、`extrude` 等当前没有完全对应的基础体时会使用安全近似并返回提示，不会执行生成代码。
+
+示例文件：[`examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json`](../examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json)。

@@ -18,6 +18,7 @@ import type {
   DirectorAssetSource,
   DirectorCameraAnimation,
   DirectorObject,
+  DirectorMaterialSettings,
   DirectorProject,
   DirectorTransform,
   GeometryPrimitiveType,
@@ -26,6 +27,7 @@ import type {
   PanoramaProjectionMode,
   ScenePlan,
 } from "../schema/directorProject";
+import { convertObjectSculptSpecToSceneScript, isObjectSculptSpec } from "./objectSculptorAdapter";
 import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
@@ -92,6 +94,8 @@ export interface SceneScriptProp {
   rotationY?: number;
   scale?: number | number[];
   color?: string;
+  geometryAnchor?: "base" | "center";
+  material?: DirectorMaterialSettings;
   parentId?: string | null;
   pivot?: number[];
   animation?: SceneScriptObjectAnimation;
@@ -531,6 +535,8 @@ export function addProp(input: SceneScriptProp = {}) {
 
   nextState.updateObjectName(prop.id, input.name ?? preset?.name ?? prop.name);
   if (input.color ?? preset?.color) nextState.updateObjectColor(prop.id, input.color ?? preset?.color ?? prop.color ?? "#d7e7ff");
+  if (input.material) nextState.updateObjectMaterial(prop.id, input.material);
+  if (input.geometryAnchor) nextState.updateObjectGeometryAnchor(prop.id, input.geometryAnchor);
   nextState.updateObjectTransform(prop.id, {
     position: toTuple3(input.position, prop.transform.position),
     rotation: normalizeRotation(input, prop.transform.rotation),
@@ -568,6 +574,8 @@ export function updateProp(input: SceneScriptProp & { id?: string; name?: string
   const store = useDirectorStore.getState();
   if (input.name && input.name !== target.name) store.updateObjectName(target.id, input.name);
   if (input.color) store.updateObjectColor(target.id, input.color);
+  if (input.material) store.updateObjectMaterial(target.id, input.material);
+  if (input.geometryAnchor) store.updateObjectGeometryAnchor(target.id, input.geometryAnchor);
   store.updateObjectTransform(target.id, getTransformPatch(input, target.transform));
   if (input.parentId !== undefined) store.setObjectParent(target.id, input.parentId);
   if (input.pivot) store.updateObjectPivot(target.id, toTuple3(input.pivot, target.pivot ?? [0, 0, 0]));
@@ -898,6 +906,8 @@ export function exportSceneScript(): SceneScript {
       scale: object.transform.scale,
       pivot: object.pivot,
       color: object.color,
+      geometryAnchor: object.geometryAnchor,
+      material: object.material,
       animation: animationFromObject(object),
       children,
     };
@@ -982,6 +992,12 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
     case "import_scene_script": {
       const result = applySceneScript(args as SceneScript);
       return { ...result, screenshot: await captureScenePlanReview() };
+    }
+    case "import_object_sculpt_spec": {
+      if (!isObjectSculptSpec(args)) throw new Error("不是有效的 ObjectSculptSpec：需要 targetName、componentTree 和 materials");
+      const converted = convertObjectSculptSpecToSceneScript(args);
+      const result = applySceneScript(converted.script);
+      return { ...result, warnings: converted.warnings, targetName: args.targetName, screenshot: await captureScenePlanReview() };
     }
     case "validate_scene_plan": {
       const { plan, warnings } = validateScenePlan(args);

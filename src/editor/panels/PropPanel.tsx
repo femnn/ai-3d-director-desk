@@ -37,6 +37,7 @@ export function PropPanel() {
   const updateObjectTransform = useDirectorStore((state) => state.updateObjectTransform);
   const updateUniformScale = useDirectorStore((state) => state.updateUniformScale);
   const updateObjectColor = useDirectorStore((state) => state.updateObjectColor);
+  const updateObjectMaterial = useDirectorStore((state) => state.updateObjectMaterial);
   const updateObjectPivot = useDirectorStore((state) => state.updateObjectPivot);
   const setObjectParent = useDirectorStore((state) => state.setObjectParent);
   const groupObjects = useDirectorStore((state) => state.groupObjects);
@@ -194,6 +195,40 @@ export function PropPanel() {
         onColorChange={(value) => updateObjectColor(prop.id, value)}
         onHexChange={(value) => updateObjectColor(prop.id, value)}
       /> : null}
+      {prop.kind !== "group" ? (
+        <InspectorSection title="材质表面">
+          <InspectorRangeNumberField
+            label="粗糙度"
+            rangeAriaLabel="模型材质粗糙度"
+            numberAriaLabel="模型材质粗糙度数值"
+            min="0"
+            max="1"
+            step="0.01"
+            value={prop.material?.roughness ?? 0.68}
+            onValueChange={(value) => updateObjectMaterial(prop.id, { ...prop.material, roughness: Number(value) })}
+          />
+          <InspectorRangeNumberField
+            label="金属度"
+            rangeAriaLabel="模型材质金属度"
+            numberAriaLabel="模型材质金属度数值"
+            min="0"
+            max="1"
+            step="0.01"
+            value={prop.material?.metalness ?? 0.02}
+            onValueChange={(value) => updateObjectMaterial(prop.id, { ...prop.material, metalness: Number(value) })}
+          />
+          <InspectorRangeNumberField
+            label="透明度"
+            rangeAriaLabel="模型材质透明度"
+            numberAriaLabel="模型材质透明度数值"
+            min="0.05"
+            max="1"
+            step="0.01"
+            value={prop.material?.opacity ?? 1}
+            onValueChange={(value) => updateObjectMaterial(prop.id, { ...prop.material, opacity: Number(value) })}
+          />
+        </InspectorSection>
+      ) : null}
       {selectedObjectIds.length > 1 ? (
         <div className="inspector-action-row">
           <button type="button" onClick={() => groupObjects(selectedObjectIds)}>

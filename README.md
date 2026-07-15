@@ -50,6 +50,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **机位监看与视频录制**：手机和电脑显示同一实时机位画面，支持 5 / 10 / 15 秒轨迹录制与 MP4 导出。
 - **角色姿势与动画**：提供循环动作、镜头移动驱动动作、视频动作提取、图片姿势提取、骨骼编辑和 AnimoFlow 文字动作入口。
 - **AI 快速布景**：Agent 通过白名单 JSON 命令创建角色、道具、站位和机位，不执行任意脚本。
+- **参考图程序化道具**：兼容 ObjectSculptSpec，把 AI 从参考图拆出的部件树导入为可编辑、可分层、可动画的导演台道具，并保留金属度、粗糙度和透明度。
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
 - **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **多人多机位**：多台手机同时加入时分别控制独立机位，机位不足时自动创建。
@@ -101,17 +102,22 @@ npm run dev
 - `capture_shot` / `screenshot`
 - `export_scene_script` / `import_scene_script`
 - `export_character` / `import_character`
+- `import_object_sculpt_spec`（参考图程序化道具部件树）
 - `record_camera_animation` / `play_camera_animation`
 
 布景命令使用固定 JSON schema，不接受任意 JavaScript。
 
-`apply_scene_script` 支持递归 `groups[].children` 部件树，以及 `repeat`、`mirror`、`pathCopy`。几何体支持立方体、圆角盒、球体、半球、胶囊体、圆柱体、管道、圆盘、平面、楔形、环状体、圆锥和棱锥。任意组合或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
+`apply_scene_script` 支持递归 `groups[].children` 部件树，以及 `repeat`、`mirror`、`pathCopy`。几何体支持立方体、圆角盒、球体、椭球体、半球、胶囊体、圆柱体、管道、圆盘、水平面、竖直卡片、楔形、环状体、圆锥和棱锥。任意组合或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
+
+参考图生成复杂道具时，可让 Codex 按 [ObjectSculptSpec 导入指南](docs/AI_SCENE_SCRIPT_GUIDE.md#从参考图生成更真实的程序化道具) 输出 JSON，再在 AI 布景面板直接导入。导演台只解析白名单结构，不执行 AI 生成的任意 JavaScript。
 
 ### 致谢与来源
 
 本项目以 [jiguang132/storyai-3d-director-desk](https://github.com/jiguang132/storyai-3d-director-desk) 为基础进行独立二次开发。感谢原作者 **jiguang132** 提供浏览器 3D 导演台的基础实现。
 
 本项目增加并持续改造了手机虚拟摄影机、多人独立机位、实时监看与 MP4 录制、角色动画与骨骼编辑、Agent 快速布景、桌面程序和工程恢复等功能。原作者并未参与这些后续功能的开发或维护。项目继续遵循原仓库的 MIT License。
+
+程序化道具工作流兼容并参考 MIT 许可的 [vinhhien112/Three.js-Object-Sculptor-Codex-Plugin](https://github.com/vinhhien112/Three.js-Object-Sculptor-Codex-Plugin) 的 `ObjectSculptSpec`、动作友好层级和截图修正思路；本项目使用独立实现的安全转换器，不执行该工具生成的代码。
 
 ## English
 
@@ -122,6 +128,7 @@ npm run dev
 - **Live monitoring and MP4 recording**: the phone and desktop use the same live camera view, with 5, 10, and 15-second camera-path recording.
 - **Character posing and animation**: looping presets, camera-motion-driven playback, video motion extraction, image pose extraction, direct rig editing, and an AnimoFlow text-to-motion entry point.
 - **Agent-assisted scene building**: a local agent creates characters, props, blocking, and cameras through a strict JSON tool whitelist.
+- **Reference-driven procedural props**: import an AI-authored ObjectSculptSpec as an editable, hierarchical, animation-ready prop with roughness, metalness, and opacity preserved.
 - **Save and restore**: export complete project JSON or reusable scene commands, including imported assets, edited poses, cameras, and camera animations.
 - **Grouped prop animation**: group props manually, edit keyframes and numbered path points, and animate assemblies or child parts independently.
 - **Multi-phone production**: multiple phones can join simultaneously and control separate cameras; missing cameras are created automatically.

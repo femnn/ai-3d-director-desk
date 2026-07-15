@@ -29,6 +29,7 @@ const tools = [
   "export_character",
   "import_character",
   "import_scene_script",
+  "import_object_sculpt_spec",
   "record_camera_animation",
   "play_camera_animation",
   "screenshot",

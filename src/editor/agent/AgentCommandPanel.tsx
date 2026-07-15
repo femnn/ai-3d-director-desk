@@ -44,7 +44,25 @@ export function AgentCommandPanel() {
     return !sceneKeys.some((key) => key in candidate) && ("bodyType" in candidate || "type" in candidate) && "action" in candidate;
   }
 
+  function isObjectSculptJson(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    const candidate = payload as Record<string, unknown>;
+    return typeof candidate.targetName === "string" && Array.isArray(candidate.componentTree) && Array.isArray(candidate.materials);
+  }
+
   async function executePayload(payload: unknown) {
+    if (isObjectSculptJson(payload)) {
+      const result = await executeDirectorAgentTool("import_object_sculpt_spec", payload) as {
+        targetName?: string;
+        groupIds?: string[];
+        propIds?: string[];
+        warnings?: string[];
+      };
+      setStatus(
+        `程序化道具“${result.targetName ?? "未命名"}”已导入：${result.groupIds?.length ?? 0} 个组合、${result.propIds?.length ?? 0} 个可编辑部件${result.warnings?.length ? `；${result.warnings.length} 项使用安全近似` : ""}。`
+      );
+      return;
+    }
     if (isCharacterJson(payload)) {
       const result = await executeDirectorAgentTool("import_character", payload) as { id?: string };
       setStatus(`角色已导入并开始播放${result.id ? `（${result.id}）` : ""}`);
@@ -97,7 +115,7 @@ export function AgentCommandPanel() {
           <div className="agent-panel-header">
             <div>
               <h2>AI布景命令</h2>
-              <p>粘贴含场景计划的 JSON，创建后会自动截取当前画面供 agent 复查修正。</p>
+              <p>支持布景、独立角色和 ObjectSculptSpec 程序化道具 JSON；创建后会自动截图供 agent 复查。</p>
             </div>
             <button type="button" aria-label="关闭AI布景面板" onClick={() => setOpen(false)}>
               <X aria-hidden="true" size={16} />
@@ -123,7 +141,7 @@ export function AgentCommandPanel() {
               </button>
               <label>
                 <Upload aria-hidden="true" size={15} />
-                导入并执行
+                导入 JSON 并执行
                 <input
                   accept="application/json,.json"
                   type="file"

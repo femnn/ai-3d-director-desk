@@ -13,6 +13,7 @@ import type {
   DirectorCameraCapture,
   DirectorCameraShot,
   DirectorObject,
+  DirectorMaterialSettings,
   DirectorProject,
   DirectorTransform,
   GeometryPrimitiveType,
@@ -123,6 +124,8 @@ export interface DirectorActions {
   updateObjectName: (id: string, name: string) => void;
   updateCrowdLabel: (crowdId: string, label: string) => void;
   updateObjectColor: (id: string, color: string) => void;
+  updateObjectMaterial: (id: string, material: DirectorMaterialSettings) => void;
+  updateObjectGeometryAnchor: (id: string, anchor: "base" | "center") => void;
   updateCrowdColor: (crowdId: string, color: string) => void;
   updateCharacterBodyType: (id: string, bodyType: CharacterBodyType) => void;
   updateUniformScale: (id: string, scale: number) => void;
@@ -1666,6 +1669,22 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             ...item,
             color,
           })),
+        },
+      })),
+    updateObjectMaterial: (id, material) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, material })),
+        },
+      })),
+    updateObjectGeometryAnchor: (id, geometryAnchor) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, geometryAnchor })),
         },
       })),
     updateCrowdColor: (crowdId, color) =>

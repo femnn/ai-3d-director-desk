@@ -5,12 +5,14 @@ export const GEOMETRY_PRIMITIVE_OPTIONS = [
   { type: "box", label: "立方体" },
   { type: "rounded-box", label: "圆角盒" },
   { type: "sphere", label: "球体" },
+  { type: "ellipsoid", label: "椭球体" },
   { type: "hemisphere", label: "半球" },
   { type: "capsule", label: "胶囊体" },
   { type: "cylinder", label: "圆柱体" },
   { type: "pipe", label: "管道" },
   { type: "disc", label: "圆盘" },
   { type: "plane", label: "平面" },
+  { type: "plane-card", label: "竖直卡片" },
   { type: "wedge", label: "楔形" },
   { type: "torus", label: "环状体" },
   { type: "cone", label: "圆锥" },
@@ -56,6 +58,14 @@ export interface DirectorTransform {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
+}
+
+export interface DirectorMaterialSettings {
+  roughness?: number;
+  metalness?: number;
+  opacity?: number;
+  emissive?: string;
+  emissiveIntensity?: number;
 }
 
 export type ObjectAnimationPlaybackMode = "normal" | "recording-sync" | "camera-driven";
@@ -176,6 +186,9 @@ export interface DirectorObject {
   color?: string;
   assetRefId?: string;
   geometryType?: GeometryPrimitiveType;
+  /** Procedural parts use centered unit geometry so local component transforms stay predictable. */
+  geometryAnchor?: "base" | "center";
+  material?: DirectorMaterialSettings;
   crowdId?: string;
   crowdLabel?: string;
   linkedCameraId?: string | null;

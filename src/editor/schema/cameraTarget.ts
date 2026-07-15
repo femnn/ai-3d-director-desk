@@ -9,12 +9,14 @@ const GEOMETRY_FOCUS_OFFSET_Y: Record<GeometryPrimitiveType, number> = {
   box: 0.5,
   "rounded-box": 0.5,
   sphere: 0.55,
+  ellipsoid: 0.55,
   hemisphere: 0.3,
   capsule: 0.8,
   cylinder: 0.6,
   pipe: 0.6,
   disc: 0.04,
   plane: 0.01,
+  "plane-card": 0,
   wedge: 0.5,
   torus: 0.14,
   cone: 0.55,
@@ -30,6 +32,7 @@ export function isCameraFocusableObject(object: DirectorObject) {
 }
 
 export function getDirectorObjectFocusOffsetY(object: DirectorObject) {
+  if (object.geometryAnchor === "center") return 0;
   if (object.assetRefId) {
     return IMPORTED_MODEL_FOCUS_OFFSET_Y;
   }

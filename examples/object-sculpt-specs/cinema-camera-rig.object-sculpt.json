@@ -1,0 +1,147 @@
+{
+  "targetName": "电影摄影机套件",
+  "directorPlacement": {
+    "position": [2, 0, 0],
+    "rotation": [0, 0, 0],
+    "scale": [1, 1, 1]
+  },
+  "materials": [
+    { "id": "black-metal", "name": "黑色阳极金属", "baseColor": "#3d4652", "roughness": 0.26, "metalness": 0.82 },
+    { "id": "dark-rubber", "name": "深色橡胶", "baseColor": "#111317", "roughness": 0.86, "metalness": 0.02 },
+    { "id": "lens-glass", "name": "镜片玻璃", "baseColor": "#8ac4d8", "roughness": 0.08, "metalness": 0.05, "opacity": 0.68 },
+    { "id": "screen", "name": "监视器画面", "baseColor": "#45a7c8", "roughness": 0.2, "metalness": 0.05 },
+    { "id": "accent", "name": "控制环", "baseColor": "#d54b36", "roughness": 0.42, "metalness": 0.34 }
+  ],
+  "componentTree": [
+    {
+      "id": "camera-body",
+      "name": "摄影机机身",
+      "level": "macro",
+      "primitive": "box",
+      "parent": null,
+      "material": "black-metal",
+      "dimensions": { "width": 1.15, "height": 0.72, "depth": 0.72 },
+      "transform": { "position": [0, 1.72, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.06, "segments": 4 } },
+      "actionProfile": { "pivot": { "mode": "center", "localPosition": [0, 0, 0] } }
+    },
+    {
+      "id": "lens-barrel",
+      "name": "镜头筒",
+      "level": "macro",
+      "primitive": "cylinder",
+      "parent": "camera-body",
+      "material": "black-metal",
+      "dimensions": { "width": 0.58, "height": 0.88, "depth": 0.58 },
+      "transform": { "position": [0, 0, 0.72], "rotation": [1.5708, 0, 0], "scale": [1, 1, 1] },
+      "actionProfile": { "pivot": { "mode": "center", "localPosition": [0, 0, -0.35] } }
+    },
+    {
+      "id": "focus-ring",
+      "name": "红色跟焦环",
+      "level": "meso",
+      "primitive": "torus",
+      "parent": "lens-barrel",
+      "material": "accent",
+      "dimensions": { "width": 0.66, "height": 0.66, "depth": 0.12 },
+      "transform": { "position": [0, 0.18, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "actionProfile": { "pivot": { "mode": "center", "localPosition": [0, 0, 0] } }
+    },
+    {
+      "id": "front-glass",
+      "name": "前组镜片",
+      "level": "meso",
+      "primitive": "cylinder",
+      "parent": "lens-barrel",
+      "material": "lens-glass",
+      "dimensions": { "width": 0.48, "height": 0.05, "depth": 0.48 },
+      "transform": { "position": [0, 0.47, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
+    },
+    {
+      "id": "matte-box",
+      "name": "遮光斗",
+      "level": "macro",
+      "primitive": "box",
+      "parent": "lens-barrel",
+      "material": "dark-rubber",
+      "dimensions": { "width": 0.92, "height": 0.16, "depth": 0.82 },
+      "transform": { "position": [0, 0.58, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.035, "segments": 3 } }
+    },
+    {
+      "id": "top-handle",
+      "name": "顶部提手",
+      "level": "meso",
+      "primitive": "capsule",
+      "parent": "camera-body",
+      "material": "dark-rubber",
+      "dimensions": { "width": 0.18, "height": 0.72, "depth": 0.18 },
+      "transform": { "position": [0, 0.72, -0.08], "rotation": [0, 0, 1.5708], "scale": [1, 1, 1] },
+      "actionProfile": { "pivot": { "mode": "hinge", "localPosition": [-0.3, 0, 0] } }
+    },
+    {
+      "id": "monitor-arm",
+      "name": "监视器支臂",
+      "level": "meso",
+      "primitive": "capsule",
+      "parent": "camera-body",
+      "material": "black-metal",
+      "dimensions": { "width": 0.1, "height": 0.52, "depth": 0.1 },
+      "transform": { "position": [-0.42, 0.62, -0.08], "rotation": [0, 0, -0.62], "scale": [1, 1, 1] },
+      "actionProfile": { "pivot": { "mode": "hinge", "localPosition": [0, -0.22, 0] } }
+    },
+    {
+      "id": "monitor-body",
+      "name": "导演监视器",
+      "level": "meso",
+      "primitive": "box",
+      "parent": "monitor-arm",
+      "material": "black-metal",
+      "dimensions": { "width": 0.72, "height": 0.46, "depth": 0.09 },
+      "transform": { "position": [-0.18, 0.36, 0], "rotation": [0, 0, 0.28], "scale": [1, 1, 1] },
+      "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.03, "segments": 3 } },
+      "actionProfile": { "pivot": { "mode": "hinge", "localPosition": [0.3, -0.18, 0] } }
+    },
+    {
+      "id": "monitor-screen",
+      "name": "监视器屏幕",
+      "level": "micro",
+      "primitive": "plane-card",
+      "parent": "monitor-body",
+      "material": "screen",
+      "dimensions": { "width": 0.62, "height": 0.36, "depth": 0.01 },
+      "transform": { "position": [0, 0, 0.051], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
+    },
+    {
+      "id": "baseplate",
+      "name": "快装底板",
+      "level": "meso",
+      "primitive": "box",
+      "parent": "camera-body",
+      "material": "black-metal",
+      "dimensions": { "width": 1.38, "height": 0.12, "depth": 0.62 },
+      "transform": { "position": [0, -0.44, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "geometryDescriptor": { "edgeTreatment": { "type": "bevel", "bevelRadius": 0.025, "segments": 2 } }
+    },
+    {
+      "id": "left-rail",
+      "name": "左侧导轨",
+      "level": "meso",
+      "primitive": "cylinder",
+      "parent": "baseplate",
+      "material": "black-metal",
+      "dimensions": { "width": 0.08, "height": 1.72, "depth": 0.08 },
+      "transform": { "position": [-0.34, -0.14, 0.36], "rotation": [1.5708, 0, 0], "scale": [1, 1, 1] }
+    },
+    {
+      "id": "right-rail",
+      "name": "右侧导轨",
+      "level": "meso",
+      "primitive": "cylinder",
+      "parent": "baseplate",
+      "material": "black-metal",
+      "dimensions": { "width": 0.08, "height": 1.72, "depth": 0.08 },
+      "transform": { "position": [0.34, -0.14, 0.36], "rotation": [1.5708, 0, 0], "scale": [1, 1, 1] }
+    }
+  ]
+}

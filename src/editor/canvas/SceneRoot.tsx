@@ -12,6 +12,7 @@ import type {
   DirectorAssetRef,
   DirectorCameraShot,
   DirectorObject,
+  DirectorMaterialSettings,
   GeometryPrimitiveType,
 } from "../schema/directorProject";
 import {
@@ -552,11 +553,54 @@ function ImportedModelFallback({ color = "#ff9f43" }: { color?: string }) {
 function GeometryPrimitiveModel({
   color = "#d7e7ff",
   geometryType,
+  geometryAnchor = "base",
+  materialSettings,
 }: {
   color?: string;
   geometryType: GeometryPrimitiveType;
+  geometryAnchor?: "base" | "center";
+  materialSettings?: DirectorMaterialSettings;
 }) {
-  const material = <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} />;
+  const material = (
+    <meshStandardMaterial
+      color={color}
+      emissive={materialSettings?.emissive}
+      emissiveIntensity={materialSettings?.emissiveIntensity ?? 0}
+      metalness={materialSettings?.metalness ?? 0.02}
+      opacity={materialSettings?.opacity ?? 1}
+      roughness={materialSettings?.roughness ?? 0.68}
+      transparent={(materialSettings?.opacity ?? 1) < 1}
+    />
+  );
+
+  if (geometryAnchor === "center") {
+    if (geometryType === "rounded-box") {
+      return <RoundedBox args={[1, 1, 1]} radius={0.08} smoothness={4} name="geometry-rounded-box-centered">{material}</RoundedBox>;
+    }
+    if (geometryType === "sphere" || geometryType === "ellipsoid") {
+      return <mesh name={`geometry-${geometryType}-centered`}><sphereGeometry args={[0.5, 40, 24]} />{material}</mesh>;
+    }
+    if (geometryType === "capsule") {
+      return <mesh name="geometry-capsule-centered"><capsuleGeometry args={[0.25, 0.5, 8, 24]} />{material}</mesh>;
+    }
+    if (geometryType === "cylinder" || geometryType === "disc") {
+      return <mesh name={`geometry-${geometryType}-centered`}><cylinderGeometry args={[0.5, 0.5, 1, 32]} />{material}</mesh>;
+    }
+    if (geometryType === "pipe") {
+      return <mesh name="geometry-pipe-centered"><cylinderGeometry args={[0.5, 0.5, 1, 32, 1, true]} /><meshStandardMaterial color={color} metalness={materialSettings?.metalness ?? 0.08} opacity={materialSettings?.opacity ?? 1} roughness={materialSettings?.roughness ?? 0.58} side={DoubleSide} transparent={(materialSettings?.opacity ?? 1) < 1} /></mesh>;
+    }
+    if (geometryType === "plane" || geometryType === "plane-card") {
+      return <mesh name={`geometry-${geometryType}-centered`} rotation={geometryType === "plane" ? [-Math.PI / 2, 0, 0] : [0, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color={color} metalness={materialSettings?.metalness ?? 0.02} opacity={materialSettings?.opacity ?? 1} roughness={materialSettings?.roughness ?? 0.68} side={DoubleSide} transparent={(materialSettings?.opacity ?? 1) < 1} /></mesh>;
+    }
+    if (geometryType === "torus") {
+      return <mesh name="geometry-torus-centered"><torusGeometry args={[0.38, 0.12, 20, 64]} />{material}</mesh>;
+    }
+    if (geometryType === "cone" || geometryType === "pyramid") {
+      return <mesh name={`geometry-${geometryType}-centered`}><coneGeometry args={[0.5, 1, geometryType === "pyramid" ? 4 : 32]} />{material}</mesh>;
+    }
+    if (geometryType === "wedge") return <WedgeModel color={color} />;
+    return <mesh name="geometry-box-centered"><boxGeometry args={[1, 1, 1]} />{material}</mesh>;
+  }
 
   if (geometryType === "rounded-box") {
     return (
@@ -566,7 +610,7 @@ function GeometryPrimitiveModel({
     );
   }
 
-  if (geometryType === "sphere") {
+  if (geometryType === "sphere" || geometryType === "ellipsoid") {
     return (
       <mesh name="geometry-sphere" position={[0, 0.55, 0]}>
         <sphereGeometry args={[0.55, 32, 16]} />
@@ -625,6 +669,15 @@ function GeometryPrimitiveModel({
       <mesh name="geometry-plane" position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} side={DoubleSide} />
+      </mesh>
+    );
+  }
+
+  if (geometryType === "plane-card") {
+    return (
+      <mesh name="geometry-plane-card" position={[0, 0.5, 0]}>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial color={color} metalness={materialSettings?.metalness ?? 0.02} opacity={materialSettings?.opacity ?? 1} roughness={materialSettings?.roughness ?? 0.68} side={DoubleSide} transparent={(materialSettings?.opacity ?? 1) < 1} />
       </mesh>
     );
   }
@@ -1215,7 +1268,7 @@ function ObjectSceneNode({
           ) : null}
         </>
       ) : item.kind === "prop" && item.geometryType ? (
-        <GeometryPrimitiveModel color={item.color} geometryType={item.geometryType} />
+        <GeometryPrimitiveModel color={item.color} geometryAnchor={item.geometryAnchor} geometryType={item.geometryType} materialSettings={item.material} />
       ) : null}
       </group>
       {children}

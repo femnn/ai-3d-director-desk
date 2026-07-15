@@ -37,7 +37,7 @@ it("imports and immediately executes a standalone character animation JSON", asy
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("import_character", payload));
   expect(screen.getByText(/角色已导入并开始播放/)).toBeInTheDocument();
-  expect(screen.getByText("导入并执行")).toBeInTheDocument();
+  expect(screen.getByText("导入 JSON 并执行")).toBeInTheDocument();
 });
 
 it("imports and immediately executes a scene script JSON", async () => {
@@ -55,4 +55,25 @@ it("imports and immediately executes a scene script JSON", async () => {
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("apply_scene_script", payload));
   expect(screen.getByText(/普通循环动作已自动播放/)).toBeInTheDocument();
+});
+
+it("recognizes and imports an ObjectSculptSpec as an editable procedural prop", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<AgentCommandPanel />);
+  await user.click(screen.getByRole("button", { name: "打开AI布景面板" }));
+  mockExecuteDirectorAgentTool.mockResolvedValue({ targetName: "电影灯", groupIds: ["group_1"], propIds: ["prop_1"], warnings: [] });
+
+  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+  const payload = {
+    targetName: "电影灯",
+    componentTree: [{ id: "lamp_body", name: "灯体", primitive: "cylinder", parent: null }],
+    materials: [{ id: "metal", baseColor: "#30343a" }],
+  };
+  const file = new File([JSON.stringify(payload)], "cinema-light.object-sculpt.json", { type: "application/json" });
+  Object.defineProperty(file, "text", { value: async () => JSON.stringify(payload) });
+
+  fireEvent.change(input, { target: { files: [file] } });
+
+  await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("import_object_sculpt_spec", payload));
+  expect(screen.getByText(/程序化道具“电影灯”已导入/)).toBeInTheDocument();
 });
