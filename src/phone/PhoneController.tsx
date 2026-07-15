@@ -6,6 +6,10 @@ import type { ViewportAspectRatio } from "../editor/schema/viewportAspectRatio";
 import { useDirectorStore } from "../editor/store/directorStore";
 import { setCharacterAnimationElapsedSnapshot } from "../editor/animation/characterAnimation";
 import { setObjectAnimationElapsedSnapshot } from "../editor/animation/objectAnimation";
+import {
+  setAnimationSequenceRuntimeSnapshot,
+  type AnimationSequenceRuntimeSnapshot,
+} from "../editor/animation/animationSequence";
 import { PhoneCameraPreview } from "./PhoneCameraPreview";
 import { PhoneModeNav } from "./PhoneModeNav";
 import {
@@ -45,6 +49,7 @@ interface DesktopStateMessage {
   cameraDrivenAnimationCameraIds?: string[];
   characterAnimationElapsed?: Record<string, number>;
   objectAnimationElapsed?: Record<string, number>;
+  animationSequenceRuntime?: AnimationSequenceRuntimeSnapshot;
 }
 
 interface LiveCameraState {
@@ -361,6 +366,9 @@ export function PhoneController() {
           if (message.state.objectAnimationElapsed) {
             setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);
           }
+          if (message.state.animationSequenceRuntime) {
+            setAnimationSequenceRuntimeSnapshot(message.state.animationSequenceRuntime);
+          }
           setPreviewAspectRatio((current) => (current === desktopAspectRatio ? current : desktopAspectRatio));
           if (message.state.phonePreviewPending && !previewReady && !message.state.phonePreviewProject) {
             setPreviewReady(false);
@@ -380,6 +388,9 @@ export function PhoneController() {
             useDirectorStore.getState().replaceProject(message.state.phonePreviewProject);
             if (message.state.objectAnimationElapsed) {
               setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);
+            }
+            if (message.state.animationSequenceRuntime) {
+              setAnimationSequenceRuntimeSnapshot(message.state.animationSequenceRuntime);
             }
             setPreviewReady(true);
             if (!liveStateRef.current.recording) setStatus("当前布景已同步");

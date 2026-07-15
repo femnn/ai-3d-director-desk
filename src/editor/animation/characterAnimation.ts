@@ -264,7 +264,7 @@ function sampleLightDanceControls(elapsed: number, duration: number) {
   return getLightDanceSample(elapsed, duration).controls;
 }
 
-function getActionControls(actionId: CharacterActionId, elapsed: number, duration: number): Record<string, number> {
+export function getActionControls(actionId: CharacterActionId, elapsed: number, duration: number): Record<string, number> {
   const phase = getPhase(elapsed, duration);
   const breath = Math.sin(phase) * 2;
   const stride = Math.sin(phase * 2);
@@ -398,7 +398,7 @@ function getActionControls(actionId: CharacterActionId, elapsed: number, duratio
   }
 }
 
-function getActionRootOffset(actionId: CharacterActionId, elapsed: number, duration: number): Tuple3 {
+export function getActionRootOffset(actionId: CharacterActionId, elapsed: number, duration: number): Tuple3 {
   if (actionId === "light-dance") {
     return getLightDanceSample(elapsed, duration).root;
   }

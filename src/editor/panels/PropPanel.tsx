@@ -259,9 +259,9 @@ export function PropPanel() {
           ariaLabel="物体动画播放方式"
           value={animationTrack.playbackMode}
           options={[
-            { value: "normal", label: "普通播放" },
-            { value: "recording-sync", label: "录制同步" },
-            { value: "camera-driven", label: "镜头驱动" },
+            { value: "normal", label: "手动播放" },
+            { value: "recording-sync", label: "录制时播放" },
+            { value: "camera-driven", label: "随镜头运动" },
           ]}
           onChange={(value) => updateAnimation({ playbackMode: value as ObjectAnimationTrack["playbackMode"] })}
         />

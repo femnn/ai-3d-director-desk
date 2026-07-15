@@ -89,3 +89,40 @@ it("does not treat phone camera rig updates as a new scene preview", () => {
 
   expect(getPhonePreviewFingerprint(cameraMovedProject)).toBe(getPhonePreviewFingerprint(project));
 });
+
+it("keeps the active unified animation sequence in the phone preview", () => {
+  const animatedProject: DirectorProject = {
+    ...project,
+    animationSequences: [{
+      id: "sequence-1",
+      name: "桌椅动画",
+      duration: 10,
+      playbackMode: "recording",
+      loop: true,
+      enabled: true,
+      cameraId: null,
+      bindings: [{ alias: "table", objectId: "prop-1", objectName: "桌子" }],
+      tracks: [{
+        id: "track-1",
+        name: "桌子移动",
+        type: "object",
+        binding: "table",
+        startTime: 0,
+        endTime: 10,
+        loop: false,
+        blendIn: 0,
+        blendOut: 0,
+        keyframes: [
+          { time: 0, position: [0, 0, 0] },
+          { time: 10, position: [2, 0, 0] },
+        ],
+      }],
+    }],
+    activeAnimationSequenceId: "sequence-1",
+  };
+
+  const preview = createPhonePreviewProject(animatedProject);
+
+  expect(preview.animationSequences).toEqual(animatedProject.animationSequences);
+  expect(preview.activeAnimationSequenceId).toBe("sequence-1");
+});

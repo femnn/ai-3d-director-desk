@@ -17,6 +17,7 @@ import {
   Grid3X3,
   Image,
   ImagePlus,
+  ListVideo,
   Move3D,
   Plus,
   Ratio,
@@ -86,9 +87,13 @@ function waitForNextAnimationFrame() {
 export function ViewportToolbar({
   getViewportCameraSnapshot,
   toolbarContainerRef,
+  animationTimelineOpen = false,
+  onToggleAnimationTimeline,
 }: {
   getViewportCameraSnapshot?: () => CameraShotSnapshot;
   toolbarContainerRef?: MutableRefObject<HTMLDivElement | null>;
+  animationTimelineOpen?: boolean;
+  onToggleAnimationTimeline?: () => void;
 }) {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const aspectRatioPanelRef = useRef<HTMLDivElement | null>(null);
@@ -457,18 +462,21 @@ export function ViewportToolbar({
     { label: "当前视角截图", icon: Camera, onClick: () => void handleCapture("current") },
     { label: "四方位截图", icon: Grid2X2, onClick: () => void handleCapture("four") },
     { label: "十二方位截图", icon: Grid3X3, onClick: () => void handleCapture("twelve") },
+    { label: "动画时间轴", icon: ListVideo, onClick: () => onToggleAnimationTimeline?.() },
     { label: "全屏", icon: Expand, onClick: toggleViewportPanelsCollapsed },
   ];
 
   function renderActionButton(action: ToolbarAction) {
     const Icon = action.icon;
-    const active = action.mode ? transformMode === action.mode : false;
+    const active = action.mode
+      ? transformMode === action.mode
+      : action.label === "动画时间轴" && animationTimelineOpen;
 
     return (
       <button
         key={action.label}
         aria-label={action.label}
-        aria-pressed={action.mode ? active : undefined}
+        aria-pressed={action.mode || action.label === "动画时间轴" ? active : undefined}
         className={`ui-icon-button viewport-toolbar-button${active ? " is-active" : ""}`}
         type="button"
         onClick={action.onClick}

@@ -1,0 +1,104 @@
+{
+  "reset": true,
+  "scene": {
+    "backgroundColor": "#27313a",
+    "showGrid": true,
+    "showGround": true,
+    "groundOpacity": 0.7
+  },
+  "groups": [
+    {
+      "kind": "group",
+      "id": "stunt_car",
+      "name": "特技汽车",
+      "position": [-8, 0, 1.8],
+      "selectionMode": "whole",
+      "children": [
+        { "id": "car_body", "name": "汽车车身", "geometryType": "rounded-box", "position": [0, 0.85, 0], "geometrySize": [3.8, 0.75, 1.75], "color": "#d63d36", "material": { "roughness": 0.28, "metalness": 0.45 } },
+        { "id": "car_cabin", "name": "汽车座舱", "geometryType": "rounded-box", "position": [-0.35, 1.48, 0], "geometrySize": [1.75, 0.72, 1.55], "color": "#6eb4cf", "material": { "roughness": 0.16, "metalness": 0.08, "opacity": 0.78 } },
+        { "id": "car_door_left", "name": "左车门", "geometryType": "rounded-box", "position": [-0.25, 0.95, 0.91], "geometrySize": [1.45, 0.72, 0.12], "color": "#c92f2b", "pivot": [-0.7, 0, 0] },
+        { "id": "car_door_right", "name": "右车门", "geometryType": "rounded-box", "position": [-0.25, 0.95, -0.91], "geometrySize": [1.45, 0.72, 0.12], "color": "#c92f2b", "pivot": [-0.7, 0, 0] },
+        { "id": "car_wheel_fl", "name": "左前轮", "geometryType": "torus", "position": [1.15, 0.46, 0.94], "rotation": [1.5708, 0, 0], "geometrySize": [0.78, 0.78, 0.28], "color": "#20252a" },
+        { "id": "car_wheel_fr", "name": "右前轮", "geometryType": "torus", "position": [1.15, 0.46, -0.94], "rotation": [1.5708, 0, 0], "geometrySize": [0.78, 0.78, 0.28], "color": "#20252a" },
+        { "id": "car_wheel_rl", "name": "左后轮", "geometryType": "torus", "position": [-1.15, 0.46, 0.94], "rotation": [1.5708, 0, 0], "geometrySize": [0.78, 0.78, 0.28], "color": "#20252a" },
+        { "id": "car_wheel_rr", "name": "右后轮", "geometryType": "torus", "position": [-1.15, 0.46, -0.94], "rotation": [1.5708, 0, 0], "geometrySize": [0.78, 0.78, 0.28], "color": "#20252a" }
+      ]
+    },
+    {
+      "kind": "group",
+      "id": "freight_train",
+      "name": "货运列车",
+      "position": [0, 0, 0],
+      "selectionMode": "whole",
+      "children": [
+        { "id": "train_chassis", "name": "列车底盘", "geometryType": "box", "position": [0, 0.65, 0], "geometrySize": [13.5, 0.35, 2.15], "color": "#282e34", "material": { "roughness": 0.62, "metalness": 0.42 } },
+        { "id": "train_engine", "name": "火车头", "geometryType": "rounded-box", "position": [-5.2, 1.65, 0], "geometrySize": [2.4, 2.15, 2], "color": "#2f6a82" },
+        { "id": "train_coach_a", "name": "一号车厢", "geometryType": "rounded-box", "position": [-1.5, 1.65, 0], "geometrySize": [4.2, 2.15, 2], "color": "#d5c49e" },
+        { "id": "train_coach_b", "name": "二号车厢", "geometryType": "rounded-box", "position": [3.2, 1.65, 0], "geometrySize": [4.2, 2.15, 2], "color": "#d5c49e" },
+        { "id": "train_wheels", "name": "列车车轮组", "geometryType": "torus", "position": [-5.2, 0.45, 1.08], "rotation": [1.5708, 0, 0], "geometrySize": [0.72, 0.72, 0.24], "color": "#20252a", "repeat": { "count": 9, "offset": [1.35, 0, 0] }, "mirror": { "axis": "z" } }
+      ]
+    }
+  ],
+  "camera": {
+    "id": "stunt_camera",
+    "name": "飞跃全景机位",
+    "position": [0, 5.8, 15],
+    "lookAt": [0, 2.2, 0],
+    "fov": 48
+  },
+  "directorView": {
+    "position": [12, 9, 17],
+    "lookAt": [0, 1.5, 0],
+    "fov": 46
+  },
+  "animationSequences": [
+    {
+      "format": "storyai-animation-sequence",
+      "version": 1,
+      "sequence": {
+        "id": "sequence_car_jump_breakup",
+        "name": "汽车飞跃火车并解体",
+        "duration": 10,
+        "playbackMode": "recording",
+        "loop": false,
+        "enabled": true,
+        "cameraId": "stunt_camera",
+        "bindings": [
+          { "alias": "car", "objectId": "stunt_car", "objectName": "特技汽车" },
+          { "alias": "door_left", "objectId": "car_door_left", "objectName": "左车门" },
+          { "alias": "door_right", "objectId": "car_door_right", "objectName": "右车门" },
+          { "alias": "wheel_fl", "objectId": "car_wheel_fl", "objectName": "左前轮" },
+          { "alias": "wheel_fr", "objectId": "car_wheel_fr", "objectName": "右前轮" },
+          { "alias": "wheel_rl", "objectId": "car_wheel_rl", "objectName": "左后轮" },
+          { "alias": "wheel_rr", "objectId": "car_wheel_rr", "objectName": "右后轮" }
+        ],
+        "tracks": [
+          {
+            "id": "track_car_jump",
+            "name": "汽车抛物线飞跃",
+            "type": "object",
+            "binding": "car",
+            "startTime": 0,
+            "endTime": 6,
+            "loop": false,
+            "keyframes": [
+              { "time": 0, "position": [-8, 0, 1.8], "rotation": [0, 0, 0] },
+              { "time": 1.2, "position": [-5.5, 0.3, 1.8], "rotation": [0, 0, -0.08] },
+              { "time": 2.4, "position": [-3.2, 3.2, 1.8], "rotation": [0.08, 0, -0.18] },
+              { "time": 3.2, "position": [0, 5.4, 1.8], "rotation": [0.14, 0, 0] },
+              { "time": 4.2, "position": [3.5, 3.5, 1.8], "rotation": [0.05, 0, 0.16] },
+              { "time": 5.3, "position": [6.5, 0.5, 1.8], "rotation": [-0.06, 0, 0.08] },
+              { "time": 6, "position": [8, 0, 1.8], "rotation": [0, 0, 0] }
+            ]
+          },
+          { "id": "track_door_left", "name": "左车门抛飞", "type": "object", "binding": "door_left", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [-0.25, 0.95, 0.91], "rotation": [0, 0, 0] }, { "time": 2, "position": [-1.5, 3.2, 3.2], "rotation": [2.4, 1.8, 3.2] }, { "time": 4, "position": [-3.2, 0.2, 5.2], "rotation": [5.8, 4.2, 7.4] } ] },
+          { "id": "track_door_right", "name": "右车门抛飞", "type": "object", "binding": "door_right", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [-0.25, 0.95, -0.91], "rotation": [0, 0, 0] }, { "time": 2, "position": [-0.8, 3.8, -3.6], "rotation": [-2.8, 2.2, -3.4] }, { "time": 4, "position": [-2.4, 0.15, -5.6], "rotation": [-6.2, 4.6, -7.8] } ] },
+          { "id": "track_wheel_fl", "name": "左前轮脱落", "type": "object", "binding": "wheel_fl", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [1.15, 0.46, 0.94], "rotation": [1.5708, 0, 0] }, { "time": 2, "position": [3.4, 2.1, 2.8], "rotation": [8, 0.8, 1.4] }, { "time": 4, "position": [6.2, 0.4, 4.6], "rotation": [14, 1.4, 2.6] } ] },
+          { "id": "track_wheel_fr", "name": "右前轮脱落", "type": "object", "binding": "wheel_fr", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [1.15, 0.46, -0.94], "rotation": [1.5708, 0, 0] }, { "time": 2, "position": [3.8, 2.4, -2.6], "rotation": [8.5, -0.8, -1.2] }, { "time": 4, "position": [6.6, 0.4, -4.2], "rotation": [15, -1.5, -2.4] } ] },
+          { "id": "track_wheel_rl", "name": "左后轮脱落", "type": "object", "binding": "wheel_rl", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [-1.15, 0.46, 0.94], "rotation": [1.5708, 0, 0] }, { "time": 2, "position": [-2.8, 2.8, 3.5], "rotation": [7.4, 1.1, 1.8] }, { "time": 4, "position": [-5.4, 0.35, 5.8], "rotation": [13.5, 2, 3.2] } ] },
+          { "id": "track_wheel_rr", "name": "右后轮脱落", "type": "object", "binding": "wheel_rr", "startTime": 6, "endTime": 10, "loop": false, "keyframes": [ { "time": 0, "position": [-1.15, 0.46, -0.94], "rotation": [1.5708, 0, 0] }, { "time": 2, "position": [-3.2, 3, -3.2], "rotation": [7.8, -1, -1.7] }, { "time": 4, "position": [-5.8, 0.35, -5.4], "rotation": [14, -1.8, -3] } ] }
+        ]
+      }
+    }
+  ]
+}

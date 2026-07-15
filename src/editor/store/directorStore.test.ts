@@ -769,6 +769,71 @@ it("migrates persisted procedural characters to the built-in UE4 mannequin rig",
   });
 });
 
+it.each([
+  ["normal", "manual"],
+  ["recording-sync", "recording"],
+  ["camera-driven", "camera-motion"],
+] as const)("migrates legacy animation sequence mode %s to %s", (legacyMode, expectedMode) => {
+  const project = createDefaultDirectorProject();
+  const character = project.objects.find((item) => item.kind === "character")!;
+  project.animationSequences = [{
+    id: `legacy-${legacyMode}`,
+    name: "旧动画",
+    duration: 5,
+    playbackMode: legacyMode as never,
+    loop: true,
+    enabled: true,
+    cameraId: null,
+    bindings: [{ alias: "actor", objectId: character.id, objectName: character.name }],
+    tracks: [],
+  }];
+  project.activeAnimationSequenceId = `legacy-${legacyMode}`;
+
+  useDirectorStore.getState().replaceProject(project);
+
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.playbackMode).toBe(expectedMode);
+});
+
+it("sanitizes malformed external object animation keyframes during project migration", () => {
+  const project = createDefaultDirectorProject();
+  const target = project.objects[0]!;
+  project.animationSequences = [{
+    id: "external-sequence",
+    name: "外部动画",
+    duration: 5,
+    playbackMode: "manual",
+    loop: false,
+    enabled: true,
+    cameraId: null,
+    bindings: [{ alias: "target", objectId: target.id, objectName: target.name }],
+    tracks: [{
+      id: "external-track",
+      name: "不完整轨道",
+      type: "object",
+      binding: "target",
+      startTime: 0,
+      endTime: 5,
+      keyframes: [
+        { time: 0, position: "invalid" as never },
+        { time: 100, position: [2, 0, 0] },
+      ],
+      path: { type: "curve", closed: false, points: [[0, 0, 0], [Number.NaN, 1, 0]] },
+    }],
+  }];
+
+  useDirectorStore.getState().replaceProject(project);
+
+  const track = useDirectorStore.getState().project.animationSequences?.[0]?.tracks[0];
+  expect(track?.type).toBe("object");
+  if (track?.type === "object") {
+    expect(track.keyframes).toEqual([
+      { time: 0, position: undefined, rotation: undefined, scale: undefined },
+      { time: 5, position: [2, 0, 0], rotation: undefined, scale: undefined },
+    ]);
+    expect(track.path).toBeUndefined();
+  }
+});
+
 it("adds the built-in UE4 mannequin rig to persisted characters that predate rig metadata", () => {
   const legacyProject = createDefaultDirectorProject();
   const legacyCharacter = legacyProject.objects.find((item) => item.kind === "character");

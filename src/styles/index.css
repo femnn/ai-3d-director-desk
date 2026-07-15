@@ -440,10 +440,18 @@ textarea:focus-visible {
 
 .canvas-frame {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   height: 100%;
   width: 100%;
+}
+
+.director-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .director-canvas {
@@ -466,6 +474,178 @@ textarea:focus-visible {
 
 .director-canvas canvas {
   height: 100% !important;
+}
+
+.animation-timeline {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  flex: 0 0 min(238px, 36vh);
+  flex-direction: column;
+  min-height: 170px;
+  border-top: 1px solid rgb(var(--border-rgb) / 0.45);
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--panel-rgb));
+}
+
+.director-shell-fullbleed:not(.is-sidebars-collapsed) .animation-timeline {
+  margin-right: var(--right-sidebar-width);
+  margin-left: var(--left-sidebar-width);
+}
+
+.animation-timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgb(var(--border-rgb) / 0.3);
+}
+
+.animation-timeline-title,
+.animation-timeline-controls,
+.animation-timeline-loop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.animation-timeline-title {
+  min-width: 280px;
+}
+
+.animation-timeline-title strong {
+  font-size: 13px;
+}
+
+.animation-timeline select,
+.animation-timeline button {
+  min-height: 30px;
+  border: 1px solid rgb(var(--border-rgb) / 0.45);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--field-rgb));
+}
+
+.animation-timeline button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.animation-timeline-controls {
+  flex: 1;
+}
+
+.animation-timeline-loop {
+  min-height: 30px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.animation-timeline-close {
+  margin-left: auto;
+}
+
+.animation-timeline-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.animation-timeline-ruler {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 11px;
+}
+
+.animation-timeline-ruler input {
+  width: 100%;
+}
+
+.animation-timeline-track-list {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 0 12px 10px;
+}
+
+.animation-timeline button.animation-timeline-track {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 0;
+  padding: 3px 0;
+  text-align: left;
+  background: transparent;
+}
+
+.animation-timeline-track + .animation-timeline-track {
+  border-top: 1px solid rgb(var(--border-rgb) / 0.18);
+}
+
+.animation-timeline-track-label {
+  display: grid;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.animation-timeline-track-label strong,
+.animation-timeline-track-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.animation-timeline-track-label strong {
+  font-size: 12px;
+}
+
+.animation-timeline-track-label small {
+  color: rgb(var(--text-muted-rgb));
+  font-size: 10px;
+}
+
+.animation-timeline-track-lane {
+  position: relative;
+  display: block;
+  height: 26px;
+  border-radius: 4px;
+  background: rgb(var(--field-rgb));
+}
+
+.animation-timeline-track-clip {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  overflow: hidden;
+  min-width: 3px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #ffffff;
+  background: #1677a8;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.animation-timeline-track.is-object .animation-timeline-track-clip {
+  background: #8b5e22;
+}
+
+.animation-timeline-empty {
+  margin: auto;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 12px;
 }
 
 .panel-card {

@@ -11,6 +11,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import type {
   DirectorAssetRef,
   DirectorCameraShot,
+  DirectorAnimationSequence,
   DirectorObject,
   DirectorMaterialSettings,
   GeometryPrimitiveType,
@@ -31,6 +32,13 @@ import { getUE4GroundedLabelY } from "../runtime/ue4Mannequin/ue4MannequinRig";
 import { getEffectiveGroundOpacity } from "./panoramaMath";
 import { getCrowdAnchorTransform } from "../store/directorStore";
 import { getObjectAnimationElapsed, sampleObjectAnimation } from "../animation/objectAnimation";
+import {
+  findSequenceTrackForObject,
+  getAnimationSequenceRuntimeSnapshot,
+  sampleSequenceCharacter,
+  sampleSequenceObject,
+  useAnimationSequenceRuntime,
+} from "../animation/animationSequence";
 
 export { getEffectiveGroundOpacity, getPanoramaRotationRadians } from "./panoramaMath";
 
@@ -1136,6 +1144,7 @@ function ObjectSceneNode({
   onSelect,
   onPoseControlChange,
   poseHandleInteractionMode,
+  animationSequence,
   children,
 }: {
   asset?: DirectorAssetRef;
@@ -1148,6 +1157,7 @@ function ObjectSceneNode({
   onSelect?: (item: DirectorObject) => void;
   onPoseControlChange?: (characterId: string, controls: Record<string, number>) => void;
   poseHandleInteractionMode: "persistent" | "hold";
+  animationSequence?: DirectorAnimationSequence;
   children?: ReactNode;
 }) {
   const groupRef = useRef<Group>(null!);
@@ -1163,9 +1173,39 @@ function ObjectSceneNode({
     ? motionClips.find((clip) => clip.id === item.characterActionTrack?.motionClipId)
     : undefined;
   const animatedCharacter = useAnimatedCharacterRigState(item, motionClip);
+  const sequenceRuntime = useAnimationSequenceRuntime();
+  const sequenceCharacterTrack = animationSequence && sequenceRuntime.sequenceId === animationSequence.id
+    ? findSequenceTrackForObject(animationSequence, item.id, "character")
+    : undefined;
+  const sequenceMotionClip = sequenceCharacterTrack?.type === "character" && sequenceCharacterTrack.motionClipId
+    ? motionClips.find((clip) => clip.id === sequenceCharacterTrack.motionClipId)
+    : undefined;
+  const sequenceCharacter = sequenceCharacterTrack?.type === "character" && animationSequence
+    ? sampleSequenceCharacter(
+        animationSequence,
+        sequenceCharacterTrack,
+        sequenceRuntime.elapsed,
+        item,
+        sequenceMotionClip
+      )
+    : null;
+  const hasActiveSequenceCharacterTrack = sequenceCharacterTrack?.type === "character";
   const editingPose = poseEditMode && selected && item.characterRig?.rigType === "ue4-mannequin" && !item.assetRefId;
-  const visibleRigState = editingPose ? item.characterRig : animatedCharacter.rigState;
-  const visibleRootOffset: [number, number, number] = editingPose ? [0, 0, 0] : animatedCharacter.rootOffset;
+  const visibleRigState = editingPose
+    ? item.characterRig
+    : hasActiveSequenceCharacterTrack
+      ? sequenceCharacter?.rigState ?? item.characterRig
+      : animatedCharacter.rigState;
+  const visibleRootOffset: [number, number, number] = editingPose
+    ? [0, 0, 0]
+    : hasActiveSequenceCharacterTrack
+      ? sequenceCharacter?.rootOffset ?? [0, 0, 0]
+      : animatedCharacter.rootOffset;
+  const visibleRootRotation: [number, number, number] = editingPose
+    ? [0, 0, 0]
+    : hasActiveSequenceCharacterTrack
+      ? sequenceCharacter?.rootRotation ?? [0, 0, 0]
+      : [0, 0, 0];
   const isImportedModel = asset?.sourceType === "model";
   const characterLabelKey = `${item.id}:${item.bodyType ?? ""}:${item.characterRig?.rigType ?? ""}`;
   const fallbackCharacterLabelY =
@@ -1231,7 +1271,9 @@ function ObjectSceneNode({
         onSelect?.(item);
       }}
     >
-      {item.objectAnimationTrack?.enabled ? <ObjectAnimationRig item={item} targetRef={groupRef} /> : null}
+      {item.objectAnimationTrack?.enabled || animationSequence ? (
+        <ObjectAnimationRig animationSequence={animationSequence} item={item} targetRef={groupRef} />
+      ) : null}
       <group position={[-pivot[0], -pivot[1], -pivot[2]]}>
       {isImportedModel && asset ? (
         <ImportedModelBoundary key={`${asset.id}:${asset.url}`} fallback={<ImportedModelFallback color={item.color} />}>
@@ -1239,7 +1281,7 @@ function ObjectSceneNode({
             <ImportedModel
               animated={asset.animated}
               animationDuration={item.characterActionTrack ? getActionTrackDuration(item.characterActionTrack) : undefined}
-              animationElapsed={item.characterActionTrack?.enabled ? animatedCharacter.elapsed : undefined}
+              animationElapsed={sequenceCharacter?.elapsed ?? (item.characterActionTrack?.enabled ? animatedCharacter.elapsed : undefined)}
               color={item.color}
               fileName={asset.fileName}
               url={asset.url}
@@ -1248,7 +1290,7 @@ function ObjectSceneNode({
         </ImportedModelBoundary>
       ) : item.kind === "character" ? (
         <>
-          <group position={visibleRootOffset}>
+          <group position={visibleRootOffset} rotation={visibleRootRotation}>
             <Suspense fallback={null}>
               <CharacterModel
                 bodyType={item.bodyType}
@@ -1303,11 +1345,35 @@ function ObjectSceneNode({
   );
 }
 
-function ObjectAnimationRig({ item, targetRef }: { item: DirectorObject; targetRef: MutableRefObject<Group> }) {
+function ObjectAnimationRig({
+  animationSequence,
+  item,
+  targetRef,
+}: {
+  animationSequence?: DirectorAnimationSequence;
+  item: DirectorObject;
+  targetRef: MutableRefObject<Group>;
+}) {
   useFrame(() => {
     const group = targetRef.current;
-    if (!item.objectAnimationTrack?.enabled || !group) return;
-    const sampled = sampleObjectAnimation(item.objectAnimationTrack, getObjectAnimationElapsed(item), item.transform);
+    if (!group) return;
+    const runtime = getAnimationSequenceRuntimeSnapshot();
+    const sequenceTrack = animationSequence && runtime.sequenceId === animationSequence.id
+      ? findSequenceTrackForObject(animationSequence, item.id, "object")
+      : undefined;
+    const sampled = sequenceTrack?.type === "object"
+      ? sampleSequenceObject(animationSequence!, sequenceTrack, runtime.elapsed, item.transform)
+      : item.objectAnimationTrack?.enabled
+        ? sampleObjectAnimation(item.objectAnimationTrack, getObjectAnimationElapsed(item), item.transform)
+        : null;
+    if (!sampled) {
+      if (sequenceTrack?.type === "object") {
+        group.position.set(...item.transform.position);
+        group.rotation.set(...item.transform.rotation);
+        group.scale.set(...item.transform.scale);
+      }
+      return;
+    }
     group.position.set(...sampled.position);
     group.rotation.set(...sampled.rotation);
     group.scale.set(...sampled.scale);
@@ -1526,6 +1592,8 @@ export function SceneRoot({
   const objects = useDirectorStore((state) => state.project.objects);
   const cameras = useDirectorStore((state) => state.project.cameras);
   const panoramaAssetId = useDirectorStore((state) => state.project.panoramaAssetId);
+  const animationSequences = useDirectorStore((state) => state.project.animationSequences ?? []);
+  const activeAnimationSequenceId = useDirectorStore((state) => state.project.activeAnimationSequenceId ?? null);
   const viewMode = useDirectorStore((state) => state.viewMode);
   const selectedObjectId = useDirectorStore((state) => state.selectedObjectId);
   const selectedCrowdId = useDirectorStore((state) => state.selectedCrowdId);
@@ -1533,6 +1601,7 @@ export function SceneRoot({
   const selectObject = useDirectorStore((state) => state.selectObject);
   const selectCrowd = useDirectorStore((state) => state.selectCrowd);
   const panoramaAsset = assets.find((item) => item.id === panoramaAssetId);
+  const animationSequence = animationSequences.find((sequence) => sequence.id === activeAnimationSequenceId);
   const translationSnap = scene.snapToGrid ? 1 : null;
   const assetsById = useMemo(() => new Map(assets.map((item) => [item.id, item])), [assets]);
   const cameraObjectsByCameraId = useMemo(() => {
@@ -1611,6 +1680,7 @@ export function SceneRoot({
           />
         ) : null}
         <ObjectSceneNode
+          animationSequence={animationSequence}
           asset={asset}
           item={item}
           selected={selected}

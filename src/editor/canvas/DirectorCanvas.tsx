@@ -30,6 +30,7 @@ import { ViewportToolbar } from "./ViewportToolbar";
 import { getViewportAspectFrameRect, type ViewportSafeAreaInsets } from "./viewportAspectFrame";
 import { useLiveVideoCaptureActive, usePhoneCameraPath } from "../phone/phoneCameraControl";
 import { CameraMonitor } from "./CameraMonitor";
+import { AnimationTimeline } from "../animation/AnimationTimeline";
 
 export const DEFAULT_DIRECTOR_VIEW_SNAPSHOT: CameraShotSnapshot = DEFAULT_DIRECTOR_CAMERA_VIEW_SNAPSHOT;
 const VIEWPORT_FRAME_PADDING = 40;
@@ -632,6 +633,7 @@ export function DirectorCanvas() {
   const [directorViewSnapshot, setDirectorViewSnapshot] = useState(DEFAULT_DIRECTOR_VIEW_SNAPSHOT);
   const [poseEditorViewSnapshot, setPoseEditorViewSnapshot] = useState<CameraShotSnapshot>(DEFAULT_DIRECTOR_VIEW_SNAPSHOT);
   const [toolbarHeight, setToolbarHeight] = useState(DEFAULT_VIEWPORT_TOOLBAR_HEIGHT);
+  const [animationTimelineOpen, setAnimationTimelineOpen] = useState(false);
   const hasPanorama = Boolean(panoramaAssetId);
   const panoramaAsset = assets.find((item) => item.id === panoramaAssetId);
   const showViewportGrid = sceneSettings.showGrid && shouldRenderViewportGrid(hasPanorama, sceneSettings.snapToGrid);
@@ -728,7 +730,8 @@ export function DirectorCanvas() {
 
   return (
     <div className="canvas-frame">
-      <div className="director-canvas" data-testid="director-canvas">
+      <div className="director-stage">
+        <div className="director-canvas" data-testid="director-canvas">
         <Canvas
           camera={{ position: DEFAULT_DIRECTOR_VIEW_SNAPSHOT.position, fov: DEFAULT_DIRECTOR_VIEW_SNAPSHOT.fov }}
           dpr={recordingVideo ? 1 : [1, 1.5]}
@@ -811,23 +814,30 @@ export function DirectorCanvas() {
             <SceneRoot focusCharacterId={poseEditCharacter?.id} />
           </Suspense>
         </Canvas>
-      </div>
-      <ViewportAspectOverlay
+        </div>
+        <ViewportAspectOverlay
         bottomPadding={aspectOverlayBottomPadding}
         onToggleRuleOfThirds={setViewportRuleOfThirdsEnabled}
         ratio={viewportAspectRatio}
         safeAreaInsets={viewportSafeAreaInsets}
         showRuleOfThirds={viewportRuleOfThirdsEnabled}
       />
-      {poseEditCharacter ? (
+        {poseEditCharacter ? (
         <ViewportGizmoOverlay
           onSnapshotChange={updateViewportGizmoSnapshot}
           rightOffset={gizmoRightOffset}
           snapshot={visibleViewportSnapshot}
         />
       ) : null}
-      {poseEditCharacter ? null : <CameraMonitor />}
-      <ViewportToolbar getViewportCameraSnapshot={getViewportCameraSnapshot} toolbarContainerRef={toolbarRef} />
+        {poseEditCharacter ? null : <CameraMonitor />}
+        <ViewportToolbar
+          animationTimelineOpen={animationTimelineOpen}
+          getViewportCameraSnapshot={getViewportCameraSnapshot}
+          onToggleAnimationTimeline={() => setAnimationTimelineOpen((open) => !open)}
+          toolbarContainerRef={toolbarRef}
+        />
+      </div>
+      {animationTimelineOpen ? <AnimationTimeline onClose={() => setAnimationTimelineOpen(false)} /> : null}
     </div>
   );
 }

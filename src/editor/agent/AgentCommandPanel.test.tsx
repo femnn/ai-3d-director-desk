@@ -54,7 +54,7 @@ it("imports and immediately executes a scene script JSON", async () => {
   fireEvent.change(input, { target: { files: [file] } });
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("apply_scene_script", payload));
-  expect(screen.getByText(/普通循环动作已自动播放/)).toBeInTheDocument();
+  expect(screen.getByText(/已完成：1 个角色/)).toBeInTheDocument();
 });
 
 it("recognizes and imports an ObjectSculptSpec as an editable procedural prop", async () => {

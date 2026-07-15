@@ -41,6 +41,7 @@ export type CharacterActionId =
   | "phone";
 export type CharacterActionPlaybackMode = "normal" | "camera-driven";
 export type CharacterMotionSource = "built-in" | "video" | "mocap";
+export type AnimationSequencePlaybackMode = "manual" | "recording" | "camera-motion";
 export type CharacterBodyType =
   | "mannequin"
   | "female"
@@ -132,6 +133,8 @@ export interface CharacterActionTrack {
 export interface CharacterMotionFrame {
   time: number;
   controls: Record<string, number>;
+  rootOffset?: [number, number, number];
+  rootRotation?: [number, number, number];
 }
 
 export interface CharacterMotionClip {
@@ -140,6 +143,51 @@ export interface CharacterMotionClip {
   name: string;
   duration: number;
   frames: CharacterMotionFrame[];
+}
+
+export interface DirectorAnimationBinding {
+  alias: string;
+  objectId: string;
+  objectName: string;
+}
+
+export interface DirectorAnimationTrackBase {
+  id: string;
+  name: string;
+  binding: string;
+  startTime: number;
+  endTime: number;
+  loop?: boolean;
+  blendIn?: number;
+  blendOut?: number;
+}
+
+export interface DirectorCharacterAnimationTrack extends DirectorAnimationTrackBase {
+  type: "character";
+  actionId?: CharacterActionId;
+  motionClipId?: string | null;
+}
+
+export interface DirectorObjectAnimationTrack extends DirectorAnimationTrackBase {
+  type: "object";
+  keyframes: ObjectAnimationKeyframe[];
+  path?: ObjectAnimationPath;
+}
+
+export type DirectorAnimationSequenceTrack =
+  | DirectorCharacterAnimationTrack
+  | DirectorObjectAnimationTrack;
+
+export interface DirectorAnimationSequence {
+  id: string;
+  name: string;
+  duration: 5 | 10 | 15;
+  playbackMode: AnimationSequencePlaybackMode;
+  loop: boolean;
+  enabled: boolean;
+  cameraId?: string | null;
+  bindings: DirectorAnimationBinding[];
+  tracks: DirectorAnimationSequenceTrack[];
 }
 
 export interface ScenePlan {
@@ -243,6 +291,8 @@ export interface DirectorProject {
   cameras: DirectorCameraShot[];
   cameraAnimations: DirectorCameraAnimation[];
   characterMotionClips?: CharacterMotionClip[];
+  animationSequences?: DirectorAnimationSequence[];
+  activeAnimationSequenceId?: string | null;
   activeCameraId: string | null;
   panoramaAssetId: string | null;
   scenePlan?: ScenePlan | null;

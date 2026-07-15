@@ -9,6 +9,11 @@ import {
   endObjectAnimationsForCamera,
   reportCameraDrivenObjectMovement,
 } from "../animation/objectAnimation";
+import {
+  beginAnimationSequenceRecording,
+  endAnimationSequenceRecording,
+  reportAnimationSequenceCameraMovement,
+} from "../animation/animationSequence";
 import { getCameraRigPositionFromViewSnapshot } from "../schema/cameraGeometry";
 import type {
   DirectorCameraAnimation,
@@ -455,12 +460,16 @@ function applyPhoneCameraState(state: PhoneCameraState) {
   }
   phoneUpdateTimestampByCameraId.set(cameraId, updatedAt);
   if (state.recording) {
+    const project = useDirectorStore.getState().project;
+    beginAnimationSequenceRecording(cameraId, project.animationSequences ?? [], project.activeAnimationSequenceId);
     beginCameraDrivenCharacterAnimations(cameraId, getCameraDrivenCharacterIds(cameraId));
     beginObjectAnimationsForCamera(cameraId, useDirectorStore.getState().project.objects);
     reportCameraDrivenCharacterMovement(cameraId, { position, target, fov, time: updatedAt });
     reportCameraDrivenObjectMovement(cameraId, { position, target, fov, time: updatedAt });
+    reportAnimationSequenceCameraMovement(cameraId, { position, target, fov, time: updatedAt });
     appendPathPoint(cameraId, position);
   } else {
+    endAnimationSequenceRecording(cameraId);
     endCameraDrivenCharacterAnimations(cameraId);
     endObjectAnimationsForCamera(cameraId);
   }
@@ -555,6 +564,11 @@ export function playCameraAnimation(animation: DirectorCameraAnimation) {
   useDirectorStore.getState().setActiveCamera(animation.cameraId);
   beginCameraDrivenCharacterAnimations(animation.cameraId, getCameraDrivenCharacterIds(animation.cameraId));
   beginObjectAnimationsForCamera(animation.cameraId, useDirectorStore.getState().project.objects);
+  beginAnimationSequenceRecording(
+    animation.cameraId,
+    useDirectorStore.getState().project.animationSequences ?? [],
+    useDirectorStore.getState().project.activeAnimationSequenceId
+  );
 
   function tick(now: number) {
     const playbackElapsed = Math.min(now - startedAt, playbackDuration);
@@ -590,12 +604,14 @@ export function playCameraAnimation(animation: DirectorCameraAnimation) {
     });
     reportCameraDrivenCharacterMovement(animation.cameraId, { position, target, fov, time: now });
     reportCameraDrivenObjectMovement(animation.cameraId, { position, target, fov, time: now });
+    reportAnimationSequenceCameraMovement(animation.cameraId, { position, target, fov, time: now });
     if (playbackElapsed < playbackDuration) {
       activePlaybackId = window.requestAnimationFrame(tick);
     } else {
       activePlaybackId = null;
       endCameraDrivenCharacterAnimations(animation.cameraId);
       endObjectAnimationsForCamera(animation.cameraId);
+      endAnimationSequenceRecording(animation.cameraId);
       useDirectorStore.getState().saveLatestSnapshot();
     }
   }

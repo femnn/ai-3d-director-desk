@@ -13,10 +13,12 @@ import type {
   CharacterActionPlaybackMode,
   CharacterBodyType,
   CharacterMotionFrame,
+  CharacterMotionClip,
   CharacterMotionSource,
   CharacterRigType,
   DirectorAssetSource,
   DirectorCameraAnimation,
+  DirectorAnimationSequence,
   DirectorObject,
   DirectorMaterialSettings,
   DirectorProject,
@@ -39,6 +41,11 @@ import {
   syncNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import type { PosePresetId } from "../schema/poseSchema";
+import {
+  pauseAnimationSequence,
+  playAnimationSequence,
+  scrubAnimationSequence,
+} from "../animation/animationSequence";
 
 type NumberTuple3 = [number, number, number];
 
@@ -169,9 +176,21 @@ export interface SceneScript {
   directorView?: SceneScriptCamera;
   activeCameraId?: string | null;
   cameraAnimations?: DirectorCameraAnimation[];
+  animationSequences?: Array<DirectorAnimationSequence | AnimationSequencePackage>;
   panorama?: SceneScriptPanorama | null;
   scene?: Partial<DirectorProject["scene"]>;
   scenePlan?: ScenePlan | null;
+}
+
+export interface AnimationSequenceMotionClipInput extends Omit<CharacterMotionClip, "characterId"> {
+  binding: string;
+}
+
+export interface AnimationSequencePackage {
+  format: "storyai-animation-sequence";
+  version: 1;
+  sequence: DirectorAnimationSequence;
+  motionClips?: AnimationSequenceMotionClipInput[];
 }
 
 type AgentToolResult = Record<string, unknown> | string;
@@ -743,6 +762,9 @@ function isSceneScriptGroup(value: SceneScriptGroup | SceneScriptProp): value is
 }
 
 export function applySceneScript(script: SceneScript = {}) {
+  const store = useDirectorStore.getState();
+  store.beginUndoBatch();
+  try {
   const scenePlan = script.scenePlan ? validateScenePlan(script.scenePlan).plan : null;
   const proceduralConversions = (script.proceduralObjects ?? []).map(convertObjectSculptSpecToSceneScript);
   const proceduralGroups = proceduralConversions.flatMap((conversion) => conversion.script.groups ?? []);
@@ -773,8 +795,12 @@ export function applySceneScript(script: SceneScript = {}) {
     useDirectorStore.getState().removePanoramaAsset();
   }
 
-  const characterIds = (script.characters ?? []).map((character) => addCharacter(character).id);
   const objectIdMap = new Map<string, string>();
+  const characterIds = (script.characters ?? []).map((character) => {
+    const id = addCharacter(character).id;
+    if (character.id) objectIdMap.set(character.id, id);
+    return id;
+  });
   const groupIds: string[] = [];
   const propIds: string[] = [];
   const createPart = (
@@ -816,6 +842,7 @@ export function applySceneScript(script: SceneScript = {}) {
     if (camera.id) cameraIdMap.set(camera.id, id);
     return id;
   });
+  cameraIdMap.forEach((value, key) => objectIdMap.set(key, value));
   if (script.cameraAnimations) {
     useDirectorStore.getState().replaceCameraAnimations(
       script.cameraAnimations.map((animation) => ({
@@ -828,6 +855,9 @@ export function applySceneScript(script: SceneScript = {}) {
   if (activeCameraId && useDirectorStore.getState().project.cameras.some((camera) => camera.id === activeCameraId)) {
     useDirectorStore.getState().setActiveCamera(activeCameraId);
   }
+  const animationSequenceReviews = (script.animationSequences ?? []).map((sequence) =>
+    importAnimationSequencePackage(sequence, objectIdMap)
+  );
   if (script.directorView && typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("storyai:director-view", {
       detail: cameraSnapshotFromInput(script.directorView),
@@ -844,7 +874,11 @@ export function applySceneScript(script: SceneScript = {}) {
     scenePlan: scenePlan ? buildScenePlanReview(scenePlan) : null,
     structureReview: buildAssemblyReview(),
     proceduralWarnings,
+    animationSequenceReviews,
   };
+  } finally {
+    useDirectorStore.getState().endUndoBatch();
+  }
 }
 
 export function exportSceneScript(): SceneScript {
@@ -976,6 +1010,7 @@ export function exportSceneScript(): SceneScript {
     cameras,
     activeCameraId: project.activeCameraId,
     cameraAnimations: project.cameraAnimations,
+    animationSequences: (project.animationSequences ?? []).map((sequence) => exportAnimationSequencePackage(sequence.id)),
     panorama: panoramaAsset
       ? {
           name: panoramaAsset.name,
@@ -995,6 +1030,139 @@ export function exportCharacterPackage(characterId: string): CharacterPackage {
     format: "storyai-character",
     version: 1,
     character,
+  };
+}
+
+function unwrapAnimationSequencePackage(
+  value: DirectorAnimationSequence | AnimationSequencePackage
+): { sequence: DirectorAnimationSequence; motionClips: AnimationSequenceMotionClipInput[] } {
+  if ("format" in value && value.format === "storyai-animation-sequence") {
+    return { sequence: value.sequence, motionClips: value.motionClips ?? [] };
+  }
+  return { sequence: value as DirectorAnimationSequence, motionClips: [] };
+}
+
+function resolveAnimationSequence(
+  value: DirectorAnimationSequence | AnimationSequencePackage,
+  authoredIdMap: Map<string, string> = new Map()
+) {
+  const { sequence, motionClips } = unwrapAnimationSequencePackage(value);
+  if (!sequence || typeof sequence !== "object" || !Array.isArray(sequence.bindings) || !Array.isArray(sequence.tracks)) {
+    throw new Error("动画命令缺少 sequence、bindings 或 tracks");
+  }
+  const objects = useDirectorStore.getState().project.objects;
+  const bindings = sequence.bindings.map((binding) => {
+    const mappedId = authoredIdMap.get(binding.objectId) ?? binding.objectId;
+    const byId = objects.find((object) => object.id === mappedId);
+    if (byId) return { ...binding, objectId: byId.id, objectName: byId.name };
+    const matches = objects.filter((object) => object.name === binding.objectName || object.name === binding.alias);
+    if (matches.length > 1) throw new Error(`动画绑定“${binding.alias}”匹配到多个同名对象`);
+    if (!matches.length) throw new Error(`动画绑定“${binding.alias}”找不到对象 ${binding.objectName || binding.objectId}`);
+    return { ...binding, objectId: matches[0].id, objectName: matches[0].name };
+  });
+  const bindingByAlias = new Map(bindings.map((binding) => [binding.alias, binding]));
+  sequence.tracks.forEach((track) => {
+    if (!bindingByAlias.has(track.binding)) throw new Error(`轨道“${track.name}”引用了未定义绑定 ${track.binding}`);
+  });
+
+  const clipIdMap = new Map<string, string>();
+  motionClips.forEach((clip) => {
+    const binding = bindingByAlias.get(clip.binding);
+    if (!binding) throw new Error(`动作片段“${clip.name}”引用了未定义绑定 ${clip.binding}`);
+    const id = useDirectorStore.getState().addCharacterMotionClip({
+      characterId: binding.objectId,
+      name: clip.name,
+      duration: clip.duration,
+      frames: clip.frames,
+    });
+    clipIdMap.set(clip.id, id);
+  });
+
+  return {
+    ...sequence,
+    cameraId: sequence.cameraId ? authoredIdMap.get(sequence.cameraId) ?? sequence.cameraId : null,
+    bindings,
+    tracks: sequence.tracks.map((track) =>
+      track.type === "character" && track.motionClipId && clipIdMap.has(track.motionClipId)
+        ? { ...track, motionClipId: clipIdMap.get(track.motionClipId)! }
+        : track
+    ),
+  };
+}
+
+export function importAnimationSequencePackage(
+  value: DirectorAnimationSequence | AnimationSequencePackage,
+  authoredIdMap: Map<string, string> = new Map()
+) {
+  const store = useDirectorStore.getState();
+  store.beginUndoBatch();
+  try {
+    const sequence = resolveAnimationSequence(value, authoredIdMap);
+    const existing = useDirectorStore.getState().project.animationSequences?.some((item) => item.id === sequence.id);
+    if (existing) useDirectorStore.getState().updateAnimationSequence(sequence.id, sequence);
+    else useDirectorStore.getState().addAnimationSequence(sequence);
+    useDirectorStore.getState().setActiveAnimationSequence(sequence.id);
+    return reviewAnimationSequence(sequence.id);
+  } finally {
+    useDirectorStore.getState().endUndoBatch();
+  }
+}
+
+export function exportAnimationSequencePackage(sequenceId?: string): AnimationSequencePackage {
+  const project = useDirectorStore.getState().project;
+  const sequence = (project.animationSequences ?? []).find((item) => item.id === (sequenceId ?? project.activeAnimationSequenceId));
+  if (!sequence) throw new Error("找不到动画序列");
+  const motionClips = sequence.tracks.flatMap((track) => {
+    if (track.type !== "character" || !track.motionClipId) return [];
+    const clip = (project.characterMotionClips ?? []).find((item) => item.id === track.motionClipId);
+    if (!clip) return [];
+    return [{
+      id: clip.id,
+      binding: track.binding,
+      name: clip.name,
+      duration: clip.duration,
+      frames: clip.frames,
+    }];
+  });
+  return { format: "storyai-animation-sequence", version: 1, sequence, motionClips };
+}
+
+export function reviewAnimationSequence(sequenceId?: string) {
+  const project = useDirectorStore.getState().project;
+  const sequence = (project.animationSequences ?? []).find((item) => item.id === (sequenceId ?? project.activeAnimationSequenceId));
+  if (!sequence) throw new Error("找不到动画序列");
+  const warnings: string[] = [];
+  const aliases = new Set(sequence.bindings.map((binding) => binding.alias));
+  sequence.bindings.forEach((binding) => {
+    if (!project.objects.some((object) => object.id === binding.objectId)) warnings.push(`绑定 ${binding.alias} 的对象已不存在`);
+  });
+  sequence.tracks.forEach((track) => {
+    if (!aliases.has(track.binding)) warnings.push(`轨道 ${track.name} 缺少绑定`);
+    if (track.startTime < 0 || track.endTime > sequence.duration || track.endTime <= track.startTime) {
+      warnings.push(`轨道 ${track.name} 的时间范围无效`);
+    }
+    if (track.type === "object") {
+      const ordered = [...track.keyframes].sort((left, right) => left.time - right.time);
+      ordered.slice(1).forEach((frame, index) => {
+        const previous = ordered[index];
+        if (!frame.position || !previous.position) return;
+        if (Math.hypot(...frame.position.map((value, axis) => value - previous.position![axis])) > 30) {
+          warnings.push(`轨道 ${track.name} 存在超过 30 米的突然位移`);
+        }
+      });
+    }
+  });
+  return {
+    id: sequence.id,
+    name: sequence.name,
+    duration: sequence.duration,
+    playbackMode: sequence.playbackMode,
+    loop: sequence.loop,
+    bindingCount: sequence.bindings.length,
+    trackCount: sequence.tracks.length,
+    characterTrackCount: sequence.tracks.filter((track) => track.type === "character").length,
+    objectTrackCount: sequence.tracks.filter((track) => track.type === "object").length,
+    warnings,
   };
 }
 
@@ -1035,6 +1203,50 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       const result = applySceneScript(converted.script);
       return { ...result, warnings: converted.warnings, targetName: args.targetName, screenshot: await captureScenePlanReview() };
     }
+    case "create_animation_sequence":
+    case "import_animation_sequence":
+      return importAnimationSequencePackage(args as DirectorAnimationSequence | AnimationSequencePackage);
+    case "update_animation_sequence": {
+      const input = args as { id?: string; patch?: Partial<DirectorAnimationSequence> } & Partial<DirectorAnimationSequence>;
+      const id = input.id ?? useDirectorStore.getState().project.activeAnimationSequenceId;
+      if (!id) throw new Error("找不到要更新的动画序列");
+      useDirectorStore.getState().updateAnimationSequence(id, input.patch ?? input);
+      return reviewAnimationSequence(id);
+    }
+    case "delete_animation_sequence": {
+      const id = (args as { id?: string }).id ?? useDirectorStore.getState().project.activeAnimationSequenceId;
+      if (!id) throw new Error("找不到要删除的动画序列");
+      pauseAnimationSequence();
+      useDirectorStore.getState().deleteAnimationSequence(id);
+      return { id };
+    }
+    case "play_animation_sequence": {
+      const id = (args as { id?: string }).id ?? useDirectorStore.getState().project.activeAnimationSequenceId;
+      const sequence = useDirectorStore.getState().project.animationSequences?.find((item) => item.id === id);
+      if (!sequence) throw new Error("找不到要播放的动画序列");
+      useDirectorStore.getState().setActiveAnimationSequence(sequence.id);
+      playAnimationSequence(sequence, { reset: (args as { reset?: boolean }).reset !== false });
+      return reviewAnimationSequence(sequence.id);
+    }
+    case "pause_animation_sequence":
+      pauseAnimationSequence();
+      return { ok: true };
+    case "scrub_animation_sequence": {
+      const input = args as { id?: string; time?: number };
+      const id = input.id ?? useDirectorStore.getState().project.activeAnimationSequenceId;
+      const sequence = useDirectorStore.getState().project.animationSequences?.find((item) => item.id === id);
+      if (!sequence) throw new Error("找不到要定位的动画序列");
+      useDirectorStore.getState().setActiveAnimationSequence(sequence.id);
+      scrubAnimationSequence(sequence, Number(input.time ?? 0));
+      return { id: sequence.id, time: Math.min(sequence.duration, Math.max(0, Number(input.time ?? 0))) };
+    }
+    case "export_animation_sequence":
+      return { animationPackage: exportAnimationSequencePackage((args as { id?: string }).id) };
+    case "review_animation_sequence":
+      return {
+        ...reviewAnimationSequence((args as { id?: string }).id),
+        screenshot: await captureScenePlanReview(),
+      };
     case "validate_scene_plan": {
       const { plan, warnings } = validateScenePlan(args);
       return { plan, warnings, review: buildScenePlanReview(plan) };

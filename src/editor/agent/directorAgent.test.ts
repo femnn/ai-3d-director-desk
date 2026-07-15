@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { applySceneScript, exportCharacterPackage, exportSceneScript, importCharacterPackage } from "./directorAgent";
+import {
+  applySceneScript,
+  exportAnimationSequencePackage,
+  exportCharacterPackage,
+  exportSceneScript,
+  importAnimationSequencePackage,
+  importCharacterPackage,
+  reviewAnimationSequence,
+} from "./directorAgent";
 import {
   getCharacterActionElapsed,
   isNormalCharacterAnimationPlaying,
@@ -7,6 +15,9 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
+import danceExample from "../../../examples/animation-sequences/ai-dance-15s.json";
+import fightExample from "../../../examples/animation-sequences/two-person-fight-10s.json";
+import carJumpExample from "../../../examples/animation-sequences/car-jump-train-breakup-10s.json";
 
 beforeEach(() => {
   useDirectorStore.setState({
@@ -327,4 +338,96 @@ it("builds procedural objects as whole movable assemblies without inheriting par
   expect(restoredRoot.assemblySelectionMode).toBe("whole");
   expect(restored.objects.find((object) => object.name === "车身")?.geometrySize).toEqual([4.2, 0.8, 1.8]);
   expect(restored.objects.find((object) => object.name === "车轮")?.assemblyRootId).toBe(restoredRoot.id);
+});
+
+it("imports an external multi-object animation package and round-trips its bindings and clips", () => {
+  applySceneScript({
+    reset: true,
+    characters: [{ id: "hero", name: "男主" }],
+    groups: [{ kind: "group", id: "car", name: "汽车", children: [{ id: "door", name: "车门", geometryType: "box" }] }],
+  });
+
+  const result = importAnimationSequencePackage({
+    format: "storyai-animation-sequence",
+    version: 1,
+    sequence: {
+      id: "sequence_action",
+      name: "联合动画",
+      duration: 10,
+      playbackMode: "recording",
+      loop: false,
+      enabled: true,
+      bindings: [
+        { alias: "hero", objectId: "missing", objectName: "男主" },
+        { alias: "door", objectId: "missing-door", objectName: "车门" },
+      ],
+      tracks: [
+        { id: "hero_track", name: "男主动作", type: "character", binding: "hero", startTime: 0, endTime: 10, motionClipId: "clip_external" },
+        { id: "door_track", name: "车门脱落", type: "object", binding: "door", startTime: 5, endTime: 10, keyframes: [{ time: 0, position: [0, 0, 0] }, { time: 5, position: [4, 2, 0] }] },
+      ],
+    },
+    motionClips: [{
+      id: "clip_external",
+      binding: "hero",
+      name: "外部动作",
+      duration: 10,
+      frames: [{ time: 0, controls: {} }, { time: 10, controls: { "body.yaw": 30 }, rootOffset: [1, 0, 0] }],
+    }],
+  });
+
+  expect(result).toMatchObject({ name: "联合动画", trackCount: 2, warnings: [] });
+  const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
+  expect(sequence.bindings.every((binding) => !binding.objectId.startsWith("missing"))).toBe(true);
+  const characterTrack = sequence.tracks.find((track) => track.type === "character");
+  expect(characterTrack?.type).toBe("character");
+  if (characterTrack?.type === "character") {
+    expect(characterTrack.motionClipId).not.toBe("clip_external");
+  }
+  expect(reviewAnimationSequence(sequence.id).warnings).toEqual([]);
+
+  const exported = exportAnimationSequencePackage(sequence.id);
+  useDirectorStore.getState().deleteAnimationSequence(sequence.id);
+  importAnimationSequencePackage(exported);
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.tracks).toHaveLength(2);
+  expect(exportSceneScript().animationSequences).toHaveLength(1);
+});
+
+it("applies the shipped dance, fight, and car stunt animation examples", () => {
+  const dance = importAnimationSequencePackage(danceExample as never);
+  expect(dance).toMatchObject({ duration: 15, trackCount: 1 });
+
+  applySceneScript(fightExample as never);
+  expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(2);
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({
+    duration: 10,
+    playbackMode: "recording",
+  });
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.tracks).toHaveLength(2);
+
+  applySceneScript(carJumpExample as never);
+  const state = useDirectorStore.getState();
+  const carSequence = state.project.animationSequences?.[0];
+  expect(carSequence).toMatchObject({
+    duration: 10,
+    playbackMode: "recording",
+    loop: false,
+  });
+  expect(carSequence?.bindings).toHaveLength(7);
+  expect(carSequence?.tracks).toHaveLength(7);
+  expect(carSequence?.cameraId).toBe(state.project.activeCameraId);
+  expect(carSequence?.bindings.every((binding) =>
+    state.project.objects.some((item) => item.id === binding.objectId)
+  )).toBe(true);
+});
+
+it("applies a complete AI scene and its animation sequences as one undo batch", () => {
+  useDirectorStore.setState({ undoStack: [] });
+  const before = useDirectorStore.getState().project;
+
+  applySceneScript(carJumpExample as never);
+
+  expect(useDirectorStore.getState().undoStack).toHaveLength(1);
+  useDirectorStore.getState().undo();
+  expect(useDirectorStore.getState().project.objects).toEqual(before.objects);
+  expect(useDirectorStore.getState().project.animationSequences).toEqual(before.animationSequences);
 });

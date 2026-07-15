@@ -52,7 +52,9 @@ The phone monitor is read-only scene output. Touch input controls the camera and
 
 - Use the Pose tab for a static pose, a pose preset, or direct rig editing.
 - Use the Animation tab for looping presets and 5, 10, or 15-second loops.
-- In camera-driven mode, character animation advances while the recorded camera moves and pauses when the camera stops.
+- Open the unified timeline from the viewport toolbar to synchronize character, group, and child-part tracks.
+- The only playback modes are Manual, During Recording, and Follow Camera Motion. Loop is a separate switch.
+- In Follow Camera Motion mode, the sequence advances while the recorded camera moves and pauses about 200ms after it stops.
 - Upload a person video to extract motion or a full-body image to extract a single pose. Results depend on visibility, occlusion, and camera angle.
 - Text-generated motion requires an available local or remote AnimoFlow service.
 

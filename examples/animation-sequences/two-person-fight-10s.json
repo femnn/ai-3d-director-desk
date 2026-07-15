@@ -1,0 +1,61 @@
+{
+  "reset": true,
+  "characters": [
+    { "id": "fighter_a", "name": "格斗者A", "bodyType": "broad", "color": "#d94b45", "position": [-1.4, 0, 0], "rotationY": 1.5708, "pose": "fight" },
+    { "id": "fighter_b", "name": "格斗者B", "bodyType": "slim", "color": "#3d8ee8", "position": [1.4, 0, 0], "rotationY": -1.5708, "pose": "fight" }
+  ],
+  "camera": { "id": "fight_camera", "name": "格斗全景", "position": [0, 2.2, 7.5], "lookAt": [0, 1.1, 0], "fov": 42 },
+  "animationSequences": [
+    {
+      "format": "storyai-animation-sequence",
+      "version": 1,
+      "sequence": {
+        "id": "sequence_two_person_fight",
+        "name": "双人攻防10秒",
+        "duration": 10,
+        "playbackMode": "recording",
+        "loop": true,
+        "enabled": true,
+        "cameraId": "fight_camera",
+        "bindings": [
+          { "alias": "attacker", "objectId": "fighter_a", "objectName": "格斗者A" },
+          { "alias": "defender", "objectId": "fighter_b", "objectName": "格斗者B" }
+        ],
+        "tracks": [
+          { "id": "track_attacker", "name": "进攻组合", "type": "character", "binding": "attacker", "startTime": 0, "endTime": 10, "loop": true, "blendIn": 0.15, "blendOut": 0.15, "motionClipId": "fight_clip_a" },
+          { "id": "track_defender", "name": "防守反击", "type": "character", "binding": "defender", "startTime": 0, "endTime": 10, "loop": true, "blendIn": 0.15, "blendOut": 0.15, "motionClipId": "fight_clip_b" }
+        ]
+      },
+      "motionClips": [
+        {
+          "id": "fight_clip_a",
+          "binding": "attacker",
+          "name": "进攻者动作",
+          "duration": 10,
+          "frames": [
+            { "time": 0, "rootOffset": [0, 0, 0], "controls": { "body.pitch": -5, "leftShoulder.pitch": 38, "rightShoulder.pitch": 32, "leftElbow.bend": 72, "rightElbow.bend": 72, "leftHip.pitch": 8, "rightHip.pitch": -8 } },
+            { "time": 2, "rootOffset": [0, 0, 0.45], "controls": { "body.pitch": -12, "body.yaw": 14, "torso.yaw": -18, "leftShoulder.pitch": 92, "leftElbow.bend": 18, "rightShoulder.pitch": 28, "rightElbow.bend": 78, "leftHip.pitch": -18, "rightHip.pitch": 24, "rightKnee.bend": 42 } },
+            { "time": 4, "rootOffset": [0, -0.04, 0.7], "controls": { "body.yaw": -24, "torso.yaw": 28, "leftShoulder.pitch": 30, "leftElbow.bend": 82, "rightShoulder.pitch": 110, "rightElbow.bend": 12, "leftHip.pitch": 28, "leftKnee.bend": 48, "rightHip.pitch": -10 } },
+            { "time": 6, "rootOffset": [0, -0.16, 0.35], "controls": { "body.pitch": 14, "body.roll": -8, "leftShoulder.pitch": 56, "rightShoulder.pitch": 56, "leftElbow.bend": 96, "rightElbow.bend": 96, "leftHip.pitch": 42, "leftKnee.bend": 82, "rightHip.pitch": 42, "rightKnee.bend": 82 } },
+            { "time": 8, "rootOffset": [0, 0, 0.5], "controls": { "body.pitch": -9, "body.yaw": 18, "torso.yaw": -22, "leftShoulder.pitch": 34, "leftElbow.bend": 76, "rightShoulder.pitch": 104, "rightElbow.bend": 16, "leftHip.pitch": -12, "rightHip.pitch": 28, "rightKnee.bend": 46 } },
+            { "time": 10, "rootOffset": [0, 0, 0], "controls": { "body.pitch": -5, "leftShoulder.pitch": 38, "rightShoulder.pitch": 32, "leftElbow.bend": 72, "rightElbow.bend": 72, "leftHip.pitch": 8, "rightHip.pitch": -8 } }
+          ]
+        },
+        {
+          "id": "fight_clip_b",
+          "binding": "defender",
+          "name": "防守者动作",
+          "duration": 10,
+          "frames": [
+            { "time": 0, "rootOffset": [0, 0, 0], "controls": { "body.pitch": -4, "leftShoulder.pitch": 34, "rightShoulder.pitch": 38, "leftElbow.bend": 74, "rightElbow.bend": 74 } },
+            { "time": 2, "rootOffset": [0.15, -0.08, -0.35], "controls": { "body.pitch": 8, "body.roll": 12, "head.roll": -10, "leftShoulder.pitch": 78, "leftElbow.bend": 108, "rightShoulder.pitch": 74, "rightElbow.bend": 106, "leftHip.pitch": 36, "leftKnee.bend": 66, "rightHip.pitch": 22, "rightKnee.bend": 42 } },
+            { "time": 4, "rootOffset": [-0.2, 0, -0.45], "controls": { "body.yaw": 28, "torso.yaw": -30, "leftShoulder.pitch": 102, "leftElbow.bend": 14, "rightShoulder.pitch": 40, "rightElbow.bend": 82, "leftHip.pitch": -12, "rightHip.pitch": 24, "rightKnee.bend": 44 } },
+            { "time": 6, "rootOffset": [0.1, -0.04, -0.2], "controls": { "body.yaw": -18, "torso.yaw": 22, "leftShoulder.pitch": 28, "leftElbow.bend": 78, "rightShoulder.pitch": 108, "rightElbow.bend": 12, "leftHip.pitch": 26, "leftKnee.bend": 48, "rightHip.pitch": -10 } },
+            { "time": 8, "rootOffset": [-0.1, -0.12, -0.38], "controls": { "body.pitch": 12, "body.roll": -12, "head.roll": 10, "leftShoulder.pitch": 82, "leftElbow.bend": 112, "rightShoulder.pitch": 78, "rightElbow.bend": 110, "leftHip.pitch": 42, "leftKnee.bend": 76, "rightHip.pitch": 32, "rightKnee.bend": 58 } },
+            { "time": 10, "rootOffset": [0, 0, 0], "controls": { "body.pitch": -4, "leftShoulder.pitch": 34, "rightShoulder.pitch": 38, "leftElbow.bend": 74, "rightElbow.bend": 74 } }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -34,13 +34,14 @@ export function AgentCommandPanel() {
   const [open, setOpen] = useState(false);
   const [script, setScript] = useState(EXAMPLE_SCRIPT);
   const [status, setStatus] = useState<string | null>(null);
+  const [pendingAnimationScript, setPendingAnimationScript] = useState<string | null>(null);
   const lineCount = useMemo(() => script.split("\n").length, [script]);
 
   function isCharacterJson(payload: unknown) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
     const candidate = payload as Record<string, unknown>;
     if (candidate.format === "storyai-character") return true;
-    const sceneKeys = ["characters", "props", "groups", "proceduralObjects", "camera", "cameras", "directorView", "scene", "panorama", "scenePlan"];
+    const sceneKeys = ["characters", "props", "groups", "proceduralObjects", "camera", "cameras", "directorView", "scene", "panorama", "scenePlan", "animationSequences"];
     return !sceneKeys.some((key) => key in candidate) && ("bodyType" in candidate || "type" in candidate) && "action" in candidate;
   }
 
@@ -50,7 +51,25 @@ export function AgentCommandPanel() {
     return typeof candidate.targetName === "string" && Array.isArray(candidate.componentTree) && Array.isArray(candidate.materials);
   }
 
+  function isAnimationSequenceJson(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    const candidate = payload as Record<string, unknown>;
+    return candidate.format === "storyai-animation-sequence" || (
+      Array.isArray(candidate.bindings) && Array.isArray(candidate.tracks) && typeof candidate.duration === "number"
+    );
+  }
+
   async function executePayload(payload: unknown) {
+    if (isAnimationSequenceJson(payload)) {
+      const result = await executeDirectorAgentTool("import_animation_sequence", payload) as {
+        name?: string;
+        duration?: number;
+        trackCount?: number;
+        warnings?: string[];
+      };
+      setStatus(`动画“${result.name ?? "未命名"}”已导入：${result.duration ?? 0}秒、${result.trackCount ?? 0}条轨道${result.warnings?.length ? `；${result.warnings.length}项警告` : ""}。`);
+      return;
+    }
     if (isObjectSculptJson(payload)) {
       const result = await executeDirectorAgentTool("import_object_sculpt_spec", payload) as {
         targetName?: string;
@@ -76,16 +95,28 @@ export function AgentCommandPanel() {
       cameraIds?: string[];
       scenePlan?: unknown;
       proceduralWarnings?: string[];
+      animationSequenceReviews?: unknown[];
     } : {};
+    const sequenceMessage = summary.animationSequenceReviews?.length
+      ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列，请按序列模式播放`
+      : "";
     setStatus(
-      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}。普通循环动作已自动播放。`
+      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}${sequenceMessage}。`
     );
   }
 
   async function applyScript() {
     try {
       const payload = JSON.parse(script) as unknown;
+      if (isAnimationSequenceJson(payload) && pendingAnimationScript !== script) {
+        const wrapper = payload as { sequence?: { name?: string; duration?: number; tracks?: unknown[] } };
+        const candidate = wrapper.sequence ?? payload as { name?: string; duration?: number; tracks?: unknown[] };
+        setPendingAnimationScript(script);
+        setStatus(`待确认：${candidate.name ?? "未命名动画"}，${candidate.duration ?? 0}秒，${candidate.tracks?.length ?? 0}条轨道。再次点击即应用，并可一步撤销。`);
+        return;
+      }
       await executePayload(payload);
+      setPendingAnimationScript(null);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "执行失败");
     }
@@ -122,7 +153,7 @@ export function AgentCommandPanel() {
           <div className="agent-panel-header">
             <div>
               <h2>AI布景命令</h2>
-              <p>支持布景、独立角色和 ObjectSculptSpec 程序化道具 JSON；创建后会自动截图供 agent 复查。</p>
+              <p>支持布景、独立角色、ObjectSculptSpec 程序化道具和 AI 动画序列 JSON；创建后会自动截图供 agent 复查。</p>
             </div>
             <button type="button" aria-label="关闭AI布景面板" onClick={() => setOpen(false)}>
               <X aria-hidden="true" size={16} />
@@ -134,7 +165,10 @@ export function AgentCommandPanel() {
             rows={Math.min(Math.max(lineCount, 10), 22)}
             spellCheck={false}
             value={script}
-            onChange={(event) => setScript(event.target.value)}
+            onChange={(event) => {
+              setScript(event.target.value);
+              setPendingAnimationScript(null);
+            }}
           />
           <div className="agent-panel-footer">
             <div className="agent-panel-actions">
@@ -159,7 +193,15 @@ export function AgentCommandPanel() {
                     try {
                       const text = await file.text();
                       setScript(text);
-                      await executePayload(JSON.parse(text) as unknown);
+                      const payload = JSON.parse(text) as unknown;
+                      if (isAnimationSequenceJson(payload)) {
+                        setPendingAnimationScript(text);
+                        const wrapper = payload as { sequence?: { name?: string; duration?: number; tracks?: unknown[] } };
+                        const candidate = wrapper.sequence ?? payload as { name?: string; duration?: number; tracks?: unknown[] };
+                        setStatus(`待确认：${candidate.name ?? "未命名动画"}，${candidate.duration ?? 0}秒，${candidate.tracks?.length ?? 0}条轨道。`);
+                      } else {
+                        await executePayload(payload);
+                      }
                     } catch (error) {
                       setStatus(error instanceof Error ? error.message : "导入执行失败");
                     }
@@ -169,7 +211,7 @@ export function AgentCommandPanel() {
             </div>
             <button className="agent-panel-run" type="button" onClick={() => void applyScript()}>
               <Play aria-hidden="true" size={15} />
-              执行布景
+              {pendingAnimationScript === script ? "确认应用动画" : "执行布景"}
             </button>
             {status ? <p>{status}</p> : null}
           </div>

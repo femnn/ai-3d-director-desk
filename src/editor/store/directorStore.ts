@@ -12,6 +12,7 @@ import type {
   DirectorCameraAnimationKeyframe,
   DirectorCameraCapture,
   DirectorCameraShot,
+  DirectorAnimationSequence,
   DirectorObject,
   DirectorMaterialSettings,
   DirectorProject,
@@ -32,6 +33,7 @@ import {
 } from "../schema/cameraGeometry";
 import type { ViewportAspectRatio } from "../schema/viewportAspectRatio";
 import { resetObjectAnimationRuntime } from "../animation/objectAnimation";
+import { resetAnimationSequenceRuntime } from "../animation/animationSequence";
 
 export type TransformMode = "translate" | "rotate" | "scale";
 
@@ -151,6 +153,11 @@ export interface DirectorActions {
   }) => string;
   groupObjects: (objectIds?: string[], name?: string) => string | null;
   setObjectAnimationTrack: (id: string, track: ObjectAnimationTrack | null) => void;
+  addAnimationSequence: (sequence: DirectorAnimationSequence) => string;
+  updateAnimationSequence: (id: string, patch: Partial<DirectorAnimationSequence>) => void;
+  deleteAnimationSequence: (id: string) => void;
+  setActiveAnimationSequence: (id: string | null) => void;
+  replaceAnimationSequences: (sequences: DirectorAnimationSequence[]) => void;
   addCameraShot: (snapshot?: CameraShotSnapshot) => string;
   addCameraAnimation: (input: {
     cameraId: string;
@@ -510,6 +517,105 @@ function normalizeObjectAnimationTrack(track: unknown, objectId: string, objectN
   };
 }
 
+function normalizeAnimationSequence(
+  input: unknown,
+  objects: DirectorObject[],
+  cameras: DirectorCameraShot[]
+): DirectorAnimationSequence | null {
+  if (!input || typeof input !== "object") return null;
+  const value = input as Partial<DirectorAnimationSequence>;
+  if (typeof value.id !== "string" || typeof value.name !== "string") return null;
+  const requestedDuration = typeof value.duration === "number" ? value.duration : 5;
+  const duration = ([5, 10, 15] as const).reduce((nearest, candidate) =>
+    Math.abs(candidate - requestedDuration) < Math.abs(nearest - requestedDuration) ? candidate : nearest
+  );
+  const objectIds = new Set(objects.map((object) => object.id));
+  const bindings = Array.isArray(value.bindings)
+    ? value.bindings.flatMap((binding) =>
+        binding &&
+        typeof binding.alias === "string" &&
+        typeof binding.objectId === "string" &&
+        objectIds.has(binding.objectId)
+          ? [{ alias: binding.alias, objectId: binding.objectId, objectName: binding.objectName || objects.find((object) => object.id === binding.objectId)?.name || binding.alias }]
+          : []
+      )
+    : [];
+  const aliases = new Set(bindings.map((binding) => binding.alias));
+  const tracks: DirectorAnimationSequence["tracks"] = [];
+  if (Array.isArray(value.tracks)) {
+    value.tracks.forEach((track) => {
+        if (!track || typeof track.id !== "string" || typeof track.binding !== "string" || !aliases.has(track.binding)) return;
+        const startTime = Math.min(duration, Math.max(0, Number(track.startTime ?? 0)));
+        const endTime = Math.min(duration, Math.max(startTime + 0.001, Number(track.endTime ?? duration)));
+        const base = {
+          id: track.id,
+          name: typeof track.name === "string" ? track.name : track.id,
+          binding: track.binding,
+          startTime,
+          endTime,
+          loop: Boolean(track.loop),
+          blendIn: Math.max(0, Number(track.blendIn ?? 0)),
+          blendOut: Math.max(0, Number(track.blendOut ?? 0)),
+        };
+        if (track.type === "character") {
+          tracks.push({
+            ...base,
+            type: "character" as const,
+            actionId: track.actionId,
+            motionClipId: typeof track.motionClipId === "string" ? track.motionClipId : null,
+          });
+          return;
+        }
+        if (track.type === "object") {
+          const keyframes = Array.isArray(track.keyframes)
+            ? track.keyframes.flatMap((keyframe) => {
+                if (!keyframe || typeof keyframe !== "object" || !Number.isFinite(keyframe.time)) return [];
+                return [{
+                  time: Math.min(endTime - startTime, Math.max(0, Number(keyframe.time))),
+                  position: isFiniteVector(keyframe.position, 3) ? keyframe.position : undefined,
+                  rotation: isFiniteVector(keyframe.rotation, 3) ? keyframe.rotation : undefined,
+                  scale: isFiniteVector(keyframe.scale, 3) ? keyframe.scale : undefined,
+                }];
+              })
+            : [];
+          const pathPoints = Array.isArray(track.path?.points)
+            ? track.path.points.filter((point): point is [number, number, number] => isFiniteVector(point, 3))
+            : [];
+          tracks.push({
+            ...base,
+            type: "object" as const,
+            keyframes,
+            path: track.path && pathPoints.length >= 2
+              ? {
+                  type: track.path.type === "linear" ? "linear" : "curve",
+                  closed: Boolean(track.path.closed),
+                  orientToPath: Boolean(track.path.orientToPath),
+                  points: pathPoints,
+                }
+              : undefined,
+          });
+        }
+      });
+  }
+  const rawPlaybackMode = value.playbackMode as string | undefined;
+  const playbackMode = rawPlaybackMode === "recording" || rawPlaybackMode === "recording-sync"
+    ? "recording"
+    : rawPlaybackMode === "camera-motion" || rawPlaybackMode === "camera-driven"
+      ? "camera-motion"
+      : "manual";
+  return {
+    id: value.id,
+    name: value.name,
+    duration,
+    playbackMode,
+    loop: value.loop !== false,
+    enabled: value.enabled !== false,
+    cameraId: typeof value.cameraId === "string" && cameras.some((camera) => camera.id === value.cameraId) ? value.cameraId : null,
+    bindings,
+    tracks,
+  };
+}
+
 function migrateDirectorProject(project: DirectorProject | null | undefined): DirectorProject {
   const fallback = createDefaultDirectorProject();
   if (!project || typeof project !== "object" || !Array.isArray(project.assets) || !Array.isArray(project.objects) || !Array.isArray(project.cameras)) {
@@ -534,6 +640,13 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
     return object.parentId;
   };
 
+  const animationSequences = (project.animationSequences ?? [])
+    .map((sequence) => normalizeAnimationSequence(sequence, objects, cameras))
+    .filter((sequence): sequence is DirectorAnimationSequence => Boolean(sequence));
+  const activeAnimationSequenceId = animationSequences.some((sequence) => sequence.id === project.activeAnimationSequenceId)
+    ? project.activeAnimationSequenceId ?? null
+    : animationSequences[0]?.id ?? null;
+
   return {
     ...project,
     assets,
@@ -552,6 +665,8 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
         Array.isArray(animation.keyframes)
     ),
     characterMotionClips: (project.characterMotionClips ?? []).filter(isSafeMotionClip),
+    animationSequences,
+    activeAnimationSequenceId,
     scenePlan: project.scenePlan ?? null,
     objects: objects.map((object) => {
       const parentId = getSafeParentId(object);
@@ -738,6 +853,8 @@ export function createDefaultDirectorProject({
     cameras: [camera],
     cameraAnimations: [],
     characterMotionClips: [],
+    animationSequences: [],
+    activeAnimationSequenceId: null,
     activeCameraId: camera.id,
     panoramaAssetId: null,
     scenePlan: null,
@@ -2168,6 +2285,79 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           })),
         },
       })),
+    addAnimationSequence: (sequence) => {
+      let sequenceId = sequence.id;
+      commitMutation((state) => {
+        const existingIds = state.project.animationSequences?.map((item) => item.id) ?? [];
+        sequenceId = sequence.id && !existingIds.includes(sequence.id)
+          ? sequence.id
+          : getNextSequentialId(existingIds, "sequence_", existingIds.length + 1);
+        const normalized = normalizeAnimationSequence({ ...sequence, id: sequenceId }, state.project.objects, state.project.cameras);
+        if (!normalized) return state;
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            animationSequences: [...(state.project.animationSequences ?? []), normalized],
+            activeAnimationSequenceId: sequenceId,
+          },
+        };
+      });
+      return sequenceId;
+    },
+    updateAnimationSequence: (id, patch) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          animationSequences: (state.project.animationSequences ?? []).map((sequence) => {
+            if (sequence.id !== id) return sequence;
+            return normalizeAnimationSequence({ ...sequence, ...patch, id }, state.project.objects, state.project.cameras) ?? sequence;
+          }),
+        },
+      })),
+    deleteAnimationSequence: (id) => {
+      resetAnimationSequenceRuntime();
+      commitMutation((state) => {
+        const animationSequences = (state.project.animationSequences ?? []).filter((sequence) => sequence.id !== id);
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            animationSequences,
+            activeAnimationSequenceId:
+              state.project.activeAnimationSequenceId === id
+                ? animationSequences[0]?.id ?? null
+                : state.project.activeAnimationSequenceId ?? null,
+          },
+        };
+      });
+    },
+    setActiveAnimationSequence: (id) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          activeAnimationSequenceId:
+            id && (state.project.animationSequences ?? []).some((sequence) => sequence.id === id) ? id : null,
+        },
+      })),
+    replaceAnimationSequences: (sequences) => {
+      resetAnimationSequenceRuntime();
+      commitMutation((state) => {
+        const animationSequences = sequences
+          .map((sequence) => normalizeAnimationSequence(sequence, state.project.objects, state.project.cameras))
+          .filter((sequence): sequence is DirectorAnimationSequence => Boolean(sequence));
+        return {
+          ...state,
+          project: {
+            ...state.project,
+            animationSequences,
+            activeAnimationSequenceId: animationSequences[0]?.id ?? null,
+          },
+        };
+      });
+    },
     addCameraShot: (snapshot) => {
       let nextCameraId = "";
 
@@ -2724,6 +2914,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
     },
     resetDirectorDesk: () => {
       resetObjectAnimationRuntime();
+      resetAnimationSequenceRuntime();
       commitMutation((state) => ({
         ...state,
         ...DEFAULT_UI_STATE,
@@ -2736,6 +2927,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
     },
     replaceProject: (project) => {
       resetObjectAnimationRuntime();
+      resetAnimationSequenceRuntime();
       commitMutation((state) => ({
         ...state,
         poseEditMode: false,

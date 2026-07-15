@@ -116,9 +116,7 @@ apply_scene_script 直接导入的 JSON 对象。
 }
 ```
 
-- `normal`：进入场景后循环播放。
-- `recording-sync`：录制开始时从 0 秒推进。
-- `camera-driven`：录制时关联机位移动才推进。
+- 以上 `normal / recording-sync / camera-driven` 仅用于兼容旧的单物体动画字段。新的 AI 联动动画应使用文末统一动画序列及 `manual / recording / camera-motion`。
 - 同时设置 `keyframes` 和 `path` 时，路径负责位置，关键帧继续控制旋转和缩放。
 
 ## 角色 JSON
@@ -157,7 +155,7 @@ apply_scene_script 直接导入的 JSON 对象。
 
 ## 导入与修正流程
 
-1. 文件方式：在 AI 布景面板点击“导入并执行”，可直接选择完整布景 JSON 或 `storyai-character` 独立角色 JSON，选择后立即创建并播放普通循环动作。
+1. 文件方式：在 AI 布景面板点击“导入并执行”，可选择完整布景、`storyai-character` 独立角色或 `storyai-animation-sequence` 动画 JSON。动画序列会先预览摘要并要求确认。
 2. 文本方式：将场景 JSON 粘贴到 AI 布景面板后点击“执行布景”，或调用 `apply_scene_script`。
 3. 调用 `screenshot` 获取导演视角截图。
 4. 对照原始意图检查轮廓、尺寸、穿插、朝向和机位构图。
@@ -205,3 +203,20 @@ apply_scene_script 直接导入的 JSON 对象。
 示例文件：[`examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json`](../examples/object-sculpt-specs/cinema-camera-rig.object-sculpt.json)。
 
 大型场景验收文件：[`examples/scene-scripts/procedural-vehicle-yard.json`](../examples/scene-scripts/procedural-vehicle-yard.json)。该文件在一个 `apply_scene_script` 中同时生成可整体移动的轿车、带循环路径动画的旅客列车、展示机位和导演视角。
+
+## AI 动画序列
+
+复杂舞蹈、多人打斗和车辆事件使用 `storyai-animation-sequence` JSON，不要把参与对象分别设置为无关的旧动画。
+
+- `duration` 只使用 `5 / 10 / 15`。
+- `playbackMode` 只使用 `manual / recording / camera-motion`。
+- `loop` 是独立开关，不是播放模式。
+- `bindings` 使用语义别名绑定对象，同时填写 `objectId` 和 `objectName`。
+- 角色轨使用 `type: "character"`，可引用内置 `actionId` 或 `motionClipId`。
+- 物体轨使用 `type: "object"`；组合根负责整体运动，子部件只写局部坐标。
+- 外部角色动作帧可包含 `controls`、`rootOffset` 和 `rootRotation`。
+- 导入前调用 `review_animation_sequence`，修复缺失绑定、超出时长和突然大位移。
+
+Agent 工具：`create_animation_sequence`、`update_animation_sequence`、`delete_animation_sequence`、`play_animation_sequence`、`pause_animation_sequence`、`scrub_animation_sequence`、`export_animation_sequence`、`import_animation_sequence`、`review_animation_sequence`。
+
+验收示例：[`AI 15 秒舞蹈`](../examples/animation-sequences/ai-dance-15s.json)、[`10 秒双人打斗`](../examples/animation-sequences/two-person-fight-10s.json)、[`汽车飞跃火车并部件抛飞`](../examples/animation-sequences/car-jump-train-breakup-10s.json)。

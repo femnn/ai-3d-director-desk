@@ -495,8 +495,8 @@ export function CharacterPanel() {
             ariaLabel="角色动作播放方式"
             value={actionTrack.playbackMode}
             options={[
-              { value: "normal", label: "普通播放" },
-              { value: "camera-driven", label: "镜头驱动" },
+              { value: "normal", label: "手动播放" },
+              { value: "camera-driven", label: "随镜头运动" },
             ]}
             onChange={(value) => updateActionTrack({ playbackMode: value as "normal" | "camera-driven" })}
           />
@@ -517,7 +517,7 @@ export function CharacterPanel() {
             <button type="button" onClick={stopNormalCharacterAnimations}>暂停动画</button>
           </div>
           <p className="inspector-help-text">
-            每个动作按所选时长循环。走路和跑步会在一个动作段内向面朝方向前进一次，随后保持位置，避免持续穿过场景。镜头驱动动作只在录制时随机位实际移动推进，机位停止即暂停。
+            每个动作按所选时长循环。走路和跑步会在一个动作段内向面朝方向前进一次，随后保持位置，避免持续穿过场景。随镜头运动只在录制时随机位实际移动推进，机位停止即暂停。
           </p>
           {!isCrowd && role.characterRig?.rigType === "ue4-mannequin" && !role.assetRefId ? <PoseVideoImporter character={role} /> : null}
           {selectedMotionClips.length ? (

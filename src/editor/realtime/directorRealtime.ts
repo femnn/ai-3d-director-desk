@@ -2,6 +2,10 @@ import { executeDirectorAgentTool } from "../agent/directorAgent";
 import { getCharacterAnimationElapsedSnapshot, subscribeCharacterAnimationRuntime } from "../animation/characterAnimation";
 import { getObjectAnimationElapsedSnapshot } from "../animation/objectAnimation";
 import {
+  getAnimationSequenceRuntimeSnapshot,
+  subscribeAnimationSequenceRuntime,
+} from "../animation/animationSequence";
+import {
   getPhoneCameraAssignments,
   getPhoneCameraOwners,
   getPhoneCameraUpdateTimestamp,
@@ -40,6 +44,8 @@ export function createPhonePreviewProject(project: DirectorProject): DirectorPro
     cameras: [],
     cameraAnimations: [],
     characterMotionClips: project.characterMotionClips ?? [],
+    animationSequences: project.animationSequences ?? [],
+    activeAnimationSequenceId: project.activeAnimationSequenceId ?? null,
     activeCameraId: null,
     panoramaAssetId: project.panoramaAssetId,
   };
@@ -78,6 +84,8 @@ export function getPhonePreviewFingerprint(project: DirectorProject) {
       asset.url.slice(-64),
     ]),
     objects: preview.objects,
+    animationSequences: preview.animationSequences,
+    activeAnimationSequenceId: preview.activeAnimationSequenceId,
   });
 }
 
@@ -193,6 +201,7 @@ function buildDesktopState() {
       .map((object) => ({ id: object.id, name: object.name, crowdId: object.crowdId ?? null })),
     characterAnimationElapsed: getCharacterAnimationElapsedSnapshot(),
     objectAnimationElapsed: getObjectAnimationElapsedSnapshot(state.project.objects),
+    animationSequenceRuntime: getAnimationSequenceRuntimeSnapshot(),
     cameraDrivenAnimationCameraIds: state.project.cameras
       .filter((camera) =>
         state.project.objects.some(
@@ -216,6 +225,7 @@ export function startDirectorDeskRealtime() {
   let desktopStateFrame = 0;
   let unsubscribeStore: (() => void) | null = null;
   let unsubscribeAnimationRuntime: (() => void) | null = null;
+  let unsubscribeSequenceRuntime: (() => void) | null = null;
 
   function sendDesktopState() {
     desktopStateFrame = 0;
@@ -306,6 +316,7 @@ export function startDirectorDeskRealtime() {
 
   unsubscribeStore = useDirectorStore.subscribe(scheduleDesktopState);
   unsubscribeAnimationRuntime = subscribeCharacterAnimationRuntime(scheduleDesktopState);
+  unsubscribeSequenceRuntime = subscribeAnimationSequenceRuntime(scheduleDesktopState);
   connect();
 
   return () => {
@@ -315,6 +326,7 @@ export function startDirectorDeskRealtime() {
     if (requestPhonePreviewBroadcast === scheduleDesktopState) requestPhonePreviewBroadcast = null;
     unsubscribeStore?.();
     unsubscribeAnimationRuntime?.();
+    unsubscribeSequenceRuntime?.();
     socket?.close();
   };
 }

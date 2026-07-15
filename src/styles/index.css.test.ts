@@ -55,6 +55,7 @@ it("matches the provided top bar and view switch dimensions", () => {
   const css = readFileSync("src/styles/index.css", "utf8");
 
   expect(css).toContain("grid-template-columns: var(--left-sidebar-width) minmax(0, 1fr) var(--right-sidebar-width);");
+  expect(css).toMatch(/\.director-shell-fullbleed:not\(\.is-sidebars-collapsed\) \.animation-timeline\s*\{[\s\S]*?margin-right:\s*var\(--right-sidebar-width\);[\s\S]*?margin-left:\s*var\(--left-sidebar-width\);/);
   expect(css).toContain("min-height: 70px;");
   expect(css).toMatch(/\.top-bar-title\s*\{[\s\S]*?font-size:\s*16px;[\s\S]*?line-height:\s*22px;/);
   expect(css).toMatch(/\.mode-toggle\s*\{[\s\S]*?width:\s*212px;[\s\S]*?height:\s*44px;[\s\S]*?border-radius:\s*12px;/);

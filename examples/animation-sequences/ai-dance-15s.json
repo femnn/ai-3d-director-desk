@@ -1,0 +1,51 @@
+{
+  "format": "storyai-animation-sequence",
+  "version": 1,
+  "sequence": {
+    "id": "sequence_ai_dance_15s",
+    "name": "AI特定舞姿15秒",
+    "duration": 15,
+    "playbackMode": "manual",
+    "loop": true,
+    "enabled": true,
+    "cameraId": null,
+    "bindings": [
+      { "alias": "dancer", "objectId": "", "objectName": "角色01" }
+    ],
+    "tracks": [
+      {
+        "id": "track_dancer",
+        "name": "完整舞蹈动作",
+        "type": "character",
+        "binding": "dancer",
+        "startTime": 0,
+        "endTime": 15,
+        "loop": true,
+        "blendIn": 0.2,
+        "blendOut": 0.2,
+        "motionClipId": "clip_ai_dance"
+      }
+    ]
+  },
+  "motionClips": [
+    {
+      "id": "clip_ai_dance",
+      "binding": "dancer",
+      "name": "AI舞蹈关节片段",
+      "duration": 15,
+      "frames": [
+        { "time": 0, "rootOffset": [0, 0, 0], "rootRotation": [0, 0, 0], "controls": { "body.pitch": 0, "body.yaw": 0, "body.roll": 0, "leftShoulder.pitch": 35, "leftShoulder.spread": -28, "leftElbow.bend": 72, "rightShoulder.pitch": 35, "rightShoulder.spread": 28, "rightElbow.bend": 72, "leftHip.pitch": 12, "rightHip.pitch": -12 } },
+        { "time": 1.5, "rootOffset": [0.22, -0.04, 0.08], "rootRotation": [0, 0.18, 0], "controls": { "body.yaw": 14, "body.roll": 8, "torso.yaw": -20, "head.yaw": -12, "leftShoulder.pitch": 92, "leftShoulder.spread": -52, "leftElbow.bend": 28, "rightShoulder.pitch": -18, "rightShoulder.spread": 18, "rightElbow.bend": 42, "leftHip.pitch": -18, "rightHip.pitch": 30, "rightKnee.bend": 52 } },
+        { "time": 3, "rootOffset": [-0.18, -0.1, 0.16], "rootRotation": [0, -0.2, 0], "controls": { "body.pitch": -8, "body.yaw": -18, "torso.yaw": 24, "head.roll": -10, "leftShoulder.pitch": -25, "leftShoulder.spread": -20, "leftElbow.bend": 36, "rightShoulder.pitch": 112, "rightShoulder.spread": 34, "rightElbow.bend": 18, "leftHip.pitch": 38, "leftKnee.bend": 68, "rightHip.pitch": -12 } },
+        { "time": 4.5, "rootOffset": [0.04, -0.28, 0.06], "rootRotation": [0, 0.08, 0], "controls": { "body.pitch": 6, "body.roll": -6, "torso.pitch": -12, "leftShoulder.pitch": 76, "leftShoulder.spread": -16, "leftElbow.bend": 96, "rightShoulder.pitch": 76, "rightShoulder.spread": 16, "rightElbow.bend": 96, "leftHip.pitch": 48, "leftKnee.bend": 88, "rightHip.pitch": 48, "rightKnee.bend": 88 } },
+        { "time": 6, "rootOffset": [0.3, -0.03, -0.06], "rootRotation": [0, 0.34, 0], "controls": { "body.yaw": 28, "body.roll": 10, "torso.yaw": -32, "head.yaw": -18, "leftShoulder.pitch": 28, "leftShoulder.spread": -78, "leftElbow.bend": 20, "rightShoulder.pitch": 18, "rightShoulder.spread": 62, "rightElbow.bend": 24, "leftHip.pitch": -16, "rightHip.pitch": 34, "rightKnee.bend": 58 } },
+        { "time": 7.5, "rootOffset": [0, -0.06, 0.12], "rootRotation": [0, 0, 0], "controls": { "body.pitch": -6, "torso.pitch": 12, "head.pitch": -8, "leftShoulder.pitch": 108, "leftShoulder.spread": -34, "leftElbow.bend": 54, "rightShoulder.pitch": 108, "rightShoulder.spread": 34, "rightElbow.bend": 54, "leftHip.pitch": 26, "leftKnee.bend": 46, "rightHip.pitch": 26, "rightKnee.bend": 46 } },
+        { "time": 9, "rootOffset": [-0.3, -0.04, -0.04], "rootRotation": [0, -0.34, 0], "controls": { "body.yaw": -28, "body.roll": -10, "torso.yaw": 32, "head.yaw": 18, "leftShoulder.pitch": 18, "leftShoulder.spread": -62, "leftElbow.bend": 24, "rightShoulder.pitch": 28, "rightShoulder.spread": 78, "rightElbow.bend": 20, "leftHip.pitch": 34, "leftKnee.bend": 58, "rightHip.pitch": -16 } },
+        { "time": 10.5, "rootOffset": [-0.04, -0.3, 0.04], "rootRotation": [0, -0.08, 0], "controls": { "body.pitch": 8, "body.roll": 6, "torso.pitch": -14, "leftShoulder.pitch": 82, "leftShoulder.spread": -20, "leftElbow.bend": 102, "rightShoulder.pitch": 82, "rightShoulder.spread": 20, "rightElbow.bend": 102, "leftHip.pitch": 54, "leftKnee.bend": 96, "rightHip.pitch": 54, "rightKnee.bend": 96 } },
+        { "time": 12, "rootOffset": [0.18, -0.08, 0.14], "rootRotation": [0, 0.2, 0], "controls": { "body.pitch": -6, "body.yaw": 18, "torso.yaw": -24, "head.roll": 10, "leftShoulder.pitch": 112, "leftShoulder.spread": -34, "leftElbow.bend": 18, "rightShoulder.pitch": -25, "rightShoulder.spread": 20, "rightElbow.bend": 36, "leftHip.pitch": -12, "rightHip.pitch": 38, "rightKnee.bend": 68 } },
+        { "time": 13.5, "rootOffset": [-0.22, -0.04, 0.08], "rootRotation": [0, -0.18, 0], "controls": { "body.yaw": -14, "body.roll": -8, "torso.yaw": 20, "head.yaw": 12, "leftShoulder.pitch": -18, "leftShoulder.spread": -18, "leftElbow.bend": 42, "rightShoulder.pitch": 92, "rightShoulder.spread": 52, "rightElbow.bend": 28, "leftHip.pitch": 30, "leftKnee.bend": 52, "rightHip.pitch": -18 } },
+        { "time": 15, "rootOffset": [0, 0, 0], "rootRotation": [0, 0, 0], "controls": { "body.pitch": 0, "body.yaw": 0, "body.roll": 0, "leftShoulder.pitch": 35, "leftShoulder.spread": -28, "leftElbow.bend": 72, "rightShoulder.pitch": 35, "rightShoulder.spread": 28, "rightElbow.bend": 72, "leftHip.pitch": 12, "rightHip.pitch": -12 } }
+      ]
+    }
+  ]
+}
