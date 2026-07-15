@@ -9,6 +9,7 @@ import {
 } from "./animationSequence";
 import type { AnimationSequencePlaybackMode, DirectorAnimationSequence } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
+import { stopNormalCharacterAnimations } from "./characterAnimation";
 
 const MODE_OPTIONS: Array<{ value: AnimationSequencePlaybackMode; label: string }> = [
   { value: "manual", label: "手动播放" },
@@ -54,7 +55,10 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
 
   const selectSequence = (id: string) => {
     pauseAnimationSequence();
+    stopNormalCharacterAnimations();
     setActiveSequence(id);
+    const nextSequence = sequences.find((candidate) => candidate.id === id);
+    if (nextSequence) scrubAnimationSequence(nextSequence, 0);
   };
 
   const addEmptySequence = () => {
@@ -70,11 +74,8 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
       loop: playbackMode === "manual" ? true : sequence.loop,
     };
     updateSequence(sequence.id, nextSequence);
-    if (playbackMode === "manual") {
-      playAnimationSequence(nextSequence, { reset: true });
-    } else {
-      scrubAnimationSequence(nextSequence, 0);
-    }
+    stopNormalCharacterAnimations();
+    scrubAnimationSequence(nextSequence, 0);
   };
 
   return (
@@ -110,9 +111,11 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
               onClick={() => {
                 if (isCurrentSequencePlaying) {
                   pauseAnimationSequence();
+                  stopNormalCharacterAnimations();
                 } else if (isCurrentSequenceRecording) {
                   resumeAnimationSequenceRecording();
                 } else {
+                  stopNormalCharacterAnimations();
                   playAnimationSequence(sequence, { reset: runtime.sequenceId !== sequence.id || runtime.elapsed >= sequence.duration });
                 }
               }}

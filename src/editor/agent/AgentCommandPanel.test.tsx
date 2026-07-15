@@ -15,7 +15,7 @@ beforeEach(() => {
   mockExecuteDirectorAgentTool.mockResolvedValue({ id: "character_imported" });
 });
 
-it("imports and immediately executes a standalone character animation JSON", async () => {
+it("imports a standalone character animation JSON at its starting pose", async () => {
   const user = userEvent.setup();
   const { container } = render(<AgentCommandPanel />);
   await user.click(screen.getByRole("button", { name: "打开AI布景面板" }));
@@ -36,7 +36,7 @@ it("imports and immediately executes a standalone character animation JSON", asy
   fireEvent.change(input, { target: { files: [file] } });
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("import_character", payload));
-  expect(screen.getByText(/角色已导入并开始播放/)).toBeInTheDocument();
+  expect(screen.getByText(/角色已导入，动作已停在起点/)).toBeInTheDocument();
   expect(screen.getByText("导入 JSON 并执行")).toBeInTheDocument();
 });
 
@@ -84,7 +84,7 @@ it("replaces a scene file but appends a character animation package", async () =
   expect(screen.getByText(/角色动画已追加到当前布景/)).toBeInTheDocument();
 });
 
-it("previews an animation package and confirms that it starts playing", async () => {
+it("previews an animation package and confirms that it is ready at zero", async () => {
   const user = userEvent.setup();
   render(<AgentCommandPanel />);
   await user.click(screen.getByRole("button", { name: "打开AI布景面板" }));
@@ -93,7 +93,8 @@ it("previews an animation package and confirms that it starts playing", async ()
     duration: 5,
     trackCount: 1,
     warnings: [],
-    autoPlaying: true,
+    autoPlaying: false,
+    readyToPlay: true,
   });
   const payload = {
     format: "storyai-animation-sequence",
@@ -118,7 +119,7 @@ it("previews an animation package and confirms that it starts playing", async ()
   await user.click(screen.getByRole("button", { name: "确认应用动画" }));
 
   await waitFor(() => expect(mockExecuteDirectorAgentTool).toHaveBeenCalledWith("import_animation_sequence", payload));
-  expect(screen.getByText(/已开始播放/)).toBeInTheDocument();
+  expect(screen.getByText(/已停在0秒，点击播放后开始/)).toBeInTheDocument();
 });
 
 it("recognizes and imports an ObjectSculptSpec as an editable procedural prop", async () => {

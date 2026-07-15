@@ -53,6 +53,11 @@ it("shows the unified tracks and exposes only the three user-facing playback mod
   fireEvent.change(mode, { target: { value: "manual" } });
   expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ playbackMode: "manual", loop: true });
   expect(screen.getByRole("button", { name: "关闭动画循环" })).toHaveAttribute("aria-pressed", "true");
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ elapsed: 0, playing: false, recording: false });
+  fireEvent.click(screen.getByRole("button", { name: "播放动画" }));
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: true, recording: false });
+  fireEvent.click(screen.getByRole("button", { name: "暂停动画" }));
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: false });
 });
 
 it("pauses an active recording until the user explicitly resumes it", () => {

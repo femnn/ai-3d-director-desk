@@ -149,7 +149,7 @@ it("round-trips a reusable character package with color, pose, and video motion 
   expect(clip?.frames).toHaveLength(2);
 });
 
-it("creates, starts, and round-trips the Codex light dance through scene scripts", async () => {
+it("creates and round-trips the Codex light dance without auto-playing it", async () => {
   applySceneScript({
     reset: true,
     characters: [
@@ -174,9 +174,9 @@ it("creates, starts, and round-trips the Codex light dance through scene scripts
     playbackMode: "normal",
     enabled: true,
   });
-  expect(isNormalCharacterAnimationPlaying()).toBe(true);
+  expect(isNormalCharacterAnimationPlaying()).toBe(false);
   await new Promise((resolve) => window.setTimeout(resolve, 80));
-  expect(getCharacterActionElapsed(original!.id)).toBeGreaterThan(0);
+  expect(getCharacterActionElapsed(original!.id)).toBe(0);
 
   const exported = exportSceneScript();
   expect(exported.characters?.[0]?.action).toMatchObject({
@@ -405,7 +405,8 @@ it("applies the shipped dance, fight, and car stunt animation examples", () => {
   expect(danceSequence).toMatchObject({ duration: 15, playbackMode: "manual", loop: true });
   expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({
     sequenceId: danceSequence?.id,
-    playing: true,
+    playing: false,
+    elapsed: 0,
   });
 
   importCharacterAnimationPackage(fightExample);
@@ -417,7 +418,7 @@ it("applies the shipped dance, fight, and car stunt animation examples", () => {
     loop: true,
   });
   expect(fightSequence?.tracks).toHaveLength(2);
-  expect(getAnimationSequenceRuntimeSnapshot().playing).toBe(true);
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, elapsed: 0 });
 
   applySceneScript(carJumpExample as never);
   const state = useDirectorStore.getState();
@@ -433,7 +434,7 @@ it("applies the shipped dance, fight, and car stunt animation examples", () => {
   expect(carSequence?.bindings.every((binding) =>
     state.project.objects.some((item) => item.id === binding.objectId)
   )).toBe(true);
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: carSequence?.id, playing: true });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: carSequence?.id, playing: false, elapsed: 0 });
 });
 
 it("applies a complete AI scene and its animation sequences as one undo batch", () => {

@@ -70,10 +70,10 @@ export function AgentCommandPanel() {
     if (isCharacterAnimationJson(payload)) {
       const result = await executeDirectorAgentTool("import_character_animation", payload) as {
         characterIds?: string[];
-        animationSequenceReviews?: Array<{ autoPlaying?: boolean }>;
+        animationSequenceReviews?: Array<{ autoPlaying?: boolean; readyToPlay?: boolean }>;
       };
       setStatus(
-        `角色动画已追加到当前布景：新增 ${result.characterIds?.length ?? 0} 个角色、${result.animationSequenceReviews?.length ?? 0} 段动画${result.animationSequenceReviews?.some((review) => review.autoPlaying) ? "，已循环播放" : "，等待录制触发"}。`
+        `角色动画已追加到当前布景：新增 ${result.characterIds?.length ?? 0} 个角色、${result.animationSequenceReviews?.length ?? 0} 段动画${result.animationSequenceReviews?.some((review) => review.readyToPlay) ? "，已停在0秒，点击播放后开始" : "，已停在0秒，等待录制触发"}。`
       );
       return;
     }
@@ -84,8 +84,9 @@ export function AgentCommandPanel() {
         trackCount?: number;
         warnings?: string[];
         autoPlaying?: boolean;
+        readyToPlay?: boolean;
       };
-      setStatus(`动画“${result.name ?? "未命名"}”已导入：${result.duration ?? 0}秒、${result.trackCount ?? 0}条轨道${result.autoPlaying ? "，已开始播放" : "，等待录制触发"}${result.warnings?.length ? `；${result.warnings.length}项警告` : ""}。`);
+      setStatus(`动画“${result.name ?? "未命名"}”已导入：${result.duration ?? 0}秒、${result.trackCount ?? 0}条轨道${result.readyToPlay ? "，已停在0秒，点击播放后开始" : "，已停在0秒，等待录制触发"}${result.warnings?.length ? `；${result.warnings.length}项警告` : ""}。`);
       return;
     }
     if (isObjectSculptJson(payload)) {
@@ -102,7 +103,7 @@ export function AgentCommandPanel() {
     }
     if (isCharacterJson(payload)) {
       const result = await executeDirectorAgentTool("import_character", payload) as { id?: string };
-      setStatus(`角色已导入并开始播放${result.id ? `（${result.id}）` : ""}`);
+      setStatus(`角色已导入，动作已停在起点${result.id ? `（${result.id}）` : ""}`);
       return;
     }
     const scenePayload = options.importedFile && payload && typeof payload === "object" && !Array.isArray(payload)
@@ -116,10 +117,10 @@ export function AgentCommandPanel() {
       cameraIds?: string[];
       scenePlan?: unknown;
       proceduralWarnings?: string[];
-      animationSequenceReviews?: Array<{ autoPlaying?: boolean }>;
+      animationSequenceReviews?: Array<{ autoPlaying?: boolean; readyToPlay?: boolean }>;
     } : {};
     const sequenceMessage = summary.animationSequenceReviews?.length
-      ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列${summary.animationSequenceReviews.some((review) => review.autoPlaying) ? "并开始播放" : "，等待录制触发"}`
+      ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列${summary.animationSequenceReviews.some((review) => review.readyToPlay) ? "，已停在0秒，点击播放后开始" : "，已停在0秒，等待录制触发"}`
       : "";
     setStatus(
       `${options.importedFile ? "已替换为导入布景" : "已完成"}：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}${sequenceMessage}。`

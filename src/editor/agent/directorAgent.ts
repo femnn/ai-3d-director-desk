@@ -38,7 +38,7 @@ import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
   getDefaultCharacterActionDuration,
-  syncNormalCharacterAnimations,
+  stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import type { PosePresetId } from "../schema/poseSchema";
 import {
@@ -298,19 +298,6 @@ function applyCharacterAction(id: string, action: SceneScriptCharacter["action"]
     source: action.source === "video" || action.source === "mocap" ? action.source : "built-in",
     motionClipId: motionClipId ?? (typeof action.motionClipId === "string" ? action.motionClipId : null),
   });
-  syncImportedNormalCharacterAnimations();
-}
-
-function syncImportedNormalCharacterAnimations() {
-  const ids = useDirectorStore.getState().project.objects
-    .filter(
-      (object) =>
-        object.kind === "character" &&
-        object.characterActionTrack?.enabled &&
-        object.characterActionTrack.playbackMode === "normal"
-    )
-    .map((object) => object.id);
-  syncNormalCharacterAnimations(ids);
 }
 
 function importCharacterMotionClip(characterId: string, input: SceneScriptCharacterMotionClip | undefined) {
@@ -872,7 +859,7 @@ export function applySceneScript(script: SceneScript = {}) {
     }));
   }
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
-  syncImportedNormalCharacterAnimations();
+  stopNormalCharacterAnimations();
 
   return {
     characterIds,
@@ -1114,14 +1101,11 @@ export function importAnimationSequencePackage(
     useDirectorStore.getState().setActiveAnimationSequence(sequenceId);
     const importedSequence = useDirectorStore.getState().project.animationSequences?.find((item) => item.id === sequenceId);
     if (!importedSequence) throw new Error("动画序列未能写入工程");
-    if (importedSequence.playbackMode === "manual") {
-      playAnimationSequence(importedSequence, { reset: true });
-    } else {
-      scrubAnimationSequence(importedSequence, 0);
-    }
+    scrubAnimationSequence(importedSequence, 0);
     return {
       ...reviewAnimationSequence(sequenceId),
-      autoPlaying: importedSequence.playbackMode === "manual" && importedSequence.enabled,
+      autoPlaying: false,
+      readyToPlay: importedSequence.playbackMode === "manual" && importedSequence.enabled,
     };
   } finally {
     useDirectorStore.getState().endUndoBatch();

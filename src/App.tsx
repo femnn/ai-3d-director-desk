@@ -4,10 +4,9 @@ import { Camera, RotateCcw, X } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorDeskErrorBoundary } from "./app/DirectorDeskErrorBoundary";
 import { AgentCommandPanel } from "./editor/agent/AgentCommandPanel";
-import { stopNormalCharacterAnimations, syncNormalCharacterAnimations } from "./editor/animation/characterAnimation";
+import { stopNormalCharacterAnimations } from "./editor/animation/characterAnimation";
 import {
   getAnimationSequenceRuntimeSnapshot,
-  playAnimationSequence,
   resetAnimationSequenceRuntime,
   scrubAnimationSequence,
   syncAnimationSequenceRuntimeDefinition,
@@ -33,17 +32,6 @@ export default function App() {
   const cameraMonitorCollapsed = useDirectorStore((state) => state.cameraMonitorCollapsed);
   const setCameraMonitorCollapsed = useDirectorStore((state) => state.setCameraMonitorCollapsed);
   const resetDirectorDesk = useDirectorStore((state) => state.resetDirectorDesk);
-  const normalActionSignature = useDirectorStore((state) =>
-    state.project.objects
-      .filter(
-        (object) =>
-          object.kind === "character" &&
-          object.characterActionTrack?.enabled &&
-          object.characterActionTrack.playbackMode === "normal"
-      )
-      .map((object) => `${object.id}:${object.characterActionTrack?.actionId}:${object.characterActionTrack?.duration}`)
-      .join("|")
-  );
   const activeAnimationSequence = useDirectorStore((state) =>
     (state.project.animationSequences ?? []).find((sequence) => sequence.id === state.project.activeAnimationSequenceId)
   );
@@ -73,17 +61,9 @@ export default function App() {
 
   useEffect(() => {
     if (isPhoneRoute) return;
-    const characterIds = useDirectorStore.getState().project.objects
-      .filter(
-        (object) =>
-          object.kind === "character" &&
-          object.characterActionTrack?.enabled &&
-          object.characterActionTrack.playbackMode === "normal"
-      )
-      .map((object) => object.id);
-    syncNormalCharacterAnimations(characterIds);
+    stopNormalCharacterAnimations();
     return stopNormalCharacterAnimations;
-  }, [isPhoneRoute, normalActionSignature]);
+  }, [isPhoneRoute]);
 
   useEffect(() => {
     if (isPhoneRoute) return;
@@ -97,19 +77,11 @@ export default function App() {
     const runtime = getAnimationSequenceRuntimeSnapshot();
     const runtimeMatches = syncAnimationSequenceRuntimeDefinition(activeAnimationSequence);
     if (!runtimeMatches) {
-      if (activeAnimationSequence.playbackMode === "manual" && activeAnimationSequence.enabled) {
-        playAnimationSequence(activeAnimationSequence, { reset: true });
-      } else {
-        scrubAnimationSequence(activeAnimationSequence, 0);
-      }
+      scrubAnimationSequence(activeAnimationSequence, 0);
       return;
     }
     if (!activationChanged) return;
-    if (activeAnimationSequence.playbackMode === "manual" && activeAnimationSequence.enabled) {
-      playAnimationSequence(activeAnimationSequence, { reset: false });
-    } else if (!runtime.recording) {
-      scrubAnimationSequence(activeAnimationSequence, 0);
-    }
+    if (!runtime.recording) scrubAnimationSequence(activeAnimationSequence, 0);
   }, [
     activeAnimationSequence?.cameraId,
     activeAnimationSequence?.duration,

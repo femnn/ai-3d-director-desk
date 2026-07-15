@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "./editor/store/directorStore";
 import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime } from "./editor/animation/animationSequence";
+import {
+  isNormalCharacterAnimationPlaying,
+  stopNormalCharacterAnimations,
+  syncNormalCharacterAnimations,
+} from "./editor/animation/characterAnimation";
 
 vi.mock("./editor/canvas/DirectorCanvas", () => ({
   DirectorCanvas: () => <div data-testid="mock-director-canvas" />,
@@ -19,10 +24,28 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopNormalCharacterAnimations();
   resetAnimationSequenceRuntime();
 });
 
-it("resumes the active manual animation sequence after the director desk starts", () => {
+it("stops legacy character actions when the director desk starts", () => {
+  const character = useDirectorStore.getState().project.objects.find((object) => object.kind === "character")!;
+  useDirectorStore.getState().setCharacterActionTrack(character.id, {
+    actionId: "walk",
+    duration: 5,
+    loop: true,
+    playbackMode: "normal",
+    enabled: true,
+  });
+  syncNormalCharacterAnimations([character.id]);
+  expect(isNormalCharacterAnimationPlaying()).toBe(true);
+
+  render(<App />);
+
+  expect(isNormalCharacterAnimationPlaying()).toBe(false);
+});
+
+it("keeps the active animation sequence stopped at zero after the director desk starts", () => {
   const state = createInitialDirectorState();
   state.project.animationSequences = [{
     id: "saved-sequence",
@@ -40,7 +63,7 @@ it("resumes the active manual animation sequence after the director desk starts"
 
   render(<App />);
 
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
 
   act(() => {
     useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "recording" });
@@ -50,7 +73,7 @@ it("resumes the active manual animation sequence after the director desk starts"
   act(() => {
     useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "manual" });
   });
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
 
   act(() => {
     useDirectorStore.getState().setActiveAnimationSequence(null);
