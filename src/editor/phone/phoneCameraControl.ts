@@ -45,6 +45,7 @@ let pathSnapshot: Tuple3[] = [];
 const lastAppliedUpdateByPhoneClientId = new Map<string, number>();
 const pendingPhoneStateByClientId = new Map<string, PhoneCameraState>();
 let animationFrameId = 0;
+let phoneFlushTimer = 0;
 let activePlaybackId: number | null = null;
 const VIDEO_FRAME_RATE = 60;
 let cameraMonitorCanvas: HTMLCanvasElement | null = null;
@@ -494,7 +495,10 @@ function applyPhoneCameraState(state: PhoneCameraState) {
 }
 
 function flushPendingPhoneState() {
+  if (animationFrameId) window.cancelAnimationFrame(animationFrameId);
   animationFrameId = 0;
+  if (phoneFlushTimer) window.clearTimeout(phoneFlushTimer);
+  phoneFlushTimer = 0;
   const states = Array.from(pendingPhoneStateByClientId.values());
   pendingPhoneStateByClientId.clear();
   states.forEach(applyPhoneCameraState);
@@ -505,6 +509,9 @@ export function queuePhoneCameraState(state: PhoneCameraState) {
   pendingPhoneStateByClientId.set(phoneClientId, state);
   if (!animationFrameId) {
     animationFrameId = window.requestAnimationFrame(flushPendingPhoneState);
+  }
+  if (!phoneFlushTimer) {
+    phoneFlushTimer = window.setTimeout(flushPendingPhoneState, 40);
   }
 }
 

@@ -515,7 +515,18 @@ function parseFrames(client, chunk) {
 }
 
 function getActiveDesktopClient() {
-  return activeDesktopClientId ? clients.get(activeDesktopClientId) : null;
+  const desktops = Array.from(clients.values()).filter((client) => client.type === "desktop");
+  if (!desktops.length) {
+    activeDesktopClientId = null;
+    return null;
+  }
+  const ranked = desktops.sort((a, b) => {
+    const score = (client) => (client.hasFocus ? 4 : 0) + (client.visibilityState === "visible" ? 2 : 0);
+    return score(b) - score(a) || b.lastActiveAt - a.lastActiveAt;
+  });
+  const active = ranked[0];
+  activeDesktopClientId = active.id;
+  return active;
 }
 
 function getPhoneControllerId(payload, fallback) {
@@ -563,7 +574,10 @@ function handleSocketMessage(client, raw) {
   if (message.type === "client_hello") {
     client.type = message.clientType === "phone" ? "phone" : "desktop";
     if (client.type === "desktop") {
-      activeDesktopClientId = client.id;
+      client.visibilityState = message.visibilityState === "hidden" ? "hidden" : "visible";
+      client.hasFocus = message.hasFocus === true;
+      client.lastActiveAt = Date.now();
+      getActiveDesktopClient();
       flushPendingAgentCommands();
     }
     sendSocketJson(client, {
@@ -578,7 +592,16 @@ function handleSocketMessage(client, raw) {
     return;
   }
 
+  if (message.type === "desktop_presence" && client.type === "desktop") {
+    client.visibilityState = message.visibilityState === "hidden" ? "hidden" : "visible";
+    client.hasFocus = message.hasFocus === true;
+    client.lastActiveAt = Date.now();
+    getActiveDesktopClient();
+    return;
+  }
+
   if (message.type === "desktop_state" && client.type === "desktop") {
+    if (getActiveDesktopClient()?.id !== client.id) return;
     latestDesktopState = message.state ? { ...(latestDesktopState ?? {}), ...message.state } : null;
     broadcastToType("phone", { type: "desktop_state", state: latestDesktopState });
     return;
@@ -646,6 +669,9 @@ function handleUpgrade(req, socket) {
     socket,
     buffer: Buffer.alloc(0),
     phoneControllerId: null,
+    visibilityState: "hidden",
+    hasFocus: false,
+    lastActiveAt: Date.now(),
   };
   clients.set(client.id, client);
 
@@ -659,8 +685,7 @@ function handleUpgrade(req, socket) {
     }
     if (activeDesktopClientId === client.id) {
       activeDesktopClientId = null;
-      const nextDesktop = Array.from(clients.values()).find((item) => item.type === "desktop");
-      if (nextDesktop) activeDesktopClientId = nextDesktop.id;
+      getActiveDesktopClient();
     }
   });
   socket.on("error", () => {

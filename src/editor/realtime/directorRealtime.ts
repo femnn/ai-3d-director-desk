@@ -247,7 +247,12 @@ export function startDirectorDeskRealtime() {
     socket = new WebSocket(getWebSocketUrl());
 
     socket.addEventListener("open", () => {
-      sendJson(socket, { type: "client_hello", clientType: "desktop" });
+      sendJson(socket, {
+        type: "client_hello",
+        clientType: "desktop",
+        visibilityState: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      });
       sendDesktopState();
     });
 
@@ -317,6 +322,19 @@ export function startDirectorDeskRealtime() {
   unsubscribeStore = useDirectorStore.subscribe(scheduleDesktopState);
   unsubscribeAnimationRuntime = subscribeCharacterAnimationRuntime(scheduleDesktopState);
   unsubscribeSequenceRuntime = subscribeAnimationSequenceRuntime(scheduleDesktopState);
+  const sendDesktopPresence = () => {
+    sendJson(socket, {
+      type: "desktop_presence",
+      visibilityState: document.visibilityState,
+      hasFocus: document.hasFocus(),
+    });
+    if (document.visibilityState === "visible") scheduleDesktopState();
+  };
+  document.addEventListener("visibilitychange", sendDesktopPresence);
+  window.addEventListener("focus", sendDesktopPresence);
+  window.addEventListener("blur", sendDesktopPresence);
+  window.addEventListener("pageshow", sendDesktopPresence);
+  window.addEventListener("pointerdown", sendDesktopPresence, { passive: true });
   connect();
 
   return () => {
@@ -327,6 +345,11 @@ export function startDirectorDeskRealtime() {
     unsubscribeStore?.();
     unsubscribeAnimationRuntime?.();
     unsubscribeSequenceRuntime?.();
+    document.removeEventListener("visibilitychange", sendDesktopPresence);
+    window.removeEventListener("focus", sendDesktopPresence);
+    window.removeEventListener("blur", sendDesktopPresence);
+    window.removeEventListener("pageshow", sendDesktopPresence);
+    window.removeEventListener("pointerdown", sendDesktopPresence);
     socket?.close();
   };
 }

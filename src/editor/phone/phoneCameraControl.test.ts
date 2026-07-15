@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 import {
   getPhoneCameraAssignments,
@@ -18,6 +18,11 @@ beforeEach(() => {
   });
   releasePhoneCamera("phone_test_one");
   releasePhoneCamera("phone_test_two");
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 it("keeps phone controllers on separate cameras and preserves the director monitor selection", async () => {
@@ -54,4 +59,25 @@ it("keeps phone controllers on separate cameras and preserves the director monit
   expect(project.activeCameraId).toBe(initialCameraId);
   expect(getPhoneCameraUpdateTimestamp(assignments.phone_test_one!)).toBe(1);
   expect(getPhoneCameraUpdateTimestamp(assignments.phone_test_two!)).toBe(1);
+});
+
+it("applies the latest phone state when requestAnimationFrame is throttled", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", () => 99);
+  vi.stubGlobal("cancelAnimationFrame", () => undefined);
+  const cameraId = useDirectorStore.getState().project.cameras[0]!.id;
+
+  queuePhoneCameraState({
+    phoneClientId: "phone_test_one",
+    cameraId,
+    position: [2, 2, 6],
+    yaw: 0.2,
+    pitch: -0.1,
+    fov: 51,
+    updatedAt: 10,
+  });
+  vi.advanceTimersByTime(45);
+
+  expect(useDirectorStore.getState().project.cameras.find((camera) => camera.id === cameraId)?.fov).toBe(51);
+  expect(getPhoneCameraUpdateTimestamp(cameraId)).toBe(10);
 });
