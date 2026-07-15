@@ -1,0 +1,59 @@
+{
+  "reset": true,
+  "scenePlan": {
+    "intent": "展示 Codex 通过文字编排生成的五秒轻快舞循环",
+    "roles": [
+      {
+        "name": "舞者",
+        "purpose": "连续完成左右踏步、屈膝弹跳、手臂上举和横向指向"
+      }
+    ],
+    "environment": "简洁圆形预演舞台",
+    "composition": "全身正面机位，完整保留手臂和脚步空间"
+  },
+  "characters": [
+    {
+      "name": "Codex轻快舞角色",
+      "bodyType": "female",
+      "color": "#E04F72",
+      "pose": "stand",
+      "position": [0, 0.08, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "action": {
+        "id": "light-dance",
+        "duration": 5,
+        "playbackMode": "normal",
+        "enabled": true,
+        "source": "built-in"
+      }
+    }
+  ],
+  "props": [
+    {
+      "name": "舞台",
+      "geometryType": "disc",
+      "position": [0, 0, 0],
+      "scale": [3.2, 0.18, 3.2],
+      "color": "#243447"
+    },
+    {
+      "name": "后方灯柱",
+      "geometryType": "capsule",
+      "position": [-2.4, 0, -1.8],
+      "scale": [0.18, 2.4, 0.18],
+      "color": "#35B7FF",
+      "mirror": { "axis": "x" }
+    }
+  ],
+  "cameras": [
+    {
+      "id": "cam_codex_dance",
+      "name": "轻快舞全身机位",
+      "position": [0, 1.45, 5.4],
+      "lookAt": [0, 1.05, 0],
+      "fov": 42
+    }
+  ],
+  "activeCameraId": "cam_codex_dance"
+}

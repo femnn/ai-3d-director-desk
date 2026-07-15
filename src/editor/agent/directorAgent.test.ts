@@ -124,6 +124,45 @@ it("round-trips a reusable character package with color, pose, and video motion 
   expect(clip?.frames).toHaveLength(2);
 });
 
+it("creates and round-trips the Codex light dance through scene scripts", () => {
+  applySceneScript({
+    reset: true,
+    characters: [
+      {
+        name: "轻快舞者",
+        bodyType: "female",
+        color: "#ec4899",
+        action: {
+          id: "light-dance",
+          duration: 5,
+          playbackMode: "normal",
+          enabled: true,
+        },
+      },
+    ],
+  });
+
+  const original = useDirectorStore.getState().project.objects.find((object) => object.name === "轻快舞者");
+  expect(original?.characterActionTrack).toMatchObject({
+    actionId: "light-dance",
+    duration: 5,
+    playbackMode: "normal",
+    enabled: true,
+  });
+
+  const exported = exportSceneScript();
+  expect(exported.characters?.[0]?.action).toMatchObject({
+    id: "light-dance",
+    duration: 5,
+    playbackMode: "normal",
+    enabled: true,
+  });
+
+  applySceneScript(exported);
+  const restored = useDirectorStore.getState().project.objects.find((object) => object.name === "轻快舞者");
+  expect(restored?.characterActionTrack?.actionId).toBe("light-dance");
+});
+
 it("creates and round-trips structured animated assemblies", () => {
   applySceneScript({
     reset: true,

@@ -22,6 +22,7 @@ export const CHARACTER_ACTION_OPTIONS: Array<{ id: CharacterActionId; label: str
   { id: "push", label: "双手推进" },
   { id: "fight", label: "格斗" },
   { id: "dance", label: "舞动" },
+  { id: "light-dance", label: "Codex 轻快舞" },
   { id: "phone", label: "看手机" },
 ];
 
@@ -79,6 +80,189 @@ function getPresetControls(id: string) {
 
 function getPhase(elapsed: number, duration: number) {
   return ((elapsed % Math.max(duration, MIN_CHARACTER_ACTION_DURATION)) / Math.max(duration, MIN_CHARACTER_ACTION_DURATION)) * Math.PI * 2;
+}
+
+type TimedDancePose = {
+  time: number;
+  controls: Record<string, number>;
+};
+
+const LIGHT_DANCE_BASE_CONTROLS: Record<string, number> = {
+  "body.pitch": 0,
+  "body.yaw": 0,
+  "body.roll": 0,
+  "body.offsetY": 0,
+  "torso.pitch": 0,
+  "torso.yaw": 0,
+  "torso.roll": 0,
+  "head.pitch": 0,
+  "head.yaw": 0,
+  "head.roll": 0,
+  "leftShoulder.pitch": 0,
+  "leftShoulder.spread": 0,
+  "leftShoulder.twist": 0,
+  "rightShoulder.pitch": 0,
+  "rightShoulder.spread": 0,
+  "rightShoulder.twist": 0,
+  "leftElbow.bend": 0,
+  "rightElbow.bend": 0,
+  "leftHand.pitch": 0,
+  "leftHand.roll": 0,
+  "rightHand.pitch": 0,
+  "rightHand.roll": 0,
+  "leftHip.pitch": 0,
+  "leftHip.spread": 0,
+  "leftHip.twist": 0,
+  "rightHip.pitch": 0,
+  "rightHip.spread": 0,
+  "rightHip.twist": 0,
+  "leftKnee.bend": 0,
+  "rightKnee.bend": 0,
+  "leftFoot.pitch": 0,
+  "leftFoot.roll": 0,
+  "rightFoot.pitch": 0,
+  "rightFoot.roll": 0,
+};
+
+// Five seconds of text-directed choreography: side steps, knee lifts,
+// diagonal reaches, an overhead accent, a crouched bounce, and a cross-body finish.
+const LIGHT_DANCE_POSES: TimedDancePose[] = [
+  {
+    time: 0,
+    controls: {
+      "body.yaw": -8, "body.roll": -5, "body.offsetY": -0.04, "torso.yaw": 7, "head.yaw": 5,
+      "leftShoulder.pitch": -16, "leftShoulder.spread": -8, "leftElbow.bend": 22,
+      "rightShoulder.pitch": 34, "rightShoulder.spread": 30, "rightShoulder.twist": -12, "rightElbow.bend": 66,
+      "rightHand.roll": -18, "leftHip.pitch": -10, "leftHip.spread": -8,
+      "rightHip.pitch": 18, "rightHip.spread": 12, "leftKnee.bend": 10, "rightKnee.bend": 30,
+    },
+  },
+  {
+    time: 0.1,
+    controls: {
+      "body.yaw": 10, "body.roll": 7, "body.offsetY": -0.08, "torso.yaw": -10, "head.yaw": -7,
+      "leftShoulder.pitch": 38, "leftShoulder.spread": -32, "leftShoulder.twist": 12, "leftElbow.bend": 64,
+      "rightShoulder.pitch": -18, "rightShoulder.spread": 8, "rightElbow.bend": 20,
+      "leftHip.pitch": 20, "leftHip.spread": -12, "rightHip.pitch": -12, "rightHip.spread": 7,
+      "leftKnee.bend": 32, "rightKnee.bend": 12,
+    },
+  },
+  {
+    time: 0.2,
+    controls: {
+      "body.pitch": -5, "body.yaw": -6, "body.roll": -8, "body.offsetY": -0.12, "torso.yaw": 12,
+      "head.pitch": -4, "head.yaw": 8, "leftShoulder.pitch": -28, "leftShoulder.spread": -18,
+      "leftElbow.bend": 28, "rightShoulder.pitch": 54, "rightShoulder.spread": 18, "rightElbow.bend": 58,
+      "leftHip.pitch": 48, "leftHip.spread": -14, "leftKnee.bend": 68,
+      "rightHip.pitch": 8, "rightHip.spread": 10, "rightKnee.bend": 14, "leftFoot.pitch": -18,
+    },
+  },
+  {
+    time: 0.3,
+    controls: {
+      "body.yaw": 14, "body.roll": 5, "torso.yaw": -16, "torso.roll": 5, "head.yaw": -10,
+      "leftShoulder.pitch": -20, "leftShoulder.spread": -20, "leftElbow.bend": 52,
+      "rightShoulder.pitch": 72, "rightShoulder.spread": 52, "rightShoulder.twist": -18,
+      "rightElbow.bend": 12, "rightHand.roll": 14, "leftHip.pitch": -8, "rightHip.pitch": 24,
+      "leftKnee.bend": 16, "rightKnee.bend": 38,
+    },
+  },
+  {
+    time: 0.4,
+    controls: {
+      "body.pitch": -4, "body.offsetY": -0.18, "torso.pitch": 8, "head.pitch": -8,
+      "leftShoulder.pitch": 78, "leftShoulder.spread": -48, "leftShoulder.twist": 12, "leftElbow.bend": 18,
+      "rightShoulder.pitch": 78, "rightShoulder.spread": 48, "rightShoulder.twist": -12, "rightElbow.bend": 18,
+      "leftHand.roll": -14, "rightHand.roll": 14, "leftHip.pitch": 28, "rightHip.pitch": 28,
+      "leftHip.spread": -16, "rightHip.spread": 16, "leftKnee.bend": 46, "rightKnee.bend": 46,
+    },
+  },
+  {
+    time: 0.5,
+    controls: {
+      "body.pitch": 6, "body.offsetY": -0.28, "torso.pitch": -9, "head.pitch": 7,
+      "leftShoulder.pitch": -18, "leftShoulder.spread": -30, "leftElbow.bend": 58,
+      "rightShoulder.pitch": -18, "rightShoulder.spread": 30, "rightElbow.bend": 58,
+      "leftHip.pitch": 38, "rightHip.pitch": 38, "leftHip.spread": -18, "rightHip.spread": 18,
+      "leftKnee.bend": 62, "rightKnee.bend": 62, "leftFoot.pitch": 10, "rightFoot.pitch": 10,
+    },
+  },
+  {
+    time: 0.6,
+    controls: {
+      "body.yaw": -16, "body.roll": -7, "body.offsetY": -0.06, "torso.yaw": 18, "head.yaw": 10,
+      "leftShoulder.pitch": 48, "leftShoulder.spread": -72, "leftShoulder.twist": 10, "leftElbow.bend": 14,
+      "rightShoulder.pitch": 18, "rightShoulder.spread": 8, "rightShoulder.twist": -24, "rightElbow.bend": 72,
+      "leftHip.pitch": 20, "leftHip.spread": -14, "rightHip.pitch": -12, "rightHip.spread": 8,
+      "leftKnee.bend": 34, "rightKnee.bend": 12,
+    },
+  },
+  {
+    time: 0.7,
+    controls: {
+      "body.pitch": -5, "body.yaw": 20, "body.roll": 6, "body.offsetY": -0.1, "torso.yaw": -20,
+      "head.yaw": -12, "leftShoulder.pitch": -36, "leftShoulder.spread": -12, "leftElbow.bend": 30,
+      "rightShoulder.pitch": 42, "rightShoulder.spread": 34, "rightElbow.bend": 42,
+      "leftHip.pitch": -18, "rightHip.pitch": 32, "leftKnee.bend": 14, "rightKnee.bend": 48,
+      "rightFoot.pitch": -16,
+    },
+  },
+  {
+    time: 0.8,
+    controls: {
+      "body.yaw": -14, "body.roll": -5, "torso.yaw": 24, "head.yaw": 12,
+      "leftShoulder.pitch": 70, "leftShoulder.spread": 18, "leftShoulder.twist": 16, "leftElbow.bend": 16,
+      "rightShoulder.pitch": 26, "rightShoulder.spread": 12, "rightShoulder.twist": -24, "rightElbow.bend": 78,
+      "leftHip.pitch": 10, "leftHip.spread": -10, "rightHip.pitch": 20, "rightHip.spread": 14,
+      "leftKnee.bend": 18, "rightKnee.bend": 34,
+    },
+  },
+  {
+    time: 0.9,
+    controls: {
+      "body.pitch": -6, "body.yaw": 8, "body.roll": 8, "body.offsetY": -0.13, "torso.yaw": -12,
+      "head.pitch": -5, "head.yaw": -8, "leftShoulder.pitch": 38, "leftShoulder.spread": -24,
+      "leftElbow.bend": 62, "rightShoulder.pitch": 58, "rightShoulder.spread": 24, "rightElbow.bend": 54,
+      "leftHip.pitch": 8, "leftKnee.bend": 16, "rightHip.pitch": 50, "rightHip.spread": 14,
+      "rightKnee.bend": 70, "rightFoot.pitch": -20,
+    },
+  },
+  {
+    time: 1,
+    controls: {
+      "body.yaw": -8, "body.roll": -5, "body.offsetY": -0.04, "torso.yaw": 7, "head.yaw": 5,
+      "leftShoulder.pitch": -16, "leftShoulder.spread": -8, "leftElbow.bend": 22,
+      "rightShoulder.pitch": 34, "rightShoulder.spread": 30, "rightShoulder.twist": -12, "rightElbow.bend": 66,
+      "rightHand.roll": -18, "leftHip.pitch": -10, "leftHip.spread": -8,
+      "rightHip.pitch": 18, "rightHip.spread": 12, "leftKnee.bend": 10, "rightKnee.bend": 30,
+    },
+  },
+];
+
+function smoothstep(value: number) {
+  const clamped = clamp(value, 0, 1);
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+function sampleLightDanceControls(elapsed: number, duration: number) {
+  const safeDuration = Math.max(duration, MIN_CHARACTER_ACTION_DURATION);
+  const progress = (((elapsed % safeDuration) + safeDuration) % safeDuration) / safeDuration;
+  const foundIndex = LIGHT_DANCE_POSES.findIndex((pose) => pose.time >= progress);
+  const nextIndex = Math.max(1, foundIndex === -1 ? LIGHT_DANCE_POSES.length - 1 : foundIndex);
+  const previous = LIGHT_DANCE_POSES[nextIndex - 1];
+  const next = LIGHT_DANCE_POSES[nextIndex];
+  const mix = smoothstep((progress - previous.time) / Math.max(next.time - previous.time, 0.0001));
+  const keys = new Set([...Object.keys(LIGHT_DANCE_BASE_CONTROLS), ...Object.keys(previous.controls), ...Object.keys(next.controls)]);
+  const controls: Record<string, number> = {};
+  keys.forEach((key) => {
+    const start = previous.controls[key] ?? LIGHT_DANCE_BASE_CONTROLS[key] ?? 0;
+    const end = next.controls[key] ?? LIGHT_DANCE_BASE_CONTROLS[key] ?? 0;
+    controls[key] = Number((start + (end - start) * mix).toFixed(3));
+  });
+  const rhythm = Math.sin(progress * Math.PI * 8);
+  controls["body.offsetY"] = Number(((controls["body.offsetY"] ?? 0) - Math.abs(rhythm) * 0.025).toFixed(3));
+  controls["head.roll"] = Number(((controls["head.roll"] ?? 0) - rhythm * 2.5).toFixed(3));
+  return controls;
 }
 
 function getActionControls(actionId: CharacterActionId, elapsed: number, duration: number): Record<string, number> {
@@ -200,6 +384,8 @@ function getActionControls(actionId: CharacterActionId, elapsed: number, duratio
         "leftHip.pitch": -Math.sin(phase * 2) * 24,
         "rightHip.pitch": Math.sin(phase * 2) * 24,
       };
+    case "light-dance":
+      return sampleLightDanceControls(elapsed, duration);
     case "phone":
       return {
         ...getPresetControls("phone"),
@@ -214,6 +400,14 @@ function getActionControls(actionId: CharacterActionId, elapsed: number, duratio
 }
 
 function getActionRootOffset(actionId: CharacterActionId, elapsed: number, duration: number): Tuple3 {
+  if (actionId === "light-dance") {
+    const phase = getPhase(elapsed, duration);
+    return [
+      Number((Math.sin(phase) * 0.18).toFixed(4)),
+      Number((Math.max(Math.sin(phase * 4), 0) * 0.045).toFixed(4)),
+      Number((Math.sin(phase * 2) * 0.07).toFixed(4)),
+    ];
+  }
   if (actionId !== "walk" && actionId !== "run") return [0, 0, 0];
   const stride = Math.sin(getPhase(elapsed, duration) * 2);
   const speed = actionId === "run" ? 0.9 : 0.42;

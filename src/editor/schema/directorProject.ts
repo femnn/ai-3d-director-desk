@@ -35,6 +35,7 @@ export type CharacterActionId =
   | "push"
   | "fight"
   | "dance"
+  | "light-dance"
   | "phone";
 export type CharacterActionPlaybackMode = "normal" | "camera-driven";
 export type CharacterMotionSource = "built-in" | "video" | "mocap";

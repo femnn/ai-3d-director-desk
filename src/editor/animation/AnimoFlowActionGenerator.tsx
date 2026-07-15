@@ -23,6 +23,7 @@ function getPreviewActionId(prompt: string): CharacterActionId {
   const text = prompt.toLowerCase();
   if (/跑|run|jog/.test(text)) return "run";
   if (/走|walk|前进/.test(text)) return "walk";
+  if (/轻快舞|活力舞|codex.*舞|light.?dance/.test(text)) return "light-dance";
   if (/跳舞|舞|dance/.test(text)) return "dance";
   if (/格斗|打|fight|punch/.test(text)) return "fight";
   if (/喝|茶|drink|cup/.test(text)) return "drink-tea";

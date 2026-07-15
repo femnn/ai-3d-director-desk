@@ -44,7 +44,7 @@ describe("character action timeline", () => {
 
   it("keeps every built-in preset action dynamic over its five-second loop", () => {
     const actionIds = [
-      "idle", "sit", "drink-tea", "talk", "walk", "run", "turn", "look", "wave", "bow", "think", "reach", "push", "fight", "dance", "phone",
+      "idle", "sit", "drink-tea", "talk", "walk", "run", "turn", "look", "wave", "bow", "think", "reach", "push", "fight", "dance", "light-dance", "phone",
     ] as const;
 
     actionIds.forEach((actionId) => {
@@ -56,6 +56,31 @@ describe("character action timeline", () => {
         getCharacterActionRigState(animatedCharacter, 1.25)?.controls
       );
     });
+  });
+
+  it("plays the Codex light dance as a continuous five-second choreography", () => {
+    const dancingCharacter = {
+      ...character,
+      characterActionTrack: {
+        ...character.characterActionTrack!,
+        actionId: "light-dance" as const,
+        duration: 5,
+        playbackMode: "normal" as const,
+      },
+    };
+    const opening = getCharacterActionRigState(dancingCharacter, 0)?.controls ?? {};
+    const kneeLift = getCharacterActionRigState(dancingCharacter, 1)?.controls ?? {};
+    const overhead = getCharacterActionRigState(dancingCharacter, 2)?.controls ?? {};
+    const crouch = getCharacterActionRigState(dancingCharacter, 2.5)?.controls ?? {};
+    const looped = getCharacterActionRigState(dancingCharacter, 5)?.controls ?? {};
+
+    expect(kneeLift["leftKnee.bend"]).toBeGreaterThan(60);
+    expect(overhead["leftShoulder.pitch"]).toBeGreaterThan(70);
+    expect(overhead["rightShoulder.pitch"]).toBeGreaterThan(70);
+    expect(crouch["body.offsetY"]).toBeLessThan(-0.25);
+    expect(looped).toEqual(opening);
+    expect(getCharacterActionRootOffset(dancingCharacter, 1.25)[0]).toBeGreaterThan(0.1);
+    expect(getCharacterActionRootOffset(dancingCharacter, 5)).toEqual([0, 0, 0]);
   });
 
   it("advances camera-driven actions only after the camera has moved", () => {
