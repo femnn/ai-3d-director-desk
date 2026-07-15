@@ -1,5 +1,11 @@
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vitest";
 import { applySceneScript, exportCharacterPackage, exportSceneScript, importCharacterPackage } from "./directorAgent";
+import {
+  getCharacterActionElapsed,
+  isNormalCharacterAnimationPlaying,
+  setCharacterAnimationElapsedSnapshot,
+  stopNormalCharacterAnimations,
+} from "../animation/characterAnimation";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 
 beforeEach(() => {
@@ -7,6 +13,11 @@ beforeEach(() => {
     ...useDirectorStore.getState(),
     ...createInitialDirectorState(),
   });
+});
+
+afterEach(() => {
+  stopNormalCharacterAnimations();
+  setCharacterAnimationElapsedSnapshot(null);
 });
 
 it("restores a panorama and remaps exported camera animation ids during a reset import", () => {
@@ -124,7 +135,7 @@ it("round-trips a reusable character package with color, pose, and video motion 
   expect(clip?.frames).toHaveLength(2);
 });
 
-it("creates and round-trips the Codex light dance through scene scripts", () => {
+it("creates, starts, and round-trips the Codex light dance through scene scripts", async () => {
   applySceneScript({
     reset: true,
     characters: [
@@ -149,6 +160,9 @@ it("creates and round-trips the Codex light dance through scene scripts", () => 
     playbackMode: "normal",
     enabled: true,
   });
+  expect(isNormalCharacterAnimationPlaying()).toBe(true);
+  await new Promise((resolve) => window.setTimeout(resolve, 80));
+  expect(getCharacterActionElapsed(original!.id)).toBeGreaterThan(0);
 
   const exported = exportSceneScript();
   expect(exported.characters?.[0]?.action).toMatchObject({

@@ -176,8 +176,9 @@ apply_scene_script 直接导入的 JSON 对象。
 
 ## 导入与修正流程
 
-1. 将场景 JSON 粘贴到 AI 布景面板并执行，或调用 `apply_scene_script`。
-2. 调用 `screenshot` 获取导演视角截图。
-3. 对照原始意图检查轮廓、尺寸、穿插、朝向和机位构图。
-4. 使用 `update_prop`、`update_character`、`set_camera_view` 修正，不要每次重置整个场景。
-5. 调用 `export_scene_script` 保存可复用命令；单个角色使用 `export_character`。
+1. 文件方式：在 AI 布景面板点击“导入并执行”，可直接选择完整布景 JSON 或 `storyai-character` 独立角色 JSON，选择后立即创建并播放普通循环动作。
+2. 文本方式：将场景 JSON 粘贴到 AI 布景面板后点击“执行布景”，或调用 `apply_scene_script`。
+3. 调用 `screenshot` 获取导演视角截图。
+4. 对照原始意图检查轮廓、尺寸、穿插、朝向和机位构图。
+5. 使用 `update_prop`、`update_character`、`set_camera_view` 修正，不要每次重置整个场景。
+6. 调用 `export_scene_script` 保存可复用命令；单个角色使用 `export_character`。

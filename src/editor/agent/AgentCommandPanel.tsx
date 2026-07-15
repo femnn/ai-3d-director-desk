@@ -36,14 +36,31 @@ export function AgentCommandPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const lineCount = useMemo(() => script.split("\n").length, [script]);
 
+  function isCharacterJson(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    const candidate = payload as Record<string, unknown>;
+    if (candidate.format === "storyai-character") return true;
+    const sceneKeys = ["characters", "props", "groups", "camera", "cameras", "scene", "panorama", "scenePlan"];
+    return !sceneKeys.some((key) => key in candidate) && ("bodyType" in candidate || "type" in candidate) && "action" in candidate;
+  }
+
+  async function executePayload(payload: unknown) {
+    if (isCharacterJson(payload)) {
+      const result = await executeDirectorAgentTool("import_character", payload) as { id?: string };
+      setStatus(`角色已导入并开始播放${result.id ? `（${result.id}）` : ""}`);
+      return;
+    }
+    const result = await executeDirectorAgentTool("apply_scene_script", payload);
+    const summary = result && typeof result === "object" ? result as { characterIds?: string[]; groupIds?: string[]; propIds?: string[]; cameraIds?: string[]; scenePlan?: unknown } : {};
+    setStatus(
+      `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位。普通循环动作已自动播放。`
+    );
+  }
+
   async function applyScript() {
     try {
       const payload = JSON.parse(script) as unknown;
-      const result = await executeDirectorAgentTool("apply_scene_script", payload);
-      const summary = result && typeof result === "object" ? result as { characterIds?: string[]; groupIds?: string[]; propIds?: string[]; cameraIds?: string[]; scenePlan?: unknown } : {};
-      setStatus(
-        `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位。已自动截取当前画面供 agent 复查。`
-      );
+      await executePayload(payload);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "执行失败");
     }
@@ -106,15 +123,21 @@ export function AgentCommandPanel() {
               </button>
               <label>
                 <Upload aria-hidden="true" size={15} />
-                导入命令
+                导入并执行
                 <input
-                  accept="application/json"
+                  accept="application/json,.json"
                   type="file"
                   onChange={async (event) => {
                     const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
                     if (!file) return;
-                    setScript(await file.text());
-                    setStatus(`已导入 ${file.name}`);
+                    try {
+                      const text = await file.text();
+                      setScript(text);
+                      await executePayload(JSON.parse(text) as unknown);
+                    } catch (error) {
+                      setStatus(error instanceof Error ? error.message : "导入执行失败");
+                    }
                   }}
                 />
               </label>

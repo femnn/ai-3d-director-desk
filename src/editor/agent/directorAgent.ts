@@ -26,7 +26,11 @@ import type {
   PanoramaProjectionMode,
   ScenePlan,
 } from "../schema/directorProject";
-import { CHARACTER_ACTION_OPTIONS, MIN_CHARACTER_ACTION_DURATION } from "../animation/characterAnimation";
+import {
+  CHARACTER_ACTION_OPTIONS,
+  MIN_CHARACTER_ACTION_DURATION,
+  syncNormalCharacterAnimations,
+} from "../animation/characterAnimation";
 import type { PosePresetId } from "../schema/poseSchema";
 
 type NumberTuple3 = [number, number, number];
@@ -252,6 +256,19 @@ function applyCharacterAction(id: string, action: SceneScriptCharacter["action"]
     source: action.source === "video" || action.source === "mocap" ? action.source : "built-in",
     motionClipId: motionClipId ?? (typeof action.motionClipId === "string" ? action.motionClipId : null),
   });
+  syncImportedNormalCharacterAnimations();
+}
+
+function syncImportedNormalCharacterAnimations() {
+  const ids = useDirectorStore.getState().project.objects
+    .filter(
+      (object) =>
+        object.kind === "character" &&
+        object.characterActionTrack?.enabled &&
+        object.characterActionTrack.playbackMode === "normal"
+    )
+    .map((object) => object.id);
+  syncNormalCharacterAnimations(ids);
 }
 
 function importCharacterMotionClip(characterId: string, input: SceneScriptCharacterMotionClip | undefined) {
@@ -773,6 +790,7 @@ export function applySceneScript(script: SceneScript = {}) {
     useDirectorStore.getState().setActiveCamera(activeCameraId);
   }
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
+  syncImportedNormalCharacterAnimations();
 
   return {
     characterIds,

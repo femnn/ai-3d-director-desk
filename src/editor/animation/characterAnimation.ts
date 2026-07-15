@@ -528,6 +528,15 @@ export function playNormalCharacterAnimations(characterIds: string[]) {
   emit();
 }
 
+export function syncNormalCharacterAnimations(characterIds: string[]) {
+  normalCharacterIds = new Set(characterIds);
+  characterIds.forEach((id) => {
+    if (!elapsedByCharacterId.has(id)) elapsedByCharacterId.set(id, 0);
+  });
+  ensureRuntimeFrame();
+  emit();
+}
+
 export function stopNormalCharacterAnimations() {
   normalCharacterIds.clear();
   if (runtimeFrame && !hasActiveCameraDrivers()) window.cancelAnimationFrame(runtimeFrame);

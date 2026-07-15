@@ -4,6 +4,7 @@ import { Camera, RotateCcw, X } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorDeskErrorBoundary } from "./app/DirectorDeskErrorBoundary";
 import { AgentCommandPanel } from "./editor/agent/AgentCommandPanel";
+import { stopNormalCharacterAnimations, syncNormalCharacterAnimations } from "./editor/animation/characterAnimation";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { initDirectorDeskHostBridge } from "./editor/io/hostBridge";
 import { CameraAnimationPanel } from "./editor/phone/CameraAnimationPanel";
@@ -25,6 +26,17 @@ export default function App() {
   const cameraMonitorCollapsed = useDirectorStore((state) => state.cameraMonitorCollapsed);
   const setCameraMonitorCollapsed = useDirectorStore((state) => state.setCameraMonitorCollapsed);
   const resetDirectorDesk = useDirectorStore((state) => state.resetDirectorDesk);
+  const normalActionSignature = useDirectorStore((state) =>
+    state.project.objects
+      .filter(
+        (object) =>
+          object.kind === "character" &&
+          object.characterActionTrack?.enabled &&
+          object.characterActionTrack.playbackMode === "normal"
+      )
+      .map((object) => `${object.id}:${object.characterActionTrack?.actionId}:${object.characterActionTrack?.duration}`)
+      .join("|")
+  );
   const isPhoneRoute = window.location.pathname === "/phone";
 
   useEffect(() => {
@@ -44,6 +56,20 @@ export default function App() {
 
     return startDirectorDeskRealtime();
   }, [isPhoneRoute]);
+
+  useEffect(() => {
+    if (isPhoneRoute) return;
+    const characterIds = useDirectorStore.getState().project.objects
+      .filter(
+        (object) =>
+          object.kind === "character" &&
+          object.characterActionTrack?.enabled &&
+          object.characterActionTrack.playbackMode === "normal"
+      )
+      .map((object) => object.id);
+    syncNormalCharacterAnimations(characterIds);
+    return stopNormalCharacterAnimations;
+  }, [isPhoneRoute, normalActionSignature]);
 
   function handleClose() {
     window.parent?.postMessage({ type: "storyai:director-desk-close" }, window.location.origin);
