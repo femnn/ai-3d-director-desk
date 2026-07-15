@@ -597,19 +597,13 @@ function normalizeAnimationSequence(
         }
       });
   }
-  const rawPlaybackMode = value.playbackMode as string | undefined;
-  const playbackMode = rawPlaybackMode === "recording" || rawPlaybackMode === "recording-sync"
-    ? "recording"
-    : rawPlaybackMode === "camera-motion" || rawPlaybackMode === "camera-driven"
-      ? "camera-motion"
-      : "manual";
   return {
     id: value.id,
     name: value.name,
     duration,
-    playbackMode,
-    loop: value.loop !== false,
-    enabled: value.enabled !== false,
+    playbackMode: "manual",
+    loop: true,
+    enabled: true,
     cameraId: typeof value.cameraId === "string" && cameras.some((camera) => camera.id === value.cameraId) ? value.cameraId : null,
     bindings,
     tracks,
@@ -675,6 +669,14 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
         parentId,
         pivot: isFiniteVector(object.pivot, 3) ? object.pivot : [0, 0, 0],
         objectAnimationTrack: normalizeObjectAnimationTrack(object.objectAnimationTrack, object.id, object.name),
+        characterActionTrack: object.characterActionTrack
+          ? {
+              ...object.characterActionTrack,
+              playbackMode: "normal",
+              loop: true,
+              enabled: true,
+            }
+          : undefined,
       };
       if (object.kind !== "character") return normalizedObject;
 
@@ -2704,7 +2706,14 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         project: {
           ...state.project,
           objects: updateObjectById(state.project.objects, id, (item) =>
-            item.kind === "character" ? { ...item, characterActionTrack: track ? cloneJsonValue(track) : undefined } : item
+            item.kind === "character"
+              ? {
+                  ...item,
+                  characterActionTrack: track
+                    ? cloneJsonValue({ ...track, playbackMode: "normal", loop: true, enabled: true })
+                    : undefined,
+                }
+              : item
           ),
         },
       })),
@@ -2715,7 +2724,12 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           ...state.project,
           objects: state.project.objects.map((item) =>
             item.kind === "character" && item.crowdId === crowdId
-              ? { ...item, characterActionTrack: track ? cloneJsonValue(track) : undefined }
+              ? {
+                  ...item,
+                  characterActionTrack: track
+                    ? cloneJsonValue({ ...track, playbackMode: "normal", loop: true, enabled: true })
+                    : undefined,
+                }
               : item
           ),
         },

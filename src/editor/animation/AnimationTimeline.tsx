@@ -1,21 +1,13 @@
-import { useEffect } from "react";
 import { Pause, Play, Repeat2, RotateCcw, Trash2, X } from "lucide-react";
 import {
   pauseAnimationSequence,
   playAnimationSequence,
-  resumeAnimationSequenceRecording,
   scrubAnimationSequence,
   useAnimationSequenceRuntime,
 } from "./animationSequence";
-import type { AnimationSequencePlaybackMode, DirectorAnimationSequence } from "../schema/directorProject";
+import type { DirectorAnimationSequence } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 import { stopNormalCharacterAnimations } from "./characterAnimation";
-
-const MODE_OPTIONS: Array<{ value: AnimationSequencePlaybackMode; label: string }> = [
-  { value: "manual", label: "手动播放" },
-  { value: "recording", label: "录制时播放" },
-  { value: "camera-motion", label: "随镜头运动" },
-];
 
 function createEmptySequence(index: number): DirectorAnimationSequence {
   return {
@@ -44,38 +36,20 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
   const sequence = sequences.find((candidate) => candidate.id === activeId) ?? sequences[0];
   const elapsed = runtime.sequenceId === sequence?.id ? runtime.elapsed : 0;
   const isCurrentSequencePlaying = Boolean(sequence && runtime.sequenceId === sequence.id && runtime.playing);
-  const isCurrentSequenceRecording = Boolean(sequence && runtime.sequenceId === sequence.id && runtime.recording);
-
-  useEffect(() => {
-    if (!sequence || sequence.playbackMode === "manual" || isCurrentSequenceRecording) return;
-    if (runtime.sequenceId !== sequence.id || runtime.playing || runtime.elapsed !== 0) {
-      scrubAnimationSequence(sequence, 0);
-    }
-  }, [isCurrentSequenceRecording, sequence?.id, sequence?.playbackMode]);
 
   const selectSequence = (id: string) => {
     pauseAnimationSequence();
     stopNormalCharacterAnimations();
     setActiveSequence(id);
     const nextSequence = sequences.find((candidate) => candidate.id === id);
-    if (nextSequence) scrubAnimationSequence(nextSequence, 0);
+    if (nextSequence) playAnimationSequence(nextSequence, { reset: true });
   };
 
   const addEmptySequence = () => {
     const id = addSequence(createEmptySequence(sequences.length + 1));
     setActiveSequence(id);
-  };
-
-  const changePlaybackMode = (playbackMode: AnimationSequencePlaybackMode) => {
-    if (!sequence) return;
-    const nextSequence = {
-      ...sequence,
-      playbackMode,
-      loop: playbackMode === "manual" ? true : sequence.loop,
-    };
-    updateSequence(sequence.id, nextSequence);
-    stopNormalCharacterAnimations();
-    scrubAnimationSequence(nextSequence, 0);
+    const created = useDirectorStore.getState().project.animationSequences?.find((candidate) => candidate.id === id);
+    if (created) playAnimationSequence(created, { reset: true });
   };
 
   return (
@@ -99,21 +73,12 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
               aria-label={
                 isCurrentSequencePlaying
                   ? "暂停动画"
-                  : isCurrentSequenceRecording
-                    ? "继续录像动画"
-                    : sequence.playbackMode === "manual"
-                      ? "播放动画"
-                      : "等待手机录像"
+                  : "播放动画"
               }
-              title={sequence.playbackMode === "manual" || isCurrentSequenceRecording ? undefined : "该模式由手机录像启动"}
               type="button"
-              disabled={sequence.playbackMode !== "manual" && !isCurrentSequenceRecording}
               onClick={() => {
                 if (isCurrentSequencePlaying) {
                   pauseAnimationSequence();
-                  stopNormalCharacterAnimations();
-                } else if (isCurrentSequenceRecording) {
-                  resumeAnimationSequenceRecording();
                 } else {
                   stopNormalCharacterAnimations();
                   const playableSequence = sequence.enabled ? sequence : { ...sequence, enabled: true };
@@ -130,30 +95,16 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
               <RotateCcw size={15} />
             </button>
             <select
-              aria-label="动画播放模式"
-              value={sequence.playbackMode}
-              onChange={(event) => changePlaybackMode(event.currentTarget.value as AnimationSequencePlaybackMode)}
-            >
-              {MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <select
               aria-label="动画序列时长"
               value={sequence.duration}
               onChange={(event) => updateSequence(sequence.id, { duration: Number(event.currentTarget.value) as 5 | 10 | 15 })}
             >
               {[5, 10, 15].map((duration) => <option key={duration} value={duration}>{duration}秒</option>)}
             </select>
-            <button
-              className={`animation-timeline-loop${sequence.loop ? " is-active" : ""}`}
-              type="button"
-              aria-label={sequence.loop ? "关闭动画循环" : "开启动画循环"}
-              aria-pressed={sequence.loop}
-              title={sequence.loop ? "关闭动画循环" : "开启动画循环"}
-              onClick={() => updateSequence(sequence.id, { loop: !sequence.loop })}
-            >
+            <span className="animation-timeline-loop is-active" aria-label="动画自动循环">
               <Repeat2 aria-hidden="true" size={15} />
-              {sequence.loop ? "循环开" : "循环关"}
-            </button>
+              自动循环
+            </span>
             <button aria-label="删除动画序列" type="button" onClick={() => deleteSequence(sequence.id)}>
               <Trash2 size={15} />
             </button>

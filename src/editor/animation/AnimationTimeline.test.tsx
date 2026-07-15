@@ -1,8 +1,7 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 import {
-  beginAnimationSequenceRecording,
   getAnimationSequenceRuntimeSnapshot,
   resetAnimationSequenceRuntime,
   scrubAnimationSequence,
@@ -30,61 +29,44 @@ beforeEach(() => {
 
 afterEach(() => resetAnimationSequenceRuntime());
 
-it("shows the unified tracks and exposes only the three user-facing playback modes", () => {
+it("shows unified tracks with one automatic looping playback path", () => {
   render(<AnimationTimeline onClose={() => undefined} />);
   expect(screen.getByRole("region", { name: "统一动画时间轴" })).toBeInTheDocument();
   expect(screen.getByText("界面测试动画")).toBeInTheDocument();
   expect(screen.getByText("角色轨道")).toBeInTheDocument();
-  const mode = screen.getByLabelText("动画播放模式");
-  expect(Array.from(mode.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
-    "手动播放",
-    "录制时播放",
-    "随镜头运动",
-  ]);
+  expect(screen.queryByLabelText("动画播放模式")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("动画自动循环")).toHaveTextContent("自动循环");
   const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
-  scrubAnimationSequence(sequence, 2.5);
-  fireEvent.change(mode, { target: { value: "camera-motion" } });
-  expect(useDirectorStore.getState().project.animationSequences?.[0]?.playbackMode).toBe("camera-motion");
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ elapsed: 0, playing: false, recording: false });
-  expect(screen.getByRole("button", { name: "等待手机录像" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "关闭动画循环" }));
-  expect(useDirectorStore.getState().project.animationSequences?.[0]?.loop).toBe(false);
-  expect(screen.getByRole("button", { name: "开启动画循环" })).toHaveAttribute("aria-pressed", "false");
-  fireEvent.change(mode, { target: { value: "manual" } });
-  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ playbackMode: "manual", loop: true });
-  expect(screen.getByRole("button", { name: "关闭动画循环" })).toHaveAttribute("aria-pressed", "true");
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ elapsed: 0, playing: false, recording: false });
+  expect(sequence).toMatchObject({ playbackMode: "manual", loop: true, enabled: true });
   fireEvent.click(screen.getByRole("button", { name: "播放动画" }));
   expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: true, recording: false });
   fireEvent.click(screen.getByRole("button", { name: "暂停动画" }));
   expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: false });
 });
 
-it("pauses an active recording until the user explicitly resumes it", () => {
+it("starts a newly selected sequence immediately", () => {
+  useDirectorStore.getState().addAnimationSequence({
+    ...useDirectorStore.getState().project.animationSequences![0]!,
+    id: "sequence_two",
+    name: "第二段动画",
+  });
   render(<AnimationTimeline onClose={() => undefined} />);
-  fireEvent.change(screen.getByLabelText("动画播放模式"), { target: { value: "recording" } });
-  const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
-  const cameraId = useDirectorStore.getState().project.cameras[0]!.id;
-  act(() => beginAnimationSequenceRecording(cameraId, [sequence], sequence.id));
-  fireEvent.click(screen.getByRole("button", { name: "暂停动画" }));
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: true });
+  const first = useDirectorStore.getState().project.animationSequences![0]!;
 
-  act(() => beginAnimationSequenceRecording(cameraId, [sequence], sequence.id, { restart: true }));
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: true });
-  fireEvent.click(screen.getByRole("button", { name: "继续录像动画" }));
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: true, recording: true });
+  fireEvent.change(screen.getByLabelText("当前动画序列"), { target: { value: first.id } });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: first.id, playing: true, recording: false });
 });
 
-it("updates duration and loop independently", () => {
+it("updates duration while keeping automatic looping enabled", () => {
   render(<AnimationTimeline onClose={() => undefined} />);
   fireEvent.change(screen.getByLabelText("动画序列时长"), { target: { value: "15" } });
-  fireEvent.click(screen.getByRole("button", { name: "关闭动画循环" }));
-  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, loop: false });
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, loop: true });
 });
 
-it("enables a disabled sequence when the user explicitly presses play", () => {
+it("normalizes disabled sequences before playback", () => {
   const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
   useDirectorStore.getState().updateAnimationSequence(sequence.id, { enabled: false });
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.enabled).toBe(true);
   render(<AnimationTimeline onClose={() => undefined} />);
 
   fireEvent.click(screen.getByRole("button", { name: "播放动画" }));

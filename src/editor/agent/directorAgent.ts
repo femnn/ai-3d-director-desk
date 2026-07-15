@@ -38,7 +38,7 @@ import {
   CHARACTER_ACTION_OPTIONS,
   MIN_CHARACTER_ACTION_DURATION,
   getDefaultCharacterActionDuration,
-  stopNormalCharacterAnimations,
+  syncNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import type { PosePresetId } from "../schema/poseSchema";
 import {
@@ -859,7 +859,11 @@ export function applySceneScript(script: SceneScript = {}) {
     }));
   }
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
-  stopNormalCharacterAnimations();
+  syncNormalCharacterAnimations(
+    useDirectorStore.getState().project.objects
+      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
+      .map((object) => object.id)
+  );
 
   return {
     characterIds,
@@ -1101,11 +1105,11 @@ export function importAnimationSequencePackage(
     useDirectorStore.getState().setActiveAnimationSequence(sequenceId);
     const importedSequence = useDirectorStore.getState().project.animationSequences?.find((item) => item.id === sequenceId);
     if (!importedSequence) throw new Error("动画序列未能写入工程");
-    scrubAnimationSequence(importedSequence, 0);
+    playAnimationSequence(importedSequence, { reset: true });
     return {
       ...reviewAnimationSequence(sequenceId),
-      autoPlaying: false,
-      readyToPlay: importedSequence.playbackMode === "manual" && importedSequence.enabled,
+      autoPlaying: true,
+      readyToPlay: true,
     };
   } finally {
     useDirectorStore.getState().endUndoBatch();

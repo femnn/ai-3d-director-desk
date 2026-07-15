@@ -47,7 +47,6 @@ export function CharacterPanel() {
   const updateCrowdPoseControl = useDirectorStore((state) => state.updateCrowdPoseControl);
   const setCharacterActionTrack = useDirectorStore((state) => state.setCharacterActionTrack);
   const setCrowdCharacterActionTrack = useDirectorStore((state) => state.setCrowdCharacterActionTrack);
-  const cameras = useDirectorStore((state) => state.project.cameras);
   const motionClips = useDirectorStore((state) => state.project.characterMotionClips ?? []);
   const deleteCharacterMotionClip = useDirectorStore((state) => state.deleteCharacterMotionClip);
   const poseEditMode = useDirectorStore((state) => state.poseEditMode);
@@ -482,28 +481,7 @@ export function CharacterPanel() {
             value={getActionTrackDuration(actionTrack)}
             onValueChange={(value) => updateActionTrack({ duration: Number(value) })}
           />
-          <InspectorSelectField
-            label="播放方式"
-            ariaLabel="角色动作播放方式"
-            value={actionTrack.playbackMode}
-            options={[
-              { value: "normal", label: "手动播放" },
-              { value: "camera-driven", label: "随镜头运动" },
-            ]}
-            onChange={(value) => updateActionTrack({ playbackMode: value as "normal" | "camera-driven" })}
-          />
-          {actionTrack.playbackMode === "camera-driven" ? (
-            <InspectorSelectField
-              label="关联机位"
-              ariaLabel="动作关联机位"
-              value={actionTrack.cameraId ?? ""}
-              options={[
-                { value: "", label: "当前录制机位" },
-                ...cameras.map((camera) => ({ value: camera.id, label: camera.name })),
-              ]}
-              onChange={(value) => updateActionTrack({ cameraId: value || null })}
-            />
-          ) : null}
+          <p className="inspector-help-text">打开导演台后自动循环播放。</p>
           <div className="inspector-action-row" role="group" aria-label="角色动画播放">
             <button type="button" onClick={playAllNormalActions}>播放动画</button>
             <button type="button" onClick={stopNormalCharacterAnimations}>暂停动画</button>

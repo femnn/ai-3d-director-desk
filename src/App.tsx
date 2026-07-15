@@ -4,11 +4,11 @@ import { Camera, RotateCcw, X } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorDeskErrorBoundary } from "./app/DirectorDeskErrorBoundary";
 import { AgentCommandPanel } from "./editor/agent/AgentCommandPanel";
-import { stopNormalCharacterAnimations } from "./editor/animation/characterAnimation";
+import { stopNormalCharacterAnimations, syncNormalCharacterAnimations } from "./editor/animation/characterAnimation";
 import {
   getAnimationSequenceRuntimeSnapshot,
+  playAnimationSequence,
   resetAnimationSequenceRuntime,
-  scrubAnimationSequence,
   syncAnimationSequenceRuntimeDefinition,
 } from "./editor/animation/animationSequence";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
@@ -35,6 +35,12 @@ export default function App() {
   const activeAnimationSequence = useDirectorStore((state) =>
     (state.project.animationSequences ?? []).find((sequence) => sequence.id === state.project.activeAnimationSequenceId)
   );
+  const normalActionSignature = useDirectorStore((state) =>
+    state.project.objects
+      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
+      .map((object) => `${object.id}:${object.characterActionTrack?.actionId}:${object.characterActionTrack?.duration}`)
+      .join("|")
+  );
   const isPhoneRoute = window.location.pathname === "/phone";
 
   useEffect(() => {
@@ -57,9 +63,12 @@ export default function App() {
 
   useEffect(() => {
     if (isPhoneRoute) return;
-    stopNormalCharacterAnimations();
+    const characterIds = useDirectorStore.getState().project.objects
+      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
+      .map((object) => object.id);
+    syncNormalCharacterAnimations(characterIds);
     return stopNormalCharacterAnimations;
-  }, [isPhoneRoute]);
+  }, [isPhoneRoute, normalActionSignature]);
 
   useEffect(() => {
     if (isPhoneRoute) return;
@@ -69,7 +78,7 @@ export default function App() {
     }
     const runtimeMatches = syncAnimationSequenceRuntimeDefinition(activeAnimationSequence);
     if (!runtimeMatches) {
-      scrubAnimationSequence(activeAnimationSequence, 0);
+      playAnimationSequence(activeAnimationSequence, { reset: true });
     }
   }, [
     activeAnimationSequence?.cameraId,

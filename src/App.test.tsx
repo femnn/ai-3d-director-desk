@@ -28,7 +28,7 @@ afterEach(() => {
   resetAnimationSequenceRuntime();
 });
 
-it("stops legacy character actions when the director desk starts", () => {
+it("starts saved character actions when the director desk starts", () => {
   const character = useDirectorStore.getState().project.objects.find((object) => object.kind === "character")!;
   useDirectorStore.getState().setCharacterActionTrack(character.id, {
     actionId: "walk",
@@ -42,10 +42,10 @@ it("stops legacy character actions when the director desk starts", () => {
 
   render(<App />);
 
-  expect(isNormalCharacterAnimationPlaying()).toBe(false);
+  expect(isNormalCharacterAnimationPlaying()).toBe(true);
 });
 
-it("keeps the active animation sequence stopped at zero after the director desk starts", () => {
+it("starts the active animation sequence automatically after the director desk starts", () => {
   const state = createInitialDirectorState();
   state.project.animationSequences = [{
     id: "saved-sequence",
@@ -63,17 +63,18 @@ it("keeps the active animation sequence stopped at zero after the director desk 
 
   render(<App />);
 
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true, elapsed: 0 });
 
   act(() => {
     useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "recording" });
   });
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ playbackMode: "manual", loop: true, enabled: true });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
 
   act(() => {
     useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "manual" });
   });
-  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
 
   act(() => {
     useDirectorStore.getState().setActiveAnimationSequence(null);

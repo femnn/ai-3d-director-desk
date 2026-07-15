@@ -769,11 +769,7 @@ it("migrates persisted procedural characters to the built-in UE4 mannequin rig",
   });
 });
 
-it.each([
-  ["normal", "manual"],
-  ["recording-sync", "recording"],
-  ["camera-driven", "camera-motion"],
-] as const)("migrates legacy animation sequence mode %s to %s", (legacyMode, expectedMode) => {
+it.each(["normal", "recording-sync", "camera-driven"] as const)("migrates legacy animation sequence mode %s to automatic looping", (legacyMode) => {
   const project = createDefaultDirectorProject();
   const character = project.objects.find((item) => item.kind === "character")!;
   project.animationSequences = [{
@@ -781,8 +777,8 @@ it.each([
     name: "旧动画",
     duration: 5,
     playbackMode: legacyMode as never,
-    loop: true,
-    enabled: true,
+    loop: false,
+    enabled: false,
     cameraId: null,
     bindings: [{ alias: "actor", objectId: character.id, objectName: character.name }],
     tracks: [],
@@ -791,7 +787,11 @@ it.each([
 
   useDirectorStore.getState().replaceProject(project);
 
-  expect(useDirectorStore.getState().project.animationSequences?.[0]?.playbackMode).toBe(expectedMode);
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({
+    playbackMode: "manual",
+    loop: true,
+    enabled: true,
+  });
 });
 
 it("sanitizes malformed external object animation keyframes during project migration", () => {
