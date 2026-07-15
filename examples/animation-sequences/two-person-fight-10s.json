@@ -13,7 +13,7 @@
         "id": "sequence_two_person_fight",
         "name": "双人攻防10秒",
         "duration": 10,
-        "playbackMode": "recording",
+        "playbackMode": "manual",
         "loop": true,
         "enabled": true,
         "cameraId": "fight_camera",

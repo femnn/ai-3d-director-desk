@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "./editor/store/directorStore";
+import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime } from "./editor/animation/animationSequence";
 
 vi.mock("./editor/canvas/DirectorCanvas", () => ({
   DirectorCanvas: () => <div data-testid="mock-director-canvas" />,
@@ -10,10 +11,51 @@ vi.mock("./editor/canvas/DirectorCanvas", () => ({
 import App from "./App";
 
 beforeEach(() => {
+  resetAnimationSequenceRuntime();
   useDirectorStore.setState({
     ...useDirectorStore.getState(),
     ...createInitialDirectorState(),
   });
+});
+
+afterEach(() => {
+  resetAnimationSequenceRuntime();
+});
+
+it("resumes the active manual animation sequence after the director desk starts", () => {
+  const state = createInitialDirectorState();
+  state.project.animationSequences = [{
+    id: "saved-sequence",
+    name: "保存的动画",
+    duration: 5,
+    playbackMode: "manual",
+    loop: true,
+    enabled: true,
+    cameraId: null,
+    bindings: [],
+    tracks: [],
+  }];
+  state.project.activeAnimationSequenceId = "saved-sequence";
+  useDirectorStore.setState({ ...useDirectorStore.getState(), ...state });
+
+  render(<App />);
+
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
+
+  act(() => {
+    useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "recording" });
+  });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: false, elapsed: 0 });
+
+  act(() => {
+    useDirectorStore.getState().updateAnimationSequence("saved-sequence", { playbackMode: "manual" });
+  });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: "saved-sequence", playing: true });
+
+  act(() => {
+    useDirectorStore.getState().setActiveAnimationSequence(null);
+  });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: null, playing: false, elapsed: 0 });
 });
 
 it("renders the director desk header and view mode switch", () => {

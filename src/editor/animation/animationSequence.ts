@@ -154,6 +154,16 @@ export function scrubAnimationSequence(sequence: DirectorAnimationSequence, elap
   stopRuntimeFrame();
 }
 
+export function syncAnimationSequenceRuntimeDefinition(sequence: DirectorAnimationSequence) {
+  if (runtime.sequenceId !== sequence.id) return false;
+  activeSequence = sequence;
+  const elapsed = Math.min(runtime.elapsed, sequence.duration);
+  if (elapsed !== runtime.elapsed || runtime.cameraId !== (sequence.cameraId ?? null)) {
+    emit({ elapsed, cameraId: sequence.cameraId ?? null });
+  }
+  return true;
+}
+
 export function beginAnimationSequenceRecording(
   cameraId: string,
   sequences: DirectorAnimationSequence[],

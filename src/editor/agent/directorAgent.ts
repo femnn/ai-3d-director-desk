@@ -1099,10 +1099,22 @@ export function importAnimationSequencePackage(
   try {
     const sequence = resolveAnimationSequence(value, authoredIdMap);
     const existing = useDirectorStore.getState().project.animationSequences?.some((item) => item.id === sequence.id);
-    if (existing) useDirectorStore.getState().updateAnimationSequence(sequence.id, sequence);
-    else useDirectorStore.getState().addAnimationSequence(sequence);
-    useDirectorStore.getState().setActiveAnimationSequence(sequence.id);
-    return reviewAnimationSequence(sequence.id);
+    const sequenceId = existing
+      ? sequence.id
+      : useDirectorStore.getState().addAnimationSequence(sequence);
+    if (existing) useDirectorStore.getState().updateAnimationSequence(sequenceId, sequence);
+    useDirectorStore.getState().setActiveAnimationSequence(sequenceId);
+    const importedSequence = useDirectorStore.getState().project.animationSequences?.find((item) => item.id === sequenceId);
+    if (!importedSequence) throw new Error("动画序列未能写入工程");
+    if (importedSequence.playbackMode === "manual") {
+      playAnimationSequence(importedSequence, { reset: true });
+    } else {
+      scrubAnimationSequence(importedSequence, 0);
+    }
+    return {
+      ...reviewAnimationSequence(sequenceId),
+      autoPlaying: importedSequence.playbackMode === "manual" && importedSequence.enabled,
+    };
   } finally {
     useDirectorStore.getState().endUndoBatch();
   }

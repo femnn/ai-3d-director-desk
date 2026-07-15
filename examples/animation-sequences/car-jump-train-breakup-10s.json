@@ -59,7 +59,7 @@
         "id": "sequence_car_jump_breakup",
         "name": "汽车飞跃火车并解体",
         "duration": 10,
-        "playbackMode": "recording",
+        "playbackMode": "manual",
         "loop": false,
         "enabled": true,
         "cameraId": "stunt_camera",

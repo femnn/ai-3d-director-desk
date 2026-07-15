@@ -66,8 +66,9 @@ export function AgentCommandPanel() {
         duration?: number;
         trackCount?: number;
         warnings?: string[];
+        autoPlaying?: boolean;
       };
-      setStatus(`动画“${result.name ?? "未命名"}”已导入：${result.duration ?? 0}秒、${result.trackCount ?? 0}条轨道${result.warnings?.length ? `；${result.warnings.length}项警告` : ""}。`);
+      setStatus(`动画“${result.name ?? "未命名"}”已导入：${result.duration ?? 0}秒、${result.trackCount ?? 0}条轨道${result.autoPlaying ? "，已开始播放" : "，等待录制触发"}${result.warnings?.length ? `；${result.warnings.length}项警告` : ""}。`);
       return;
     }
     if (isObjectSculptJson(payload)) {
@@ -95,10 +96,10 @@ export function AgentCommandPanel() {
       cameraIds?: string[];
       scenePlan?: unknown;
       proceduralWarnings?: string[];
-      animationSequenceReviews?: unknown[];
+      animationSequenceReviews?: Array<{ autoPlaying?: boolean }>;
     } : {};
     const sequenceMessage = summary.animationSequenceReviews?.length
-      ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列，请按序列模式播放`
+      ? `；已载入 ${summary.animationSequenceReviews.length} 个统一动画序列${summary.animationSequenceReviews.some((review) => review.autoPlaying) ? "并开始播放" : "，等待录制触发"}`
       : "";
     setStatus(
       `已完成：${summary.characterIds?.length ?? 0} 个角色、${summary.groupIds?.length ?? 0} 个组合、${summary.propIds?.length ?? 0} 个部件、${summary.cameraIds?.length ?? 0} 个机位${summary.proceduralWarnings?.length ? `；${summary.proceduralWarnings.length} 项采用安全近似` : ""}${sequenceMessage}。`

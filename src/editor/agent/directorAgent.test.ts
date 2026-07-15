@@ -15,6 +15,7 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
+import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime } from "../animation/animationSequence";
 import danceExample from "../../../examples/animation-sequences/ai-dance-15s.json";
 import fightExample from "../../../examples/animation-sequences/two-person-fight-10s.json";
 import carJumpExample from "../../../examples/animation-sequences/car-jump-train-breakup-10s.json";
@@ -29,6 +30,7 @@ beforeEach(() => {
 afterEach(() => {
   stopNormalCharacterAnimations();
   setCharacterAnimationElapsedSnapshot(null);
+  resetAnimationSequenceRuntime();
 });
 
 it("restores a panorama and remaps exported camera animation ids during a reset import", () => {
@@ -384,6 +386,7 @@ it("imports an external multi-object animation package and round-trips its bindi
     expect(characterTrack.motionClipId).not.toBe("clip_external");
   }
   expect(reviewAnimationSequence(sequence.id).warnings).toEqual([]);
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: sequence.id, playing: false, elapsed: 0 });
 
   const exported = exportAnimationSequencePackage(sequence.id);
   useDirectorStore.getState().deleteAnimationSequence(sequence.id);
@@ -393,23 +396,30 @@ it("imports an external multi-object animation package and round-trips its bindi
 });
 
 it("applies the shipped dance, fight, and car stunt animation examples", () => {
-  const dance = importAnimationSequencePackage(danceExample as never);
-  expect(dance).toMatchObject({ duration: 15, trackCount: 1 });
+  applySceneScript(danceExample as never);
+  expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(1);
+  expect(useDirectorStore.getState().project.objects.find((item) => item.kind === "character")?.name).toBe("AI舞者");
+  expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, playbackMode: "manual" });
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({
+    sequenceId: useDirectorStore.getState().project.animationSequences?.[0]?.id,
+    playing: true,
+  });
 
   applySceneScript(fightExample as never);
   expect(useDirectorStore.getState().project.objects.filter((item) => item.kind === "character")).toHaveLength(2);
   expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({
     duration: 10,
-    playbackMode: "recording",
+    playbackMode: "manual",
   });
   expect(useDirectorStore.getState().project.animationSequences?.[0]?.tracks).toHaveLength(2);
+  expect(getAnimationSequenceRuntimeSnapshot().playing).toBe(true);
 
   applySceneScript(carJumpExample as never);
   const state = useDirectorStore.getState();
   const carSequence = state.project.animationSequences?.[0];
   expect(carSequence).toMatchObject({
     duration: 10,
-    playbackMode: "recording",
+    playbackMode: "manual",
     loop: false,
   });
   expect(carSequence?.bindings).toHaveLength(7);
@@ -418,6 +428,7 @@ it("applies the shipped dance, fight, and car stunt animation examples", () => {
   expect(carSequence?.bindings.every((binding) =>
     state.project.objects.some((item) => item.id === binding.objectId)
   )).toBe(true);
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: carSequence?.id, playing: true });
 });
 
 it("applies a complete AI scene and its animation sequences as one undo batch", () => {
