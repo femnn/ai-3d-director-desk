@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, Trash2, X } from "lucide-react";
+import { Pause, Play, Repeat2, RotateCcw, Trash2, X } from "lucide-react";
 import {
   pauseAnimationSequence,
   playAnimationSequence,
@@ -51,6 +51,21 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
     setActiveSequence(id);
   };
 
+  const changePlaybackMode = (playbackMode: AnimationSequencePlaybackMode) => {
+    if (!sequence) return;
+    const nextSequence = {
+      ...sequence,
+      playbackMode,
+      loop: playbackMode === "manual" ? true : sequence.loop,
+    };
+    updateSequence(sequence.id, nextSequence);
+    if (playbackMode === "manual") {
+      playAnimationSequence(nextSequence, { reset: true });
+    } else {
+      scrubAnimationSequence(nextSequence, 0);
+    }
+  };
+
   return (
     <section className="animation-timeline" aria-label="统一动画时间轴">
       <header className="animation-timeline-header">
@@ -83,13 +98,7 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
             <select
               aria-label="动画播放模式"
               value={sequence.playbackMode}
-              onChange={(event) => {
-                const playbackMode = event.currentTarget.value as AnimationSequencePlaybackMode;
-                updateSequence(sequence.id, {
-                  playbackMode,
-                  ...(playbackMode === "manual" ? { loop: true } : {}),
-                });
-              }}
+              onChange={(event) => changePlaybackMode(event.currentTarget.value as AnimationSequencePlaybackMode)}
             >
               {MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
@@ -100,14 +109,17 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
             >
               {[5, 10, 15].map((duration) => <option key={duration} value={duration}>{duration}秒</option>)}
             </select>
-            <label className="animation-timeline-loop">
-              <input
-                checked={sequence.loop}
-                type="checkbox"
-                onChange={(event) => updateSequence(sequence.id, { loop: event.currentTarget.checked })}
-              />
-              循环播放
-            </label>
+            <button
+              className={`animation-timeline-loop${sequence.loop ? " is-active" : ""}`}
+              type="button"
+              aria-label={sequence.loop ? "关闭动画循环" : "开启动画循环"}
+              aria-pressed={sequence.loop}
+              title={sequence.loop ? "关闭动画循环" : "开启动画循环"}
+              onClick={() => updateSequence(sequence.id, { loop: !sequence.loop })}
+            >
+              <Repeat2 aria-hidden="true" size={15} />
+              {sequence.loop ? "循环开" : "循环关"}
+            </button>
             <button aria-label="删除动画序列" type="button" onClick={() => deleteSequence(sequence.id)}>
               <Trash2 size={15} />
             </button>

@@ -545,6 +545,12 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.animation-timeline button.animation-timeline-loop.is-active {
+  border-color: rgb(var(--accent-rgb) / 0.8);
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+
 .animation-timeline-close {
   margin-left: auto;
 }

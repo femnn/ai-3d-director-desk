@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
-import { resetAnimationSequenceRuntime } from "./animationSequence";
+import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime, scrubAnimationSequence } from "./animationSequence";
 import { AnimationTimeline } from "./AnimationTimeline";
 
 beforeEach(() => {
@@ -36,17 +36,22 @@ it("shows the unified tracks and exposes only the three user-facing playback mod
     "录制时播放",
     "随镜头运动",
   ]);
+  const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
+  scrubAnimationSequence(sequence, 2.5);
   fireEvent.change(mode, { target: { value: "camera-motion" } });
   expect(useDirectorStore.getState().project.animationSequences?.[0]?.playbackMode).toBe("camera-motion");
-  fireEvent.click(screen.getByLabelText("循环播放"));
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ elapsed: 0, playing: false, recording: false });
+  fireEvent.click(screen.getByRole("button", { name: "关闭动画循环" }));
   expect(useDirectorStore.getState().project.animationSequences?.[0]?.loop).toBe(false);
+  expect(screen.getByRole("button", { name: "开启动画循环" })).toHaveAttribute("aria-pressed", "false");
   fireEvent.change(mode, { target: { value: "manual" } });
   expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ playbackMode: "manual", loop: true });
+  expect(screen.getByRole("button", { name: "关闭动画循环" })).toHaveAttribute("aria-pressed", "true");
 });
 
 it("updates duration and loop independently", () => {
   render(<AnimationTimeline onClose={() => undefined} />);
   fireEvent.change(screen.getByLabelText("动画序列时长"), { target: { value: "15" } });
-  fireEvent.click(screen.getByLabelText("循环播放"));
+  fireEvent.click(screen.getByRole("button", { name: "关闭动画循环" }));
   expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, loop: false });
 });
