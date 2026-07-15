@@ -1174,7 +1174,8 @@ function ObjectSceneNode({
     : undefined;
   const animatedCharacter = useAnimatedCharacterRigState(item, motionClip);
   const sequenceRuntime = useAnimationSequenceRuntime();
-  const sequenceCharacterTrack = animationSequence && sequenceRuntime.sequenceId === animationSequence.id
+  const sequenceControlsScene = Boolean(animationSequence && sequenceRuntime.sequenceId === animationSequence.id);
+  const sequenceCharacterTrack = animationSequence && sequenceControlsScene
     ? findSequenceTrackForObject(animationSequence, item.id, "character")
     : undefined;
   const sequenceMotionClip = sequenceCharacterTrack?.type === "character" && sequenceCharacterTrack.motionClipId
@@ -1193,18 +1194,18 @@ function ObjectSceneNode({
   const editingPose = poseEditMode && selected && item.characterRig?.rigType === "ue4-mannequin" && !item.assetRefId;
   const visibleRigState = editingPose
     ? item.characterRig
-    : hasActiveSequenceCharacterTrack
-      ? sequenceCharacter?.rigState ?? item.characterRig
+    : sequenceControlsScene
+      ? hasActiveSequenceCharacterTrack ? sequenceCharacter?.rigState ?? item.characterRig : item.characterRig
       : animatedCharacter.rigState;
   const visibleRootOffset: [number, number, number] = editingPose
     ? [0, 0, 0]
-    : hasActiveSequenceCharacterTrack
-      ? sequenceCharacter?.rootOffset ?? [0, 0, 0]
+    : sequenceControlsScene
+      ? hasActiveSequenceCharacterTrack ? sequenceCharacter?.rootOffset ?? [0, 0, 0] : [0, 0, 0]
       : animatedCharacter.rootOffset;
   const visibleRootRotation: [number, number, number] = editingPose
     ? [0, 0, 0]
-    : hasActiveSequenceCharacterTrack
-      ? sequenceCharacter?.rootRotation ?? [0, 0, 0]
+    : sequenceControlsScene
+      ? hasActiveSequenceCharacterTrack ? sequenceCharacter?.rootRotation ?? [0, 0, 0] : [0, 0, 0]
       : [0, 0, 0];
   const isImportedModel = asset?.sourceType === "model";
   const characterLabelKey = `${item.id}:${item.bodyType ?? ""}:${item.characterRig?.rigType ?? ""}`;
@@ -1281,7 +1282,9 @@ function ObjectSceneNode({
             <ImportedModel
               animated={asset.animated}
               animationDuration={item.characterActionTrack ? getActionTrackDuration(item.characterActionTrack) : undefined}
-              animationElapsed={sequenceCharacter?.elapsed ?? (item.characterActionTrack?.enabled ? animatedCharacter.elapsed : undefined)}
+              animationElapsed={sequenceControlsScene
+                ? sequenceCharacter?.elapsed ?? 0
+                : item.characterActionTrack?.enabled ? animatedCharacter.elapsed : undefined}
               color={item.color}
               fileName={asset.fileName}
               url={asset.url}
@@ -1358,11 +1361,14 @@ function ObjectAnimationRig({
     const group = targetRef.current;
     if (!group) return;
     const runtime = getAnimationSequenceRuntimeSnapshot();
-    const sequenceTrack = animationSequence && runtime.sequenceId === animationSequence.id
+    const sequenceControlsScene = Boolean(animationSequence && runtime.sequenceId === animationSequence.id);
+    const sequenceTrack = animationSequence && sequenceControlsScene
       ? findSequenceTrackForObject(animationSequence, item.id, "object")
       : undefined;
-    const sampled = sequenceTrack?.type === "object"
-      ? sampleSequenceObject(animationSequence!, sequenceTrack, runtime.elapsed, item.transform)
+    const sampled = sequenceControlsScene
+      ? sequenceTrack?.type === "object"
+        ? sampleSequenceObject(animationSequence!, sequenceTrack, runtime.elapsed, item.transform)
+        : item.transform
       : item.objectAnimationTrack?.enabled
         ? sampleObjectAnimation(item.objectAnimationTrack, getObjectAnimationElapsed(item), item.transform)
         : null;

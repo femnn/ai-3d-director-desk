@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { Pause, Play, Repeat2, RotateCcw, Trash2, X } from "lucide-react";
 import {
   pauseAnimationSequence,
   playAnimationSequence,
+  resumeAnimationSequenceRecording,
   scrubAnimationSequence,
   useAnimationSequenceRuntime,
 } from "./animationSequence";
@@ -40,6 +42,15 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
   const runtime = useAnimationSequenceRuntime();
   const sequence = sequences.find((candidate) => candidate.id === activeId) ?? sequences[0];
   const elapsed = runtime.sequenceId === sequence?.id ? runtime.elapsed : 0;
+  const isCurrentSequencePlaying = Boolean(sequence && runtime.sequenceId === sequence.id && runtime.playing);
+  const isCurrentSequenceRecording = Boolean(sequence && runtime.sequenceId === sequence.id && runtime.recording);
+
+  useEffect(() => {
+    if (!sequence || sequence.playbackMode === "manual" || isCurrentSequenceRecording) return;
+    if (runtime.sequenceId !== sequence.id || runtime.playing || runtime.elapsed !== 0) {
+      scrubAnimationSequence(sequence, 0);
+    }
+  }, [isCurrentSequenceRecording, sequence?.id, sequence?.playbackMode]);
 
   const selectSequence = (id: string) => {
     pauseAnimationSequence();
@@ -84,13 +95,29 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
         {sequence ? (
           <div className="animation-timeline-controls" role="group" aria-label="动画播放控制">
             <button
-              aria-label={runtime.playing && runtime.sequenceId === sequence.id ? "暂停动画" : "播放动画"}
+              aria-label={
+                isCurrentSequencePlaying
+                  ? "暂停动画"
+                  : isCurrentSequenceRecording
+                    ? "继续录像动画"
+                    : sequence.playbackMode === "manual"
+                      ? "播放动画"
+                      : "等待手机录像"
+              }
+              title={sequence.playbackMode === "manual" || isCurrentSequenceRecording ? undefined : "该模式由手机录像启动"}
               type="button"
-              onClick={() => runtime.playing && runtime.sequenceId === sequence.id
-                ? pauseAnimationSequence()
-                : playAnimationSequence(sequence, { reset: runtime.sequenceId !== sequence.id || runtime.elapsed >= sequence.duration })}
+              disabled={sequence.playbackMode !== "manual" && !isCurrentSequenceRecording}
+              onClick={() => {
+                if (isCurrentSequencePlaying) {
+                  pauseAnimationSequence();
+                } else if (isCurrentSequenceRecording) {
+                  resumeAnimationSequenceRecording();
+                } else {
+                  playAnimationSequence(sequence, { reset: runtime.sequenceId !== sequence.id || runtime.elapsed >= sequence.duration });
+                }
+              }}
             >
-              {runtime.playing && runtime.sequenceId === sequence.id ? <Pause size={15} /> : <Play size={15} />}
+              {isCurrentSequencePlaying ? <Pause size={15} /> : <Play size={15} />}
             </button>
             <button aria-label="回到开头" type="button" onClick={() => scrubAnimationSequence(sequence, 0)}>
               <RotateCcw size={15} />

@@ -47,6 +47,7 @@ let lastFrameAt = 0;
 let lastMovementAt = 0;
 let lastCameraSample: CameraSample | null = null;
 let manualPreview = false;
+let recordingPauseRequested = false;
 let lastRuntimeNotifyAt = 0;
 const listeners = new Set<() => void>();
 
@@ -119,6 +120,7 @@ function ensureRuntimeFrame() {
 export function playAnimationSequence(sequence: DirectorAnimationSequence, options: { reset?: boolean } = {}) {
   activeSequence = sequence;
   manualPreview = true;
+  recordingPauseRequested = false;
   const reset = options.reset ?? runtime.sequenceId !== sequence.id;
   emit({
     sequenceId: sequence.id,
@@ -136,13 +138,22 @@ export function playAnimationSequence(sequence: DirectorAnimationSequence, optio
 
 export function pauseAnimationSequence() {
   manualPreview = false;
-  emit({ playing: false, recording: false, cameraMoving: false });
+  recordingPauseRequested = runtime.recording;
+  emit({ playing: false, cameraMoving: false });
   stopRuntimeFrame();
+}
+
+export function resumeAnimationSequenceRecording() {
+  if (!runtime.recording || !activeSequence) return;
+  recordingPauseRequested = false;
+  emit({ playing: activeSequence.enabled, cameraMoving: false });
+  ensureRuntimeFrame();
 }
 
 export function scrubAnimationSequence(sequence: DirectorAnimationSequence, elapsed: number) {
   activeSequence = sequence;
   manualPreview = false;
+  recordingPauseRequested = false;
   emit({
     sequenceId: sequence.id,
     elapsed: Math.min(sequence.duration, Math.max(0, elapsed)),
@@ -182,9 +193,12 @@ export function beginAnimationSequenceRecording(
         canRecord(candidate)
     );
   if (!sequence) return;
-  if (!options.restart && runtime.recording && runtime.cameraId === cameraId && runtime.sequenceId === sequence.id) return;
+  const sameRecording = runtime.recording && runtime.cameraId === cameraId && runtime.sequenceId === sequence.id;
+  if (sameRecording && recordingPauseRequested) return;
+  if (!options.restart && sameRecording) return;
   activeSequence = sequence;
   manualPreview = false;
+  recordingPauseRequested = false;
   lastCameraSample = null;
   lastMovementAt = 0;
   emit({
@@ -220,6 +234,7 @@ export function endAnimationSequenceRecording(cameraId: string) {
   if (!runtime.recording || runtime.cameraId !== cameraId) return;
   emit({ playing: false, recording: false, cameraMoving: false });
   manualPreview = false;
+  recordingPauseRequested = false;
   stopRuntimeFrame();
 }
 
@@ -227,6 +242,7 @@ export function setAnimationSequenceRuntimeSnapshot(snapshot: AnimationSequenceR
   if (!snapshot) return;
   activeSequence = null;
   manualPreview = false;
+  recordingPauseRequested = false;
   stopRuntimeFrame();
   runtime = { ...snapshot };
   listeners.forEach((listener) => listener());
@@ -235,6 +251,7 @@ export function setAnimationSequenceRuntimeSnapshot(snapshot: AnimationSequenceR
 export function resetAnimationSequenceRuntime() {
   activeSequence = null;
   manualPreview = false;
+  recordingPauseRequested = false;
   lastCameraSample = null;
   lastMovementAt = 0;
   stopRuntimeFrame();

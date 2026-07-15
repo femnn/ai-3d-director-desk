@@ -5,8 +5,10 @@ import {
   endAnimationSequenceRecording,
   getAnimationSequenceRuntimeSnapshot,
   playAnimationSequence,
+  pauseAnimationSequence,
   reportAnimationSequenceCameraMovement,
   resetAnimationSequenceRuntime,
+  resumeAnimationSequenceRecording,
   sampleSequenceCharacter,
   sampleSequenceObject,
 } from "./animationSequence";
@@ -99,6 +101,25 @@ describe("unified animation sequence clock", () => {
       recording: true,
       playing: true,
     });
+  });
+
+  it("keeps a user-paused recording sequence stopped when more phone frames arrive", () => {
+    const recordingSequence = { ...sequence, playbackMode: "recording" as const };
+    beginAnimationSequenceRecording("cam_1", [recordingSequence], recordingSequence.id);
+    step(16);
+    step(50);
+    pauseAnimationSequence();
+    const pausedAt = getAnimationSequenceRuntimeSnapshot().elapsed;
+    expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: true });
+
+    beginAnimationSequenceRecording("cam_1", [recordingSequence], recordingSequence.id, { restart: true });
+    step(80);
+    expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: false, recording: true, elapsed: pausedAt });
+
+    resumeAnimationSequenceRecording();
+    step(114);
+    expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ playing: true, recording: true });
+    expect(getAnimationSequenceRuntimeSnapshot().elapsed).toBeGreaterThan(pausedAt);
   });
 
   it("holds camera-motion sequences until movement crosses the jitter threshold", () => {
