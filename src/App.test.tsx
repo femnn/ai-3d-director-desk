@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "./editor/store/directorStore";
-import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime } from "./editor/animation/animationSequence";
+import { getAnimationSequenceRuntimeSnapshot, playAnimationSequence, resetAnimationSequenceRuntime } from "./editor/animation/animationSequence";
 import {
   isNormalCharacterAnimationPlaying,
   stopNormalCharacterAnimations,
@@ -79,6 +79,30 @@ it("keeps the active animation sequence stopped at zero after the director desk 
     useDirectorStore.getState().setActiveAnimationSequence(null);
   });
   expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: null, playing: false, elapsed: 0 });
+});
+
+it("does not stop a playing sequence when its saved definition is refreshed", () => {
+  const state = createInitialDirectorState();
+  const sequence = {
+    id: "playing-sequence",
+    name: "正在播放的动画",
+    duration: 5 as const,
+    playbackMode: "manual" as const,
+    loop: true,
+    enabled: true,
+    cameraId: null,
+    bindings: [],
+    tracks: [],
+  };
+  state.project.animationSequences = [sequence];
+  state.project.activeAnimationSequenceId = sequence.id;
+  useDirectorStore.setState({ ...useDirectorStore.getState(), ...state });
+  render(<App />);
+
+  act(() => playAnimationSequence(sequence));
+  act(() => useDirectorStore.getState().updateAnimationSequence(sequence.id, { loop: false }));
+
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: sequence.id, playing: true });
 });
 
 it("renders the director desk header and view mode switch", () => {

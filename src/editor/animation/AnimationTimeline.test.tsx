@@ -81,3 +81,14 @@ it("updates duration and loop independently", () => {
   fireEvent.click(screen.getByRole("button", { name: "关闭动画循环" }));
   expect(useDirectorStore.getState().project.animationSequences?.[0]).toMatchObject({ duration: 15, loop: false });
 });
+
+it("enables a disabled sequence when the user explicitly presses play", () => {
+  const sequence = useDirectorStore.getState().project.animationSequences?.[0]!;
+  useDirectorStore.getState().updateAnimationSequence(sequence.id, { enabled: false });
+  render(<AnimationTimeline onClose={() => undefined} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "播放动画" }));
+
+  expect(useDirectorStore.getState().project.animationSequences?.[0]?.enabled).toBe(true);
+  expect(getAnimationSequenceRuntimeSnapshot()).toMatchObject({ sequenceId: sequence.id, playing: true });
+});

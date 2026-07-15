@@ -1,5 +1,5 @@
 import "./styles/index.css";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Camera, RotateCcw, X } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorDeskErrorBoundary } from "./app/DirectorDeskErrorBoundary";
@@ -35,10 +35,6 @@ export default function App() {
   const activeAnimationSequence = useDirectorStore((state) =>
     (state.project.animationSequences ?? []).find((sequence) => sequence.id === state.project.activeAnimationSequenceId)
   );
-  const animationActivationKey = activeAnimationSequence
-    ? `${activeAnimationSequence.id}:${activeAnimationSequence.playbackMode}:${activeAnimationSequence.enabled}`
-    : null;
-  const previousAnimationActivationKeyRef = useRef<string | null>(null);
   const isPhoneRoute = window.location.pathname === "/phone";
 
   useEffect(() => {
@@ -68,20 +64,13 @@ export default function App() {
   useEffect(() => {
     if (isPhoneRoute) return;
     if (!activeAnimationSequence) {
-      previousAnimationActivationKeyRef.current = null;
       if (getAnimationSequenceRuntimeSnapshot().sequenceId) resetAnimationSequenceRuntime();
       return;
     }
-    const activationChanged = previousAnimationActivationKeyRef.current !== animationActivationKey;
-    previousAnimationActivationKeyRef.current = animationActivationKey;
-    const runtime = getAnimationSequenceRuntimeSnapshot();
     const runtimeMatches = syncAnimationSequenceRuntimeDefinition(activeAnimationSequence);
     if (!runtimeMatches) {
       scrubAnimationSequence(activeAnimationSequence, 0);
-      return;
     }
-    if (!activationChanged) return;
-    if (!runtime.recording) scrubAnimationSequence(activeAnimationSequence, 0);
   }, [
     activeAnimationSequence?.cameraId,
     activeAnimationSequence?.duration,
@@ -89,7 +78,6 @@ export default function App() {
     activeAnimationSequence?.id,
     activeAnimationSequence?.loop,
     activeAnimationSequence?.playbackMode,
-    animationActivationKey,
     isPhoneRoute,
   ]);
 

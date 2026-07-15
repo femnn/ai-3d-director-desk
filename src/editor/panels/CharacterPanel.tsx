@@ -17,6 +17,7 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { AnimoFlowActionGenerator } from "../animation/AnimoFlowActionGenerator";
+import { resetAnimationSequenceRuntime } from "../animation/animationSequence";
 import { CharacterJsonControls } from "./CharacterJsonControls";
 import { PoseImageImporter, PoseVideoImporter } from "../mocap/PoseMediaImporter";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
@@ -99,19 +100,6 @@ export function CharacterPanel() {
     cameraId: null,
     enabled: true,
   };
-  const startNormalActions = () => {
-    const nextObjects = useDirectorStore.getState().project.objects;
-    playNormalCharacterAnimations(
-      nextObjects
-        .filter(
-          (item) =>
-            item.kind === "character" &&
-            item.characterActionTrack?.enabled &&
-            item.characterActionTrack.playbackMode === "normal"
-        )
-        .map((item) => item.id)
-    );
-  };
   const updateActionTrack = (patch: Partial<CharacterActionTrack>) => {
     const next = {
       ...actionTrack,
@@ -120,15 +108,19 @@ export function CharacterPanel() {
     };
     if (isCrowd && selection.crowdId) {
       setCrowdCharacterActionTrack(selection.crowdId, next);
-      if (next.enabled && next.playbackMode === "normal") startNormalActions();
       return;
     }
     setCharacterActionTrack(role.id, next);
-    if (next.enabled && next.playbackMode === "normal") startNormalActions();
   };
   const playAllNormalActions = () => {
+    if (!role.characterActionTrack) {
+      if (isCrowd && selection.crowdId) setCrowdCharacterActionTrack(selection.crowdId, actionTrack);
+      else setCharacterActionTrack(role.id, actionTrack);
+    }
+    resetAnimationSequenceRuntime();
+    const nextObjects = useDirectorStore.getState().project.objects;
     playNormalCharacterAnimations(
-      objects
+      nextObjects
         .filter((item) => item.kind === "character" && item.characterActionTrack?.enabled && item.characterActionTrack.playbackMode === "normal")
         .map((item) => item.id)
     );
@@ -513,7 +505,7 @@ export function CharacterPanel() {
             />
           ) : null}
           <div className="inspector-action-row" role="group" aria-label="角色动画播放">
-            <button type="button" onClick={playAllNormalActions}>播放普通动画</button>
+            <button type="button" onClick={playAllNormalActions}>播放动画</button>
             <button type="button" onClick={stopNormalCharacterAnimations}>暂停动画</button>
           </div>
           <p className="inspector-help-text">

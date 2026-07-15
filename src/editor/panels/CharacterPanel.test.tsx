@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
+import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime, scrubAnimationSequence } from "../animation/animationSequence";
+import { isNormalCharacterAnimationPlaying, stopNormalCharacterAnimations } from "../animation/characterAnimation";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 import { CharacterPanel } from "./CharacterPanel";
 
@@ -10,6 +12,11 @@ beforeEach(() => {
     ...createInitialDirectorState(),
     selectedObjectId: "char_default_a",
   });
+});
+
+afterEach(() => {
+  stopNormalCharacterAnimations();
+  resetAnimationSequenceRuntime();
 });
 
 it("renders the approved role property order", () => {
@@ -99,6 +106,47 @@ it("selects the Codex light dance as a fixed fifteen-second action", async () =>
   const role = useDirectorStore.getState().project.objects.find((item) => item.id === "char_default_a");
   expect(role?.characterActionTrack?.duration).toBe(15);
   expect(screen.getByLabelText("角色动作时长")).toHaveValue(15);
+});
+
+it("persists the visible default action and starts it from the play button", async () => {
+  const user = userEvent.setup();
+  render(<CharacterPanel />);
+
+  await user.click(screen.getByRole("button", { name: "动作" }));
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === "char_default_a")?.characterActionTrack).toBeUndefined();
+
+  await user.click(screen.getByRole("button", { name: "播放动画" }));
+
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === "char_default_a")?.characterActionTrack).toMatchObject({
+    actionId: "idle",
+    playbackMode: "normal",
+    enabled: true,
+  });
+  expect(isNormalCharacterAnimationPlaying()).toBe(true);
+});
+
+it("releases a paused sequence before playing the selected character action", async () => {
+  const user = userEvent.setup();
+  const role = useDirectorStore.getState().project.objects.find((item) => item.id === "char_default_a")!;
+  const sequence = {
+    id: "blocking_sequence",
+    name: "覆盖角色的序列",
+    duration: 5 as const,
+    playbackMode: "manual" as const,
+    loop: true,
+    enabled: true,
+    cameraId: null,
+    bindings: [{ alias: "role", objectId: role.id, objectName: role.name }],
+    tracks: [{ id: "track", name: "角色轨", type: "character" as const, binding: "role", startTime: 0, endTime: 5, actionId: "dance" as const }],
+  };
+  scrubAnimationSequence(sequence, 0);
+  render(<CharacterPanel />);
+
+  await user.click(screen.getByRole("button", { name: "动作" }));
+  await user.click(screen.getByRole("button", { name: "播放动画" }));
+
+  expect(getAnimationSequenceRuntimeSnapshot().sequenceId).toBeNull();
+  expect(isNormalCharacterAnimationPlaying()).toBe(true);
 });
 
 it("adjusts axis values by dragging the gray XYZ prefix handles", () => {

@@ -116,7 +116,11 @@ export function AnimationTimeline({ onClose }: { onClose: () => void }) {
                   resumeAnimationSequenceRecording();
                 } else {
                   stopNormalCharacterAnimations();
-                  playAnimationSequence(sequence, { reset: runtime.sequenceId !== sequence.id || runtime.elapsed >= sequence.duration });
+                  const playableSequence = sequence.enabled ? sequence : { ...sequence, enabled: true };
+                  if (!sequence.enabled) updateSequence(sequence.id, { enabled: true });
+                  playAnimationSequence(playableSequence, {
+                    reset: runtime.sequenceId !== sequence.id || runtime.elapsed >= sequence.duration,
+                  });
                 }
               }}
             >
