@@ -82,7 +82,13 @@ function readBuffer(req, limit = 120_000_000) {
   });
 }
 
-function convertWebmToMp4(inputPath, outputPath) {
+function getVideoFilter(captureFrameRate) {
+  return captureFrameRate <= 30
+    ? "fps=30,minterpolate=fps=60:mi_mode=blend"
+    : "fps=60";
+}
+
+function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60) {
   return new Promise((resolve, reject) => {
     execFile(
       FFMPEG_PATH,
@@ -91,7 +97,7 @@ function convertWebmToMp4(inputPath, outputPath) {
         "-i",
         inputPath,
         "-vf",
-        "fps=60",
+        getVideoFilter(captureFrameRate),
         "-vsync",
         "cfr",
         "-c:v",
@@ -809,11 +815,12 @@ async function handleApi(req, res, context) {
     const inputPath = path.join(VIDEO_TEMP_DIR, `${id}.webm`);
     const outputPath = path.join(VIDEO_TEMP_DIR, `${id}.mp4`);
     try {
+      const captureFrameRate = Number(req.headers["x-capture-frame-rate"]) === 30 ? 30 : 60;
       const video = await readBuffer(req);
       if (!video.length) throw new Error("Video is empty");
       fs.mkdirSync(VIDEO_TEMP_DIR, { recursive: true, mode: 0o700 });
       await fs.promises.writeFile(inputPath, video);
-      await convertWebmToMp4(inputPath, outputPath);
+      await convertWebmToMp4(inputPath, outputPath, captureFrameRate);
       const mp4 = await fs.promises.readFile(outputPath);
       res.writeHead(200, {
         "content-type": "video/mp4",

@@ -67,6 +67,21 @@ it("sends an initial phone state after the WebSocket connection is ready", async
   });
 });
 
+it("sends the selected long recording duration with the camera state", async () => {
+  window.history.replaceState({}, "", "/phone?mode=standard");
+  render(<PhoneController />);
+
+  fireEvent.click(screen.getByRole("button", { name: "15秒" }));
+  fireEvent.click(screen.getByRole("button", { name: "录制15秒" }));
+
+  await waitFor(() => {
+    const phoneStates = MockWebSocket.sent
+      .map((payload) => JSON.parse(payload))
+      .filter((payload) => payload.type === "phone_state");
+    expect(phoneStates[phoneStates.length - 1]?.payload).toMatchObject({ recording: true, recordingDuration: 15 });
+  });
+});
+
 it("shows the secure motion controls only in motion mode", () => {
   window.history.replaceState({}, "", "/phone?mode=motion");
   render(<PhoneController />);

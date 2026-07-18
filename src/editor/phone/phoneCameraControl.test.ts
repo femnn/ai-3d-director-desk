@@ -3,9 +3,17 @@ import { createInitialDirectorState, useDirectorStore } from "../store/directorS
 import {
   getPhoneCameraAssignments,
   getPhoneCameraUpdateTimestamp,
+  getVideoCaptureFrameRate,
   queuePhoneCameraState,
   releasePhoneCamera,
 } from "./phoneCameraControl";
+
+it("keeps five-second capture at 60fps and reduces encoder pressure for longer takes", () => {
+  expect(getVideoCaptureFrameRate(5)).toBe(60);
+  expect(getVideoCaptureFrameRate(10)).toBe(30);
+  expect(getVideoCaptureFrameRate(15)).toBe(30);
+  expect(getVideoCaptureFrameRate(undefined)).toBe(60);
+});
 
 beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {

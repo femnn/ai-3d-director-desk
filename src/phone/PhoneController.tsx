@@ -191,6 +191,7 @@ export function PhoneController() {
   const draggingLookRef = useRef<{ x: number; y: number } | null>(null);
   const dirtyRef = useRef(true);
   const recordingTimerRef = useRef(0);
+  const recordingDurationRef = useRef<5 | 10 | 15>(5);
   const controllerIdRef = useRef(getPhoneControllerId());
   const orientationBaseRef = useRef<{
     alpha: number;
@@ -682,6 +683,7 @@ export function PhoneController() {
       payload: {
         ...liveStateRef.current,
         phoneClientId: controllerIdRef.current,
+        recordingDuration: recordingDurationRef.current,
         updatedAt,
       },
     });
@@ -840,7 +842,11 @@ export function PhoneController() {
                   key={duration}
                   type="button"
                   className={recordingDuration === duration ? "is-active" : undefined}
-                  onClick={() => setRecordingDuration(duration as 5 | 10 | 15)}
+                  onClick={() => {
+                    const nextDuration = duration as 5 | 10 | 15;
+                    recordingDurationRef.current = nextDuration;
+                    setRecordingDuration(nextDuration);
+                  }}
                 >
                   {duration}秒
                 </button>

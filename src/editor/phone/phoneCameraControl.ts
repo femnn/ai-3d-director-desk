@@ -31,6 +31,7 @@ export interface PhoneCameraState {
   roll?: number;
   fov?: number;
   recording?: boolean;
+  recordingDuration?: number;
   updatedAt?: number;
 }
 
@@ -48,11 +49,13 @@ let animationFrameId = 0;
 let phoneFlushTimer = 0;
 let activePlaybackId: number | null = null;
 const VIDEO_FRAME_RATE = 60;
+const LONG_RECORDING_FRAME_RATE = 30;
 let cameraMonitorCanvas: HTMLCanvasElement | null = null;
 type FrameRequestVideoTrack = MediaStreamTrack & { requestFrame?: () => void };
 type LiveVideoCapture = {
   cameraId: string;
   chunks: BlobPart[];
+  frameRate: number;
   frameRequestTrack: FrameRequestVideoTrack | null;
   nextFrameRequestAt: number;
   recorder: MediaRecorder;
@@ -72,6 +75,7 @@ const recordingByCameraId = new Map<
 >();
 const liveVideoCapturesByCameraId = new Map<string, LiveVideoCapture>();
 const requestedLiveVideoCameraIds = new Set<string>();
+const requestedLiveVideoDurationByCameraId = new Map<string, number>();
 const liveVideoCaptureErrorsByCameraId = new Map<string, string>();
 const recordedVideoByAnimationId = new Map<string, RecordedVideo>();
 const liveVideoListeners = new Set<() => void>();
@@ -109,15 +113,21 @@ export function unregisterCameraMonitorCanvas(canvas: HTMLCanvasElement | null) 
 
 export function requestCameraMonitorVideoFrame(canvas: HTMLCanvasElement, now: number) {
   if (canvas !== cameraMonitorCanvas) return;
-  const frameInterval = 1000 / VIDEO_FRAME_RATE;
   liveVideoCapturesByCameraId.forEach((capture) => {
     if (!capture.frameRequestTrack || capture.recorder.state !== "recording") return;
+    const frameInterval = 1000 / capture.frameRate;
     if (!capture.nextFrameRequestAt) capture.nextFrameRequestAt = now;
     if (now < capture.nextFrameRequestAt - 0.5) return;
     capture.frameRequestTrack.requestFrame?.();
     capture.nextFrameRequestAt += frameInterval;
     if (capture.nextFrameRequestAt < now) capture.nextFrameRequestAt = now + frameInterval;
   });
+}
+
+export function getVideoCaptureFrameRate(recordingDuration: number | undefined) {
+  return typeof recordingDuration === "number" && recordingDuration > 5
+    ? LONG_RECORDING_FRAME_RATE
+    : VIDEO_FRAME_RATE;
 }
 
 export function removeRecordedCameraVideo(animationId: string) {
@@ -231,7 +241,12 @@ function finishCameraRecording(cameraId: string) {
   return animationId;
 }
 
-function updateRecording(cameraId: string, keyframe: DirectorCameraAnimationKeyframe, recordingEnabled: boolean) {
+function updateRecording(
+  cameraId: string,
+  keyframe: DirectorCameraAnimationKeyframe,
+  recordingEnabled: boolean,
+  recordingDuration?: number
+) {
   if (!recordingEnabled) {
     const animationId = finishCameraRecording(cameraId);
     if (animationId) stopLiveVideoCapture(cameraId, animationId);
@@ -247,7 +262,7 @@ function updateRecording(cameraId: string, keyframe: DirectorCameraAnimationKeyf
     };
     recordingByCameraId.set(cameraId, recording);
     removePhoneCameraPath(cameraId);
-    requestLiveVideoCapture(cameraId);
+    requestLiveVideoCapture(cameraId, recordingDuration);
   }
 
   const normalizedTime = Number((keyframe.time - recording.startedAt).toFixed(2));
@@ -260,9 +275,10 @@ function updateRecording(cameraId: string, keyframe: DirectorCameraAnimationKeyf
   });
 }
 
-function requestLiveVideoCapture(cameraId: string) {
+function requestLiveVideoCapture(cameraId: string, recordingDuration?: number) {
   if (requestedLiveVideoCameraIds.has(cameraId)) return;
   requestedLiveVideoCameraIds.add(cameraId);
+  requestedLiveVideoDurationByCameraId.set(cameraId, recordingDuration ?? 5);
   liveVideoCaptureErrorsByCameraId.delete(cameraId);
   emitLiveVideoChange();
   const store = useDirectorStore.getState();
@@ -283,6 +299,7 @@ function requestLiveVideoCapture(cameraId: string) {
         window.requestAnimationFrame(waitForMonitor);
       } else {
         requestedLiveVideoCameraIds.delete(cameraId);
+        requestedLiveVideoDurationByCameraId.delete(cameraId);
         liveVideoCaptureErrorsByCameraId.set(cameraId, "机位监看画布启动超时，请重新录制。");
         emitLiveVideoChange();
       }
@@ -310,19 +327,22 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
   }
 
   try {
+    const frameRate = getVideoCaptureFrameRate(requestedLiveVideoDurationByCameraId.get(cameraId));
     let stream = canvas.captureStream(0);
     let videoTrack = stream.getVideoTracks()[0] as FrameRequestVideoTrack | undefined;
     let frameRequestTrack = typeof videoTrack?.requestFrame === "function" ? videoTrack : null;
     if (!frameRequestTrack) {
       stream.getTracks().forEach((track) => track.stop());
-      stream = canvas.captureStream(VIDEO_FRAME_RATE);
+      stream = canvas.captureStream(frameRate);
       videoTrack = stream.getVideoTracks()[0] as FrameRequestVideoTrack | undefined;
     }
     if (!videoTrack) throw new Error("机位监看没有可录制的视频轨道");
+    videoTrack.contentHint = "motion";
     const recorder = createVideoRecorder(stream);
     const capture: LiveVideoCapture = {
       cameraId,
       chunks: [],
+      frameRate,
       frameRequestTrack,
       nextFrameRequestAt: 0,
       recorder,
@@ -345,6 +365,7 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     emitLiveVideoChange();
   } catch (error) {
     requestedLiveVideoCameraIds.delete(cameraId);
+    requestedLiveVideoDurationByCameraId.delete(cameraId);
     liveVideoCaptureErrorsByCameraId.set(
       cameraId,
       error instanceof Error ? error.message : "无法启动机位视频录制"
@@ -355,6 +376,7 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
 
 function cancelLiveVideoCapture(cameraId: string) {
   requestedLiveVideoCameraIds.delete(cameraId);
+  requestedLiveVideoDurationByCameraId.delete(cameraId);
   const capture = liveVideoCapturesByCameraId.get(cameraId);
   if (capture && capture.recorder.state !== "inactive") capture.recorder.stop();
   capture?.stream.getTracks().forEach((track) => track.stop());
@@ -364,6 +386,7 @@ function cancelLiveVideoCapture(cameraId: string) {
 
 function stopLiveVideoCapture(cameraId: string, animationId: string) {
   requestedLiveVideoCameraIds.delete(cameraId);
+  requestedLiveVideoDurationByCameraId.delete(cameraId);
   const capture = liveVideoCapturesByCameraId.get(cameraId);
   emitLiveVideoChange();
   if (!capture) {
@@ -388,7 +411,7 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
       emitLiveVideoChange();
       return;
     }
-    void convertVideoToMp4(source)
+    void convertVideoToMp4(source, capture.frameRate)
       .then((blob) => {
         recordedVideoByAnimationId.set(animationId, { status: "ready", blob });
         emitLiveVideoChange();
@@ -489,7 +512,8 @@ function applyPhoneCameraState(state: PhoneCameraState) {
       target,
       fov,
     },
-    Boolean(state.recording)
+    Boolean(state.recording),
+    state.recordingDuration
   );
   if (!state.recording) removePhoneCameraPath(cameraId);
 }
@@ -659,10 +683,13 @@ function createVideoRecorder(stream: MediaStream) {
   return new MediaRecorder(stream, { videoBitsPerSecond: 3_000_000 });
 }
 
-async function convertVideoToMp4(video: Blob) {
+async function convertVideoToMp4(video: Blob, captureFrameRate: number) {
   const response = await fetch("/api/video/convert", {
     method: "POST",
-    headers: { "content-type": video.type || "video/webm" },
+    headers: {
+      "content-type": video.type || "video/webm",
+      "x-capture-frame-rate": String(captureFrameRate),
+    },
     body: video,
   });
   if (!response.ok) {
