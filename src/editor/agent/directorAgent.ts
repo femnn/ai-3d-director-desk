@@ -1244,6 +1244,12 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
                   autoPlay: "true 时循环播放完整追车事件",
                   duration: [5, 10, 15],
                 }
+              : factory.id === "alien-park-abduction"
+                ? {
+                    time: "0 到 15；关闭自动播放时用于定位角色和飞碟状态",
+                    autoPlay: "true 时循环播放聊天和劫持事件",
+                    duration: [5, 10, 15],
+                  }
             : {},
         })),
       };

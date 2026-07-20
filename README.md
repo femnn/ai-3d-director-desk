@@ -53,6 +53,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **参考图程序化场景**：兼容 ObjectSculptSpec，AI 可在同一布景命令中生成汽车、火车、飞机或建筑总成；画面点击整体移动，对象树展开后精修零件，并保留材质与动画。
 - **可注册的 AI 3D 模型工厂**：把 Codex / Img2ThreeJS 生成并审查过的复杂模型注册为安全白名单资产；首个示例支持红色跑车连续变形成机甲，并在电脑监看、手机预览和录像中保持一致。
 - **AI 专用场景动画**：可把火车、汽车、建筑、飞跃路径和爆炸碎片编排成一个确定性的 5 / 10 / 15 秒场景工厂；示例包含列车驶出车站、汽车追赶飞跃和爆炸全过程。
+- **剧情化程序角色**：专用场景工厂也能驱动角色头部、躯干和四肢；公园示例包含双人长椅交谈、飞碟光束和角色升空劫持。
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
 - **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **统一 AI 动画时间轴**：用同一时钟驱动角色、组合道具和局部部件，支持手动播放、录制时播放和随镜头运动。
@@ -119,6 +120,8 @@ npm run dev
 需要保留 Img2ThreeJS / Codex 专用造型代码和连续机械形变时，使用[程序化模型工厂接入指南](docs/IMG2THREEJS_FACTORY_INTEGRATION.md)。可直接导入的变形跑车/机甲示例见 [`crimson-transformer-showcase.json`](examples/scene-scripts/crimson-transformer-showcase.json)。
 
 完整专用场景动画示例见 [`train-station-car-chase-15s.json`](examples/scene-scripts/train-station-car-chase-15s.json)，包含站台追车、汽车飞跃和爆炸近景三个机位。
+
+带角色的剧情动画示例见 [`alien-park-abduction-15s.json`](examples/scene-scripts/alien-park-abduction-15s.json)，包含双人交谈、飞碟到达和角色升空三个阶段。
 
 ### 致谢与来源
 

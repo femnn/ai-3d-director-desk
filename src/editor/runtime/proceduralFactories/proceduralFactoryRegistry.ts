@@ -18,6 +18,8 @@ export type TrainStationChaseParameters = {
   duration: 5 | 10 | 15;
 };
 
+export type AlienParkAbductionParameters = TrainStationChaseParameters;
+
 export function isProceduralFactoryId(value: unknown): value is ProceduralFactoryId {
   return typeof value === "string" && PROCEDURAL_FACTORY_IDS.has(value);
 }
@@ -64,6 +66,20 @@ export function normalizeProceduralFactorySettings(
     };
   }
 
+  if (id === "alien-park-abduction") {
+    const timeValue = typeof parameters?.time === "number" && Number.isFinite(parameters.time)
+      ? parameters.time
+      : 0;
+    return {
+      id,
+      parameters: {
+        time: clamp(timeValue, 0, 15),
+        autoPlay: parameters?.autoPlay !== false,
+        duration: toDuration(parameters?.duration ?? 15),
+      },
+    };
+  }
+
   return { id };
 }
 
@@ -72,6 +88,13 @@ export function getTrainStationChaseParameters(
 ): TrainStationChaseParameters {
   const normalized = normalizeProceduralFactorySettings(settings.id, settings.parameters);
   return normalized.parameters as TrainStationChaseParameters;
+}
+
+export function getAlienParkAbductionParameters(
+  settings: DirectorProceduralFactorySettings
+): AlienParkAbductionParameters {
+  const normalized = normalizeProceduralFactorySettings(settings.id, settings.parameters);
+  return normalized.parameters as AlienParkAbductionParameters;
 }
 
 export function getCrimsonTransformerParameters(

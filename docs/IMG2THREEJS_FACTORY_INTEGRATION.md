@@ -11,6 +11,7 @@
 
 - `crimson-transformer`：红色跑车连续变形为人形机甲。
 - `train-station-car-chase`：15 秒火车驶出车站、汽车追赶、跨轨飞跃并在另一侧爆炸的完整场景动画。
+- `alien-park-abduction`：两名关节化角色坐在公园长椅交谈，飞碟到达后用光束劫走其中一人的 15 秒动画。
 
 ## 为什么不直接导入生成的 JavaScript
 
@@ -57,6 +58,8 @@
 完整示例：[`crimson-transformer-showcase.json`](../examples/scene-scripts/crimson-transformer-showcase.json)。
 
 完整追车场景：[`train-station-car-chase-15s.json`](../examples/scene-scripts/train-station-car-chase-15s.json)。该场景提供站台追车全景、汽车飞跃侧拍和爆炸近景三个机位。`time` 可在暂停时定位到 0 至 15 秒，`autoPlay` 控制循环播放，`duration` 控制 5 / 10 / 15 秒压缩播放。
+
+角色场景示例：[`alien-park-abduction-15s.json`](../examples/scene-scripts/alien-park-abduction-15s.json)。两名角色的头部、躯干、上下臂和上下腿分别驱动，适合用程序化工厂制作具有明确剧情事件、但不要求后续逐关节编辑的角色动画。
 
 ## 让 Codex 注册新的 Img2ThreeJS 结果
 

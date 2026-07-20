@@ -4,7 +4,12 @@ import type { Object3D } from "three";
 import type { DirectorProceduralFactorySettings } from "../../schema/directorProject";
 import { createCrimsonTransformer } from "./crimsonTransformerFactory";
 import { createTrainStationChase } from "./trainStationChaseFactory";
-import { getCrimsonTransformerParameters, getTrainStationChaseParameters } from "./proceduralFactoryRegistry";
+import { createAlienParkAbduction } from "./alienParkAbductionFactory";
+import {
+  getAlienParkAbductionParameters,
+  getCrimsonTransformerParameters,
+  getTrainStationChaseParameters,
+} from "./proceduralFactoryRegistry";
 
 function disposeObject(root: Object3D) {
   root.traverse((child) => {
@@ -59,6 +64,22 @@ function TrainStationChaseModel({ settings }: { settings: DirectorProceduralFact
   return <primitive object={runtime.root} />;
 }
 
+function AlienParkAbductionModel({ settings }: { settings: DirectorProceduralFactorySettings }) {
+  const runtime = useMemo(() => createAlienParkAbduction(), []);
+  const parameters = getAlienParkAbductionParameters(settings);
+
+  useEffect(() => () => disposeObject(runtime.root), [runtime]);
+
+  useFrame(() => {
+    const elapsed = parameters.autoPlay
+      ? (Date.now() / 1000) % parameters.duration
+      : (parameters.time / 15) * parameters.duration;
+    runtime.setTime(elapsed, parameters.duration);
+  });
+
+  return <primitive object={runtime.root} />;
+}
+
 export function ProceduralFactoryModel({
   color,
   settings,
@@ -71,6 +92,9 @@ export function ProceduralFactoryModel({
   }
   if (settings.id === "train-station-car-chase") {
     return <TrainStationChaseModel settings={settings} />;
+  }
+  if (settings.id === "alien-park-abduction") {
+    return <AlienParkAbductionModel settings={settings} />;
   }
   return null;
 }

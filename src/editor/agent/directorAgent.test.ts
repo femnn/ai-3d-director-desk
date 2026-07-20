@@ -23,6 +23,7 @@ import fightExample from "../../../examples/animation-sequences/two-person-fight
 import carJumpExample from "../../../examples/animation-sequences/car-jump-train-breakup-10s.json";
 import transformerExample from "../../../examples/scene-scripts/crimson-transformer-showcase.json";
 import trainChaseExample from "../../../examples/scene-scripts/train-station-car-chase-15s.json";
+import alienParkExample from "../../../examples/scene-scripts/alien-park-abduction-15s.json";
 
 beforeEach(() => {
   useDirectorStore.setState({
@@ -156,6 +157,22 @@ it("imports and exports the complete 15 second train chase scene", () => {
   const exported = exportSceneScript();
   expect(exported.props?.[0]).toMatchObject({
     factoryId: "train-station-car-chase",
+    factoryParameters: { autoPlay: true, duration: 15, time: 0 },
+  });
+});
+
+it("imports and exports the complete 15 second park abduction scene", () => {
+  applySceneScript(alienParkExample as never);
+  const scene = useDirectorStore.getState().project;
+  const abduction = scene.objects.find((object) => object.name === "公园飞碟劫持");
+
+  expect(abduction?.proceduralFactory).toMatchObject({
+    id: "alien-park-abduction",
+    parameters: { autoPlay: true, duration: 15, time: 0 },
+  });
+  expect(scene.cameras).toHaveLength(3);
+  expect(exportSceneScript().props?.[0]).toMatchObject({
+    factoryId: "alien-park-abduction",
     factoryParameters: { autoPlay: true, duration: 15, time: 0 },
   });
 });

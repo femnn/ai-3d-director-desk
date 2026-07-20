@@ -1,0 +1,55 @@
+{
+  "reset": true,
+  "scene": {
+    "backgroundColor": "#89b8d0",
+    "groundColor": "#4e7b43",
+    "showGrid": false,
+    "showGround": true,
+    "showCameraPaths": false
+  },
+  "characters": [],
+  "props": [
+    {
+      "id": "alien-park-abduction",
+      "name": "公园飞碟劫持",
+      "factoryId": "alien-park-abduction",
+      "factoryParameters": {
+        "time": 0,
+        "autoPlay": true,
+        "duration": 15
+      },
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.82, 0.82, 0.82]
+    }
+  ],
+  "cameras": [
+    {
+      "id": "park-conversation-camera",
+      "name": "长椅双人中景",
+      "position": [5.2, 3.3, 7.4],
+      "lookAt": [0, 1.65, 0.2],
+      "fov": 35
+    },
+    {
+      "id": "ufo-arrival-camera",
+      "name": "飞碟到达全景",
+      "position": [-9.5, 7.5, 13.5],
+      "lookAt": [0.5, 3.1, 0],
+      "fov": 48
+    },
+    {
+      "id": "abduction-camera",
+      "name": "角色升空近景",
+      "position": [7.2, 5.2, 9.2],
+      "lookAt": [0.3, 3.2, 0.1],
+      "fov": 38
+    }
+  ],
+  "directorView": {
+    "position": [11.5, 8.2, 15.5],
+    "lookAt": [0, 2.4, 0],
+    "fov": 48
+  },
+  "activeCameraId": "park-conversation-camera"
+}

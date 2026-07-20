@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  getAlienParkAbductionParameters,
   getCrimsonTransformerParameters,
   getTrainStationChaseParameters,
   normalizeProceduralFactorySettings,
@@ -32,6 +33,19 @@ it("normalizes the 15 second train chase timeline", () => {
   expect(getTrainStationChaseParameters(settings)).toEqual({
     time: 15,
     autoPlay: false,
+    duration: 15,
+  });
+});
+
+it("normalizes the 15 second alien park timeline", () => {
+  const settings = normalizeProceduralFactorySettings("alien-park-abduction", {
+    time: -3,
+    autoPlay: true,
+    duration: 15,
+  });
+  expect(getAlienParkAbductionParameters(settings)).toEqual({
+    time: 0,
+    autoPlay: true,
     duration: 15,
   });
 });

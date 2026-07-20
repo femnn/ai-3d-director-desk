@@ -144,6 +144,8 @@ apply_scene_script 直接导入的 JSON 对象。
 
 `train-station-car-chase` 是完整场景动画工厂，包含火车站、四节列车、追车飞跃和确定性爆炸。直接导入 [`train-station-car-chase-15s.json`](../examples/scene-scripts/train-station-car-chase-15s.json) 即可使用。它不依赖随机刚体物理，因此电脑监看、手机画面和录像结果可以保持一致。
 
+`alien-park-abduction` 是带关节化程序角色的剧情工厂：两人在长椅聊天，飞碟进入、打开光束、吸走一人，另一人起身后退并抬头反应。示例见 [`alien-park-abduction-15s.json`](../examples/scene-scripts/alien-park-abduction-15s.json)。工厂内角色属于专用动画的一部分；需要独立选择、换姿势或复用角色时，仍应使用 `characters[]` 和角色动画序列。
+
 ## 角色 JSON
 
 完整布景中的 `characters[]` 与独立 `.character.json` 使用同一个角色结构：
