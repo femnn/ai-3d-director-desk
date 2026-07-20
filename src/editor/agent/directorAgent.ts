@@ -1238,6 +1238,12 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
                 autoTransform: "true 时自动往返变形",
                 transformDuration: [5, 10, 15],
               }
+            : factory.id === "train-station-car-chase"
+              ? {
+                  time: "0 到 15；关闭自动播放时用于定位场景时间",
+                  autoPlay: "true 时循环播放完整追车事件",
+                  duration: [5, 10, 15],
+                }
             : {},
         })),
       };

@@ -22,6 +22,7 @@ import danceExample from "../../../examples/animation-sequences/ai-dance-15s.jso
 import fightExample from "../../../examples/animation-sequences/two-person-fight-10s.json";
 import carJumpExample from "../../../examples/animation-sequences/car-jump-train-breakup-10s.json";
 import transformerExample from "../../../examples/scene-scripts/crimson-transformer-showcase.json";
+import trainChaseExample from "../../../examples/scene-scripts/train-station-car-chase-15s.json";
 
 beforeEach(() => {
   useDirectorStore.setState({
@@ -139,6 +140,24 @@ it("round-trips an allowlisted procedural factory without importing executable c
   applySceneScript(exported);
   const restored = useDirectorStore.getState().project.objects.find((object) => object.name === "赤曜变形机甲");
   expect(restored?.proceduralFactory?.id).toBe("crimson-transformer");
+});
+
+it("imports and exports the complete 15 second train chase scene", () => {
+  applySceneScript(trainChaseExample as never);
+  const scene = useDirectorStore.getState().project;
+  const chase = scene.objects.find((object) => object.name === "火车站追车爆炸");
+
+  expect(chase?.proceduralFactory).toMatchObject({
+    id: "train-station-car-chase",
+    parameters: { autoPlay: true, duration: 15, time: 0 },
+  });
+  expect(scene.cameras).toHaveLength(3);
+
+  const exported = exportSceneScript();
+  expect(exported.props?.[0]).toMatchObject({
+    factoryId: "train-station-car-chase",
+    factoryParameters: { autoPlay: true, duration: 15, time: 0 },
+  });
 });
 
 it("round-trips a reusable character package with color, pose, and video motion frames", () => {

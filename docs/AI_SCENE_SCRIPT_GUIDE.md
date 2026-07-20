@@ -142,6 +142,8 @@ apply_scene_script 直接导入的 JSON 对象。
 
 当前 `crimson-transformer` 支持汽车到机器人的连续变形。详细扩展方式见 [Img2ThreeJS 程序化模型工厂接入指南](IMG2THREEJS_FACTORY_INTEGRATION.md)。未知 `factoryId` 会被拒绝，JSON 中的代码字段不会被执行。
 
+`train-station-car-chase` 是完整场景动画工厂，包含火车站、四节列车、追车飞跃和确定性爆炸。直接导入 [`train-station-car-chase-15s.json`](../examples/scene-scripts/train-station-car-chase-15s.json) 即可使用。它不依赖随机刚体物理，因此电脑监看、手机画面和录像结果可以保持一致。
+
 ## 角色 JSON
 
 完整布景中的 `characters[]` 与独立 `.character.json` 使用同一个角色结构：

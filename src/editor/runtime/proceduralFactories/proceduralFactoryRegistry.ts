@@ -12,6 +12,12 @@ export type CrimsonTransformerParameters = {
   transformDuration: 5 | 10 | 15;
 };
 
+export type TrainStationChaseParameters = {
+  time: number;
+  autoPlay: boolean;
+  duration: 5 | 10 | 15;
+};
+
 export function isProceduralFactoryId(value: unknown): value is ProceduralFactoryId {
   return typeof value === "string" && PROCEDURAL_FACTORY_IDS.has(value);
 }
@@ -44,7 +50,28 @@ export function normalizeProceduralFactorySettings(
     };
   }
 
+  if (id === "train-station-car-chase") {
+    const timeValue = typeof parameters?.time === "number" && Number.isFinite(parameters.time)
+      ? parameters.time
+      : 0;
+    return {
+      id,
+      parameters: {
+        time: clamp(timeValue, 0, 15),
+        autoPlay: parameters?.autoPlay !== false,
+        duration: toDuration(parameters?.duration ?? 15),
+      },
+    };
+  }
+
   return { id };
+}
+
+export function getTrainStationChaseParameters(
+  settings: DirectorProceduralFactorySettings
+): TrainStationChaseParameters {
+  const normalized = normalizeProceduralFactorySettings(settings.id, settings.parameters);
+  return normalized.parameters as TrainStationChaseParameters;
 }
 
 export function getCrimsonTransformerParameters(

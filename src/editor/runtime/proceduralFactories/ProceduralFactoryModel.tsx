@@ -3,7 +3,8 @@ import { useEffect, useMemo } from "react";
 import type { Object3D } from "three";
 import type { DirectorProceduralFactorySettings } from "../../schema/directorProject";
 import { createCrimsonTransformer } from "./crimsonTransformerFactory";
-import { getCrimsonTransformerParameters } from "./proceduralFactoryRegistry";
+import { createTrainStationChase } from "./trainStationChaseFactory";
+import { getCrimsonTransformerParameters, getTrainStationChaseParameters } from "./proceduralFactoryRegistry";
 
 function disposeObject(root: Object3D) {
   root.traverse((child) => {
@@ -42,6 +43,22 @@ function CrimsonTransformerModel({
   return <primitive object={runtime.root} />;
 }
 
+function TrainStationChaseModel({ settings }: { settings: DirectorProceduralFactorySettings }) {
+  const runtime = useMemo(() => createTrainStationChase(), []);
+  const parameters = getTrainStationChaseParameters(settings);
+
+  useEffect(() => () => disposeObject(runtime.root), [runtime]);
+
+  useFrame(() => {
+    const elapsed = parameters.autoPlay
+      ? (Date.now() / 1000) % parameters.duration
+      : (parameters.time / 15) * parameters.duration;
+    runtime.setTime(elapsed, parameters.duration);
+  });
+
+  return <primitive object={runtime.root} />;
+}
+
 export function ProceduralFactoryModel({
   color,
   settings,
@@ -51,6 +68,9 @@ export function ProceduralFactoryModel({
 }) {
   if (settings.id === "crimson-transformer") {
     return <CrimsonTransformerModel color={color} settings={settings} />;
+  }
+  if (settings.id === "train-station-car-chase") {
+    return <TrainStationChaseModel settings={settings} />;
   }
   return null;
 }

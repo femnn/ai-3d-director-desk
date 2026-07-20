@@ -11,7 +11,10 @@ import {
 } from "./InspectorControls";
 import { useDirectorStore } from "../store/directorStore";
 import type { ObjectAnimationTrack } from "../schema/directorProject";
-import { getCrimsonTransformerParameters } from "../runtime/proceduralFactories/proceduralFactoryRegistry";
+import {
+  getCrimsonTransformerParameters,
+  getTrainStationChaseParameters,
+} from "../runtime/proceduralFactories/proceduralFactoryRegistry";
 
 function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: number): [number, number, number] {
   return tuple.map((item, index) => (index === axis ? value : item)) as [number, number, number];
@@ -65,6 +68,9 @@ export function PropPanel() {
   const transformerParameters = prop.proceduralFactory?.id === "crimson-transformer"
     ? getCrimsonTransformerParameters(prop.proceduralFactory)
     : null;
+  const trainChaseParameters = prop.proceduralFactory?.id === "train-station-car-chase"
+    ? getTrainStationChaseParameters(prop.proceduralFactory)
+    : null;
   const updateTransformerParameters = (
     patch: Partial<NonNullable<typeof transformerParameters>>
   ) => {
@@ -72,6 +78,15 @@ export function PropPanel() {
     setObjectProceduralFactory(prop.id, {
       id: prop.proceduralFactory.id,
       parameters: { ...transformerParameters, ...patch },
+    });
+  };
+  const updateTrainChaseParameters = (
+    patch: Partial<NonNullable<typeof trainChaseParameters>>
+  ) => {
+    if (!prop.proceduralFactory || !trainChaseParameters) return;
+    setObjectProceduralFactory(prop.id, {
+      id: prop.proceduralFactory.id,
+      parameters: { ...trainChaseParameters, ...patch },
     });
   };
   const parentOptions = objects.filter(
@@ -245,6 +260,37 @@ export function PropPanel() {
             value={String(transformerParameters.transformDuration)}
             options={[5, 10, 15].map((duration) => ({ value: String(duration), label: `${duration}秒` }))}
             onChange={(value) => updateTransformerParameters({ transformDuration: Number(value) as 5 | 10 | 15 })}
+          />
+        </InspectorSection>
+      ) : null}
+      {trainChaseParameters ? (
+        <InspectorSection title="追车场景动画">
+          <InspectorSelectField
+            label="播放状态"
+            ariaLabel="追车场景动画播放状态"
+            value={trainChaseParameters.autoPlay ? "playing" : "paused"}
+            options={[
+              { value: "playing", label: "循环播放" },
+              { value: "paused", label: "暂停检查" },
+            ]}
+            onChange={(value) => updateTrainChaseParameters({ autoPlay: value === "playing" })}
+          />
+          <InspectorRangeNumberField
+            label="场景时间"
+            rangeAriaLabel="追车场景动画时间"
+            numberAriaLabel="追车场景动画时间数值"
+            min="0"
+            max="15"
+            step="0.1"
+            value={trainChaseParameters.time}
+            onValueChange={(value) => updateTrainChaseParameters({ time: Number(value), autoPlay: false })}
+          />
+          <InspectorSelectField
+            label="循环时长"
+            ariaLabel="追车场景动画循环时长"
+            value={String(trainChaseParameters.duration)}
+            options={[5, 10, 15].map((duration) => ({ value: String(duration), label: `${duration}秒` }))}
+            onChange={(value) => updateTrainChaseParameters({ duration: Number(value) as 5 | 10 | 15 })}
           />
         </InspectorSection>
       ) : null}

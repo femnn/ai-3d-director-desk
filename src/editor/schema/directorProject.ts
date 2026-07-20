@@ -21,6 +21,7 @@ export const GEOMETRY_PRIMITIVE_OPTIONS = [
 export type GeometryPrimitiveType = (typeof GEOMETRY_PRIMITIVE_OPTIONS)[number]["type"];
 export const PROCEDURAL_FACTORY_OPTIONS = [
   { id: "crimson-transformer", label: "赤曜变形机甲" },
+  { id: "train-station-car-chase", label: "火车站追车爆炸" },
 ] as const;
 export type ProceduralFactoryId = (typeof PROCEDURAL_FACTORY_OPTIONS)[number]["id"];
 export interface DirectorProceduralFactorySettings {
