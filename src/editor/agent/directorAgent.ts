@@ -227,6 +227,7 @@ const BODY_TYPES: CharacterBodyType[] = [
   "teen",
   "child",
   "chibi",
+  "face-capture",
 ];
 
 const PROP_PRESETS: Record<
@@ -483,6 +484,10 @@ function findObject(idOrName: unknown, kind?: DirectorObject["kind"]) {
 
 function importCharacterFaceClip(characterId: string, input?: SceneScriptCharacter["face"]) {
   if (!input) return;
+  const character = useDirectorStore.getState().project.objects.find((object) => object.id === characterId);
+  if (character?.bodyType !== "face-capture") {
+    throw new Error("面部动画只能绑定独立的面捕演员，请先创建 bodyType=face-capture 的角色");
+  }
   const profile = input.profile === "gnm21" ? "gnm21" : "facecap52";
   let clipId: string | null = null;
   if (input.clip) {
@@ -517,7 +522,10 @@ function getTransformPatch(
 
 export function addCharacter(input: SceneScriptCharacter = {}) {
   const store = useDirectorStore.getState();
-  const bodyType = normalizeBodyType(input.bodyType ?? input.type);
+  const bodyType = normalizeBodyType(input.bodyType ?? input.type ?? (input.face ? "face-capture" : undefined));
+  if (input.face && bodyType !== "face-capture") {
+    throw new Error("带面部动画的角色必须使用 bodyType=face-capture");
+  }
   store.addPresetCharacter(bodyType);
 
   const nextState = useDirectorStore.getState();
@@ -557,6 +565,9 @@ export function addCharacter(input: SceneScriptCharacter = {}) {
 export function updateCharacter(input: SceneScriptCharacter & { id?: string; name?: string }) {
   const target = findObject(input.id ?? input.name, "character");
   if (!target) throw new Error("Character not found");
+  if (input.face && target.bodyType !== "face-capture") {
+    throw new Error("普通角色保持原始头部，请新增面捕演员后再绑定面部动画");
+  }
 
   const store = useDirectorStore.getState();
   if (input.name && input.name !== target.name) store.updateObjectName(target.id, input.name);
@@ -910,7 +921,7 @@ export function applySceneScript(script: SceneScript = {}) {
     useDirectorStore.getState().project.objects
       .filter((object) =>
         object.kind === "character" &&
-        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+        (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
       )
       .map((object) => object.id)
   );
@@ -968,7 +979,7 @@ export function exportSceneScript(): SceneScript {
         motionClip: motionClip
           ? { name: motionClip.name, duration: motionClip.duration, frames: motionClip.frames }
           : undefined,
-        face: object.characterFaceTrack
+        face: object.bodyType === "face-capture" && object.characterFaceTrack
           ? {
               profile: object.characterFaceTrack.profile,
               enabled: object.characterFaceTrack.enabled,
@@ -1321,6 +1332,7 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       const input = args as { characterId?: string; characterName?: string; clipId?: string; profile?: CharacterFaceProfile; loop?: boolean };
       const character = findObject(input.characterId ?? input.characterName, "character");
       if (!character) throw new Error("找不到要绑定面部动画的角色");
+      if (character.bodyType !== "face-capture") throw new Error("普通角色保留原始头部，请改用面捕演员");
       const clip = (useDirectorStore.getState().project.characterFaceClips ?? []).find(
         (candidate) => candidate.id === input.clipId && candidate.characterId === character.id
       );
@@ -1333,7 +1345,10 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       });
       syncNormalCharacterAnimations(
         useDirectorStore.getState().project.objects
-          .filter((object) => object.kind === "character" && (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled))
+          .filter((object) =>
+            object.kind === "character" &&
+            (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
+          )
           .map((object) => object.id)
       );
       return { characterId: character.id, clipId: clip.id };
@@ -1342,6 +1357,7 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       const input = args as { characterId?: string; characterName?: string; profile?: CharacterFaceProfile };
       const character = findObject(input.characterId ?? input.characterName, "character");
       if (!character) throw new Error("找不到角色");
+      if (character.bodyType !== "face-capture") throw new Error("普通角色保留原始头部，请改用面捕演员");
       const current = character.characterFaceTrack ?? { clipId: null, enabled: false, loop: true, profile: "facecap52" as const };
       useDirectorStore.getState().setCharacterFaceTrack(character.id, {
         ...current,
@@ -1353,7 +1369,7 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       const ids = useDirectorStore.getState().project.objects
         .filter((object) =>
           object.kind === "character" &&
-          (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+          (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
         )
         .map((object) => object.id);
       playNormalCharacterAnimations(ids);
@@ -1376,6 +1392,7 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
       const input = args as { characterId?: string; characterName?: string; package?: unknown; profile?: CharacterFaceProfile };
       const character = findObject(input.characterId ?? input.characterName, "character");
       if (!character) throw new Error("找不到要导入面部动画的角色");
+      if (character.bodyType !== "face-capture") throw new Error("普通角色保留原始头部，请改用面捕演员");
       const portable = parseFaceAnimationFile(input.package ?? args);
       const clipId = useDirectorStore.getState().addCharacterFaceClip({ ...portable, characterId: character.id });
       useDirectorStore.getState().setCharacterFaceTrack(character.id, {
@@ -1388,7 +1405,7 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
         useDirectorStore.getState().project.objects
           .filter((object) =>
             object.kind === "character" &&
-            (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+            (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
           )
           .map((object) => object.id)
       );

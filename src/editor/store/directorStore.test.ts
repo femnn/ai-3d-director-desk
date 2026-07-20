@@ -243,6 +243,21 @@ it("adds preset characters with a requested body type", () => {
   expect(useDirectorStore.getState().selectedObjectId).toBe(added?.id);
 });
 
+it("creates a dedicated face-capture actor while leaving normal roles on the UE4 rig", () => {
+  useDirectorStore.setState(createInitialDirectorState());
+
+  useDirectorStore.getState().addPresetCharacter("face-capture");
+
+  const characters = useDirectorStore.getState().project.objects.filter((item) => item.kind === "character");
+  expect(characters[0]).toMatchObject({ bodyType: "mannequin", characterRig: { rigType: "ue4-mannequin" } });
+  expect(characters[characters.length - 1]).toMatchObject({
+    name: "面捕演员01",
+    bodyType: "face-capture",
+    color: "#315C78",
+    characterRig: { rigType: "mannequin" },
+  });
+});
+
 it("adds camera shots with two-digit camera names", () => {
   useDirectorStore.setState(createInitialDirectorState());
 

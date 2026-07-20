@@ -1,6 +1,11 @@
 import { render } from "@testing-library/react";
+import { vi } from "vitest";
 import { BODY_TYPE_OPTIONS } from "./mannequin/bodyTypes";
 import { PrimitiveMannequin } from "./PrimitiveMannequin";
+
+vi.mock("./FaceHeadAttachment", () => ({
+  FaceHeadAttachment: () => <group name="mock-face-capture-head-model" />,
+}));
 
 it("renders a segmented humanoid mannequin with r3f-safe scene node names", () => {
   const { container } = render(<PrimitiveMannequin />);
@@ -30,7 +35,12 @@ it("renders every approved procedural body type safely", () => {
 
     expect(container.querySelectorAll("[data-testid]")).toHaveLength(0);
     expect(container.querySelector(`group[name="procedural-${option.bodyType}"]`)).toBeInTheDocument();
-    expect(container.querySelector('mesh[name="humanoid-head"]')).toBeInTheDocument();
+    if (option.bodyType === "face-capture") {
+      expect(container.querySelector('group[name="face-capture-head"]')).toBeInTheDocument();
+      expect(container.querySelector('mesh[name="humanoid-head"]')).not.toBeInTheDocument();
+    } else {
+      expect(container.querySelector('mesh[name="humanoid-head"]')).toBeInTheDocument();
+    }
 
     unmount();
   });

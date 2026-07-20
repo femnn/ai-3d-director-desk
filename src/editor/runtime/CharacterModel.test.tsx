@@ -45,3 +45,17 @@ it("keeps the procedural mannequin fallback for non-UE4 rigs", () => {
   expect(screen.getByTestId("mock-procedural-mannequin")).toHaveAttribute("data-body-type", "chibi");
   expect(screen.queryByTestId("mock-ue4-mannequin")).not.toBeInTheDocument();
 });
+
+it("renders the dedicated face-capture actor without replacing a UE4 mannequin head", () => {
+  render(
+    <CharacterModel
+      bodyType="face-capture"
+      faceProfile="facecap52"
+      faceSample={{ influences: {}, headRotation: [0, 0, 0, 1] }}
+      rigState={{ rigType: "ue4-mannequin", posePresetId: "stand", controls: {} }}
+    />
+  );
+
+  expect(screen.getByTestId("mock-procedural-mannequin")).toHaveAttribute("data-body-type", "face-capture");
+  expect(screen.queryByTestId("mock-ue4-mannequin")).not.toBeInTheDocument();
+});

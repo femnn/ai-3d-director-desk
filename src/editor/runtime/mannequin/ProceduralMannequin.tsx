@@ -1,11 +1,16 @@
-import type { CharacterRigState } from "../../schema/directorProject";
+import type { CharacterFaceSample } from "../../animation/characterFaceAnimation";
+import { NEUTRAL_CHARACTER_FACE_SAMPLE } from "../../animation/characterFaceAnimation";
+import type { CharacterFaceProfile, CharacterRigState } from "../../schema/directorProject";
+import { FaceHeadAttachment } from "../FaceHeadAttachment";
 import { getBodyPreset, type CharacterBodyType } from "./bodyTypes";
 import { degreesToRadians, getBodyTypePoseLimit, getRotationFromControls, getSingleAxisRotation } from "./mannequinPose";
-import { Foot, Hand, Head, Joint, Segment, Torso } from "./mannequinParts";
+import { Foot, Hand, Head, HumanoidMaterial, Joint, Segment, Torso } from "./mannequinParts";
 
 interface ProceduralMannequinProps {
   bodyType?: CharacterBodyType;
   color?: string;
+  faceProfile?: CharacterFaceProfile;
+  faceSample?: CharacterFaceSample;
   rigState?: CharacterRigState;
 }
 
@@ -26,10 +31,21 @@ function getLimbRotation(
   ];
 }
 
-export function ProceduralMannequin({ bodyType, color = "#4F8EF7", rigState }: ProceduralMannequinProps) {
+export function ProceduralMannequin({
+  bodyType,
+  color = "#4F8EF7",
+  faceProfile = "facecap52",
+  faceSample = NEUTRAL_CHARACTER_FACE_SAMPLE,
+  rigState,
+}: ProceduralMannequinProps) {
   const preset = getBodyPreset(bodyType);
   const controls = rigState?.controls ?? {};
   const p = preset.proportions;
+  const isFaceCaptureActor = preset.bodyType === "face-capture";
+  const upperBodyColor = color;
+  const lowerBodyColor = isFaceCaptureActor ? "#253044" : color;
+  const skinColor = isFaceCaptureActor ? "#D8DDE5" : color;
+  const shoeColor = isFaceCaptureActor ? "#101722" : color;
 
   const bodyRotation = getRotationFromControls(controls, "body", preset.bodyType);
   const torsoRotation = getRotationFromControls(controls, "torso", preset.bodyType);
@@ -69,8 +85,9 @@ export function ProceduralMannequin({ bodyType, color = "#4F8EF7", rigState }: P
           abdomenScale={p.torsoLowerScale}
           chestPosition={[0, chestY, 0]}
           chestScale={p.torsoUpperScale}
-          color={color}
+          color={upperBodyColor}
           pelvisPosition={[0, p.hipY, 0]}
+          pelvisColor={isFaceCaptureActor ? lowerBodyColor : undefined}
           pelvisRadius={p.pelvisRadius}
           pelvisScale={p.pelvisScale}
           torsoLowerHeight={p.torsoLowerHeight}
@@ -78,105 +95,134 @@ export function ProceduralMannequin({ bodyType, color = "#4F8EF7", rigState }: P
           torsoUpperHeight={p.torsoUpperHeight}
           torsoUpperRadius={p.torsoUpperRadius}
         />
-        <Head
-          color={color}
-          eyeRadius={p.eyeRadius}
-          faceOffsetZ={p.faceOffsetZ}
-          headRadius={p.headRadius}
-          headScale={p.headScale}
-          mouthScale={p.mouthScale}
-          neckHeight={p.neckHeight}
-          neckPosition={[0, neckY, 0]}
-          neckRadius={p.neckRadius}
-          noseScale={p.noseScale}
-          position={[0, headY, 0]}
-          rotation={headRotation}
-        />
+        {isFaceCaptureActor ? (
+          <>
+            <mesh name="face-capture-neck" position={[0, neckY, 0]}>
+              <cylinderGeometry args={[p.neckRadius * 0.88, p.neckRadius, p.neckHeight, 24]} />
+              <HumanoidMaterial color={skinColor} />
+            </mesh>
+            <mesh
+              name="face-capture-collar"
+              position={[0, neckY - p.neckHeight * 0.38, 0]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <torusGeometry args={[p.neckRadius * 1.36, 0.018, 10, 36]} />
+              <HumanoidMaterial color="#D9E2EE" />
+            </mesh>
+            <mesh
+              name="face-capture-shirt-hem"
+              position={[0, p.hipY + p.pelvisRadius * 0.62, 0]}
+              rotation={[Math.PI / 2, 0, 0]}
+              scale={[1, p.torsoLowerScale[2] / p.torsoLowerScale[0], 1]}
+            >
+              <torusGeometry args={[p.torsoLowerRadius * p.torsoLowerScale[0] * 0.98, 0.018, 10, 36]} />
+              <HumanoidMaterial color="#D9E2EE" />
+            </mesh>
+            <group name="face-capture-head" position={[0, headY, 0]} rotation={headRotation}>
+              <FaceHeadAttachment profile={faceProfile} sample={faceSample} />
+            </group>
+          </>
+        ) : (
+          <Head
+            color={color}
+            eyeRadius={p.eyeRadius}
+            faceOffsetZ={p.faceOffsetZ}
+            headRadius={p.headRadius}
+            headScale={p.headScale}
+            mouthScale={p.mouthScale}
+            neckHeight={p.neckHeight}
+            neckPosition={[0, neckY, 0]}
+            neckRadius={p.neckRadius}
+            noseScale={p.noseScale}
+            position={[0, headY, 0]}
+            rotation={headRotation}
+          />
+        )}
 
-        <Joint color={color} position={[-p.shoulderWidth * 0.86, shoulderY, 0]} radius={p.shoulderRadius} scale={jointScale} />
-        <Joint color={color} position={[p.shoulderWidth * 0.86, shoulderY, 0]} radius={p.shoulderRadius} scale={jointScale} />
+        <Joint color={upperBodyColor} position={[-p.shoulderWidth * 0.86, shoulderY, 0]} radius={p.shoulderRadius} scale={jointScale} />
+        <Joint color={upperBodyColor} position={[p.shoulderWidth * 0.86, shoulderY, 0]} radius={p.shoulderRadius} scale={jointScale} />
 
         <group position={[-p.shoulderWidth, armOriginY, 0]} rotation={leftShoulderRotation}>
           <Segment
-            color={color}
+            color={upperBodyColor}
             length={p.upperArmLength}
             position={[0, -(p.upperArmLength * 0.5 + p.upperArmRadius), 0]}
             radius={p.upperArmRadius}
           />
           <group position={[0, elbowY, 0]} rotation={leftElbowRotation}>
-            <Joint color={color} position={[0, 0, 0]} radius={p.elbowRadius} scale={jointScale} />
+            <Joint color={upperBodyColor} position={[0, 0, 0]} radius={p.elbowRadius} scale={jointScale} />
             <Segment
-              color={color}
+              color={upperBodyColor}
               length={p.forearmLength}
               position={[0, -(p.forearmLength * 0.5 + p.forearmRadius), 0]}
               radius={p.forearmRadius}
             />
-            <Joint color={color} position={[0, wristY, 0]} radius={p.wristRadius} scale={jointScale} />
-            <Hand color={color} position={[0, handY, 0.02]} radius={p.handRadius} scale={p.handScale} side="left" />
+            <Joint color={upperBodyColor} position={[0, wristY, 0]} radius={p.wristRadius} scale={jointScale} />
+            <Hand color={skinColor} position={[0, handY, 0.02]} radius={p.handRadius} scale={p.handScale} side="left" />
           </group>
         </group>
 
         <group position={[p.shoulderWidth, armOriginY, 0]} rotation={rightShoulderRotation}>
           <Segment
-            color={color}
+            color={upperBodyColor}
             length={p.upperArmLength}
             position={[0, -(p.upperArmLength * 0.5 + p.upperArmRadius), 0]}
             radius={p.upperArmRadius}
           />
           <group position={[0, elbowY, 0]} rotation={rightElbowRotation}>
-            <Joint color={color} position={[0, 0, 0]} radius={p.elbowRadius} scale={jointScale} />
+            <Joint color={upperBodyColor} position={[0, 0, 0]} radius={p.elbowRadius} scale={jointScale} />
             <Segment
-              color={color}
+              color={upperBodyColor}
               length={p.forearmLength}
               position={[0, -(p.forearmLength * 0.5 + p.forearmRadius), 0]}
               radius={p.forearmRadius}
             />
-            <Joint color={color} position={[0, wristY, 0]} radius={p.wristRadius} scale={jointScale} />
-            <Hand color={color} position={[0, handY, 0.02]} radius={p.handRadius} scale={p.handScale} side="right" />
+            <Joint color={upperBodyColor} position={[0, wristY, 0]} radius={p.wristRadius} scale={jointScale} />
+            <Hand color={skinColor} position={[0, handY, 0.02]} radius={p.handRadius} scale={p.handScale} side="right" />
           </group>
         </group>
       </group>
 
-      <Joint color={color} position={[-p.legSpread, hipJointY, 0]} radius={p.thighRadius * 1.08} scale={jointScale} />
-      <Joint color={color} position={[p.legSpread, hipJointY, 0]} radius={p.thighRadius * 1.08} scale={jointScale} />
+      <Joint color={lowerBodyColor} position={[-p.legSpread, hipJointY, 0]} radius={p.thighRadius * 1.08} scale={jointScale} />
+      <Joint color={lowerBodyColor} position={[p.legSpread, hipJointY, 0]} radius={p.thighRadius * 1.08} scale={jointScale} />
 
       <group position={[-p.legSpread, legOriginY, 0]} rotation={leftHipRotation}>
         <Segment
-          color={color}
+          color={lowerBodyColor}
           length={p.thighLength}
           position={[0, -(p.thighLength * 0.5 + p.thighRadius), 0]}
           radius={p.thighRadius}
         />
         <group position={[0, kneeY, 0]} rotation={leftKneeRotation}>
-          <Joint color={color} position={[0, 0, 0]} radius={p.kneeRadius} scale={jointScale} />
+          <Joint color={lowerBodyColor} position={[0, 0, 0]} radius={p.kneeRadius} scale={jointScale} />
           <Segment
-            color={color}
+            color={lowerBodyColor}
             length={p.calfLength}
             position={[0, -(p.calfLength * 0.5 + p.calfRadius), 0]}
             radius={p.calfRadius}
           />
-          <Joint color={color} position={[0, ankleY, 0]} radius={p.ankleRadius} scale={jointScale} />
-          <Foot color={color} length={p.footLength} position={[0, footY, p.footRadius * 0.74]} radius={p.footRadius} scale={p.footScale} side="left" />
+          <Joint color={lowerBodyColor} position={[0, ankleY, 0]} radius={p.ankleRadius} scale={jointScale} />
+          <Foot color={shoeColor} length={p.footLength} position={[0, footY, p.footRadius * 0.74]} radius={p.footRadius} scale={p.footScale} side="left" />
         </group>
       </group>
 
       <group position={[p.legSpread, legOriginY, 0]} rotation={rightHipRotation}>
         <Segment
-          color={color}
+          color={lowerBodyColor}
           length={p.thighLength}
           position={[0, -(p.thighLength * 0.5 + p.thighRadius), 0]}
           radius={p.thighRadius}
         />
         <group position={[0, kneeY, 0]} rotation={rightKneeRotation}>
-          <Joint color={color} position={[0, 0, 0]} radius={p.kneeRadius} scale={jointScale} />
+          <Joint color={lowerBodyColor} position={[0, 0, 0]} radius={p.kneeRadius} scale={jointScale} />
           <Segment
-            color={color}
+            color={lowerBodyColor}
             length={p.calfLength}
             position={[0, -(p.calfLength * 0.5 + p.calfRadius), 0]}
             radius={p.calfRadius}
           />
-          <Joint color={color} position={[0, ankleY, 0]} radius={p.ankleRadius} scale={jointScale} />
-          <Foot color={color} length={p.footLength} position={[0, footY, p.footRadius * 0.74]} radius={p.footRadius} scale={p.footScale} side="right" />
+          <Joint color={lowerBodyColor} position={[0, ankleY, 0]} radius={p.ankleRadius} scale={jointScale} />
+          <Foot color={shoeColor} length={p.footLength} position={[0, footY, p.footRadius * 0.74]} radius={p.footRadius} scale={p.footScale} side="right" />
         </group>
       </group>
     </group>

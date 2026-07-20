@@ -39,7 +39,7 @@ export default function App() {
     state.project.objects
       .filter((object) =>
         object.kind === "character" &&
-        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+        (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
       )
       .map((object) =>
         `${object.id}:${object.characterActionTrack?.actionId ?? ""}:${object.characterActionTrack?.duration ?? ""}:${object.characterFaceTrack?.clipId ?? ""}:${object.characterFaceTrack?.enabled ?? false}`
@@ -71,7 +71,7 @@ export default function App() {
     const characterIds = useDirectorStore.getState().project.objects
       .filter((object) =>
         object.kind === "character" &&
-        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+        (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
       )
       .map((object) => object.id);
     syncNormalCharacterAnimations(characterIds);

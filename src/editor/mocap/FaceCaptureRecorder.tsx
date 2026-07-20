@@ -31,7 +31,7 @@ function activeCharacterIds() {
   return useDirectorStore.getState().project.objects
     .filter((object) =>
       object.kind === "character" &&
-      (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+      (object.characterActionTrack?.enabled || (object.bodyType === "face-capture" && object.characterFaceTrack?.enabled))
     )
     .map((object) => object.id);
 }

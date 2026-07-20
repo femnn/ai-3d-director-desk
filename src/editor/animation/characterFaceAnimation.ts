@@ -45,6 +45,11 @@ export interface CharacterFaceSample {
   headRotation: [number, number, number, number];
 }
 
+export const NEUTRAL_CHARACTER_FACE_SAMPLE: CharacterFaceSample = {
+  influences: {},
+  headRotation: [0, 0, 0, 1],
+};
+
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 }

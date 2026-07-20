@@ -37,7 +37,17 @@ class CharacterModelBoundary extends Component<
 }
 
 export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJointPositionsChange, onLabelAnchorYChange, rigState }: CharacterModelProps) {
-  const fallback = <PrimitiveMannequin bodyType={bodyType} color={color} rigState={rigState} />;
+  const fallback = (
+    <PrimitiveMannequin
+      bodyType={bodyType}
+      color={color}
+      faceProfile={faceProfile}
+      faceSample={faceSample}
+      rigState={rigState}
+    />
+  );
+
+  if (bodyType === "face-capture") return fallback;
 
   if (rigState?.rigType !== "ue4-mannequin") {
     return fallback;
@@ -51,8 +61,6 @@ export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJoi
         onJointPositionsChange={onJointPositionsChange}
         onLabelAnchorYChange={onLabelAnchorYChange}
         rigState={rigState}
-        faceProfile={faceProfile}
-        faceSample={faceSample}
       />
     </CharacterModelBoundary>
   );

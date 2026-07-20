@@ -60,7 +60,8 @@ export type CharacterBodyType =
   | "slim"
   | "teen"
   | "child"
-  | "chibi";
+  | "chibi"
+  | "face-capture";
 export type DirectorAssetKind = "character" | "scene" | "prop" | "panorama";
 export type DirectorAssetSource = "local" | "library";
 export type PanoramaProjectionMode = "equirectangular" | "backdrop";

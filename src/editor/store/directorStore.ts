@@ -309,7 +309,7 @@ function roundTransformTuple(values: [number, number, number]): [number, number,
   return values.map((value) => roundTransformValue(value)) as [number, number, number];
 }
 
-function formatSceneItemName(prefix: "角色" | "机位", index: number) {
+function formatSceneItemName(prefix: "角色" | "机位" | "面捕演员", index: number) {
   return `${prefix}${String(index).padStart(2, "0")}`;
 }
 
@@ -746,6 +746,16 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
       }
 
       const rig = object.characterRig;
+      if (normalizedObject.bodyType === "face-capture") {
+        return {
+          ...normalizedObject,
+          characterRig: {
+            rigType: "mannequin",
+            posePresetId: rig?.posePresetId ?? "stand",
+            controls: rig?.controls ?? {},
+          },
+        };
+      }
       if (rig?.rigType === "ue4-mannequin") return normalizedObject;
 
       return {
@@ -1012,20 +1022,22 @@ function buildPresetCharacterObject(
     characterIndex
   );
   const normalizedBodyType = normalizeBodyType(bodyType);
+  const isFaceCaptureActor = normalizedBodyType === "face-capture";
+  const faceCaptureCount = state.project.objects.filter((item) => item.bodyType === "face-capture").length;
 
   return {
     id: objectId,
-    name: formatSceneItemName("角色", characterIndex),
+    name: isFaceCaptureActor ? formatSceneItemName("面捕演员", faceCaptureCount + 1) : formatSceneItemName("角色", characterIndex),
     kind: "character" as const,
     visible: true,
     locked: false,
     bodyType: normalizedBodyType,
-    color: getNextCharacterColor(state.project.objects),
+    color: isFaceCaptureActor ? "#315C78" : getNextCharacterColor(state.project.objects),
     crowdId: crowdMetadata?.crowdId,
     crowdLabel: crowdMetadata?.crowdLabel,
     transform: createTransform(position),
     characterRig: {
-      rigType: "ue4-mannequin" as const,
+      rigType: isFaceCaptureActor ? "mannequin" as const : "ue4-mannequin" as const,
       posePresetId: "stand",
       controls: {},
     },
@@ -1919,12 +1931,17 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
     updateCharacterBodyType: (id, bodyType) =>
       commitMutation((state) => {
         const normalizedBodyType = normalizeBodyType(bodyType);
+        const nextRigType: "mannequin" | "ue4-mannequin" =
+          normalizedBodyType === "face-capture" ? "mannequin" : "ue4-mannequin";
         const currentObject = state.project.objects.find((item) => item.id === id);
         const nextObject =
           currentObject?.kind === "character"
             ? {
                 ...currentObject,
                 bodyType: normalizedBodyType,
+                characterRig: currentObject.characterRig
+                  ? { ...currentObject.characterRig, rigType: nextRigType }
+                  : { rigType: nextRigType, posePresetId: "stand", controls: {} },
               }
             : null;
 
@@ -1937,6 +1954,9 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
                 ? {
                     ...item,
                     bodyType: normalizedBodyType,
+                    characterRig: item.characterRig
+                      ? { ...item.characterRig, rigType: nextRigType }
+                      : { rigType: nextRigType, posePresetId: "stand", controls: {} },
                   }
                 : item
             ),

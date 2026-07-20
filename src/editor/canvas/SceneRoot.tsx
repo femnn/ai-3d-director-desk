@@ -27,7 +27,7 @@ import type { TransformMode } from "../store/directorStore";
 import { useDirectorStore } from "../store/directorStore";
 import { CharacterModel } from "../runtime/CharacterModel";
 import { getActionTrackDuration, useAnimatedCharacterRigState } from "../animation/characterAnimation";
-import { sampleCharacterFaceClip } from "../animation/characterFaceAnimation";
+import { NEUTRAL_CHARACTER_FACE_SAMPLE, sampleCharacterFaceClip } from "../animation/characterFaceAnimation";
 import { getGroundedLabelY } from "../runtime/mannequin/bodyTypes";
 import { getUE4GroundedLabelY } from "../runtime/ue4Mannequin/ue4MannequinRig";
 import { getEffectiveGroundOpacity } from "./panoramaMath";
@@ -1180,14 +1180,17 @@ function ObjectSceneNode({
   const faceClip = item.characterFaceTrack?.clipId
     ? faceClips.find((clip) => clip.id === item.characterFaceTrack?.clipId && clip.characterId === item.id)
     : undefined;
-  const faceSample = item.characterFaceTrack?.enabled && faceClip
+  const isFaceCaptureActor = item.bodyType === "face-capture";
+  const faceSample = isFaceCaptureActor && item.characterFaceTrack?.enabled && faceClip
     ? sampleCharacterFaceClip(
         faceClip,
         item.characterFaceTrack.profile,
         animatedCharacter.elapsed,
         item.characterFaceTrack.loop
       )
-    : undefined;
+    : isFaceCaptureActor
+      ? NEUTRAL_CHARACTER_FACE_SAMPLE
+      : undefined;
   const sequenceRuntime = useAnimationSequenceRuntime();
   const sequenceControlsScene = Boolean(animationSequence && sequenceRuntime.sequenceId === animationSequence.id);
   const sequenceCharacterTrack = animationSequence && sequenceControlsScene
@@ -1313,7 +1316,7 @@ function ObjectSceneNode({
               <CharacterModel
                 bodyType={item.bodyType}
                 color={item.color}
-                faceProfile={faceSample ? item.characterFaceTrack?.profile : undefined}
+                faceProfile={isFaceCaptureActor ? (item.characterFaceTrack?.profile ?? "facecap52") : undefined}
                 faceSample={faceSample}
                 onJointPositionsChange={editingPose ? handleJointPositionsChange : undefined}
                 onLabelAnchorYChange={handleCharacterLabelAnchorYChange}

@@ -4245,6 +4245,28 @@ body.phone-immersive .phone-action-grid button {
   grid-template-columns: minmax(0, 1fr) 54px;
 }
 
+.face-capture-empty-state {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgb(var(--border-rgb) / 0.58);
+  border-radius: 6px;
+  background: rgb(var(--field-rgb) / 0.45);
+}
+
+.face-capture-empty-state p {
+  margin: 0;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.face-capture-empty-state button {
+  min-height: 36px;
+  border-color: rgb(var(--accent-rgb) / 0.65);
+  background: rgb(var(--accent-rgb) / 0.14);
+}
+
 .pose-edit-launch {
   width: 100%;
   min-height: 38px;

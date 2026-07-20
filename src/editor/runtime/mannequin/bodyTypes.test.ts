@@ -17,6 +17,7 @@ it("defines the approved LibTV-style procedural body types", () => {
     "teen",
     "child",
     "chibi",
+    "face-capture",
   ]);
 
   expect(BODY_TYPE_OPTIONS.map((item) => item.label)).toEqual([
@@ -28,6 +29,7 @@ it("defines the approved LibTV-style procedural body types", () => {
     "少年素体",
     "儿童素体",
     "二头身",
+    "面捕演员",
   ]);
 });
 

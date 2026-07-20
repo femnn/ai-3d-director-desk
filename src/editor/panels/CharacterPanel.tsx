@@ -53,6 +53,7 @@ export function CharacterPanel() {
   const deleteCharacterMotionClip = useDirectorStore((state) => state.deleteCharacterMotionClip);
   const poseEditMode = useDirectorStore((state) => state.poseEditMode);
   const setPoseEditMode = useDirectorStore((state) => state.setPoseEditMode);
+  const addPresetCharacter = useDirectorStore((state) => state.addPresetCharacter);
 
   const selection = useMemo(() => {
     const role = objects.find((item) => item.id === selectedObjectId && item.kind === "character");
@@ -127,7 +128,7 @@ export function CharacterPanel() {
           item.kind === "character" &&
           (
             (item.characterActionTrack?.enabled && item.characterActionTrack.playbackMode === "normal") ||
-            item.characterFaceTrack?.enabled
+            (item.bodyType === "face-capture" && item.characterFaceTrack?.enabled)
           )
         )
         .map((item) => item.id)
@@ -539,10 +540,13 @@ export function CharacterPanel() {
               onChange={setFaceTargetId}
             />
           ) : null}
-          {faceTargetRole.characterRig?.rigType === "ue4-mannequin" && !faceTargetRole.assetRefId ? (
+          {faceTargetRole.bodyType === "face-capture" && !faceTargetRole.assetRefId ? (
             <FaceCaptureRecorder key={faceTargetRole.id} character={faceTargetRole} />
           ) : (
-            <p>面部动画第一版仅支持内置 UE4 假人角色。</p>
+            <div className="face-capture-empty-state">
+              <p>普通角色保留原始头部。请使用独立的面捕演员录制表情。</p>
+              <button type="button" onClick={() => addPresetCharacter("face-capture")}>新增面捕演员</button>
+            </div>
           )}
         </InspectorSection>
       )}

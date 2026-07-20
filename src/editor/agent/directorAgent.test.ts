@@ -515,7 +515,8 @@ it("applies a complete AI scene and its animation sequences as one undo batch", 
 });
 
 it("lets the agent list, assign, switch, and export character face clips", async () => {
-  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  useDirectorStore.getState().addPresetCharacter("face-capture");
+  const character = useDirectorStore.getState().project.objects.find((item) => item.bodyType === "face-capture")!;
   const clipId = useDirectorStore.getState().addCharacterFaceClip({
     characterId: character.id,
     name: "表情片段",
@@ -540,4 +541,52 @@ it("lets the agent list, assign, switch, and export character face clips", async
   expect(listed.clips.map((clip) => clip.id)).toContain(clipId);
   const exported = await executeDirectorAgentTool("export_face_clip", { clipId }) as { faceAnimationPackage: { format: string } };
   expect(exported.faceAnimationPackage.format).toBe("storyai-face-animation");
+});
+
+it("keeps face clips on dedicated actors through character export and import", () => {
+  useDirectorStore.getState().addPresetCharacter("face-capture");
+  const character = useDirectorStore.getState().project.objects.find((item) => item.bodyType === "face-capture")!;
+  const clipId = useDirectorStore.getState().addCharacterFaceClip({
+    characterId: character.id,
+    name: "专用演员表情",
+    duration: 5,
+    fps: 30,
+    channels: ["jawOpen"],
+    frames: [{ time: 0, values: [0.35], headRotation: [0, 0, 0, 1] }],
+    checksum: "face_round_trip",
+  });
+  useDirectorStore.getState().setCharacterFaceTrack(character.id, {
+    clipId,
+    profile: "facecap52",
+    enabled: true,
+    loop: true,
+  });
+
+  const characterPackage = exportCharacterPackage(character.id);
+  useDirectorStore.getState().resetDirectorDesk();
+  const result = importCharacterPackage(characterPackage);
+  const project = useDirectorStore.getState().project;
+  const imported = project.objects.find((object) => object.id === result.id)!;
+  const importedClip = project.characterFaceClips?.find((clip) => clip.characterId === imported.id);
+
+  expect(imported).toMatchObject({ bodyType: "face-capture", characterRig: { rigType: "mannequin" } });
+  expect(imported.characterFaceTrack).toMatchObject({ clipId: importedClip?.id, enabled: true, loop: true });
+  expect(importedClip).toMatchObject({ name: "专用演员表情", channels: ["jawOpen"] });
+});
+
+it("rejects binding a face clip to an ordinary UE4 character", async () => {
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  const clipId = useDirectorStore.getState().addCharacterFaceClip({
+    characterId: character.id,
+    name: "不应绑定的片段",
+    duration: 5,
+    fps: 30,
+    channels: ["jawOpen"],
+    frames: [{ time: 0, values: [0], headRotation: [0, 0, 0, 1] }],
+    checksum: "face_reject",
+  });
+
+  await expect(executeDirectorAgentTool("assign_face_clip", { characterId: character.id, clipId })).rejects.toThrow(
+    "普通角色保留原始头部"
+  );
 });

@@ -49,7 +49,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **横屏全屏操控**：进入全屏时优先锁定系统横屏，不支持方向锁定的浏览器会自动使用横屏布局。
 - **机位监看与视频录制**：手机和电脑显示同一实时机位画面，支持 5 / 10 / 15 秒轨迹录制与 MP4 导出。
 - **角色姿势与动画**：提供循环动作、镜头移动驱动动作、视频动作提取、图片姿势提取、骨骼编辑和 AnimoFlow 文字动作入口。
-- **本地面部动画**：在角色“面部”页用电脑摄像头录制 5 / 10 / 15 秒表演，FaceCap 52 或 GNM Head 会立即绑定当前角色并循环播放；只保存表情数据，不保存摄像头视频。
+- **独立面捕演员**：普通角色保持原始外观；新增完整的面捕演员，用电脑摄像头录制 5 / 10 / 15 秒表演，FaceCap 52 或 GNM Head 会绑定该演员并循环播放。只保存表情数据，不保存摄像头视频。
 - **AI 快速布景**：Agent 通过白名单 JSON 命令创建角色、道具、站位和机位，不执行任意脚本。
 - **参考图程序化场景**：兼容 ObjectSculptSpec，AI 可在同一布景命令中生成汽车、火车、飞机或建筑总成；画面点击整体移动，对象树展开后精修零件，并保留材质与动画。
 - **可注册的 AI 3D 模型工厂**：把 Codex / Img2ThreeJS 生成并审查过的复杂模型注册为安全白名单资产；首个示例支持红色跑车连续变形成机甲，并在电脑监看、手机预览和录像中保持一致。
@@ -94,11 +94,12 @@ npm run dev
 
 ### 面部动画
 
-1. 选中内置 UE4 假人，在右侧打开“面部”页并选择 FaceCap 52 或 GNM Head。
-2. 打开摄像头，让面部完整进入取景框，保持自然表情并点击“校准中性表情”。
-3. 选择 5、10 或 15 秒，倒计时后完成眨眼、说话、微笑和转头等表演。
-4. 停止后片段自动绑定当前角色并循环播放；身体动作与面部动画可以同时运行。
-5. 面部片段随工程、布景命令和单角色文件保存，也可单独导入/导出 `storyai-face-animation` 或导入 GNM Studio motion JSON。
+1. 从“添加角色”中创建“面捕演员”，或在普通角色的“面部”页点击“新增面捕演员”。普通 UE4 角色不会被替换头部。
+2. 选中面捕演员，在右侧打开“面部”页并选择 FaceCap 52 或 GNM Head。
+3. 打开摄像头，让面部完整进入取景框，保持自然表情并点击“校准中性表情”。
+4. 选择 5、10 或 15 秒，倒计时后完成眨眼、说话、微笑和转头等表演。
+5. 停止后片段自动绑定当前角色并循环播放；身体动作与面部动画可以同时运行。
+6. 面部片段随工程、布景命令和单角色文件保存，也可单独导入/导出 `storyai-face-animation` 或导入 GNM Studio motion JSON。
 
 手机预览只在片段创建或修改时同步面部数据，播放期间与电脑监看共用动画时间。摄像头原始画面不会写入工程或上传。
 
@@ -152,7 +153,7 @@ npm run dev
 - **Landscape fullscreen controls**: fullscreen mode requests landscape orientation and falls back to a responsive landscape layout when orientation lock is unavailable.
 - **Live monitoring and MP4 recording**: the phone and desktop use the same live camera view, with 5, 10, and 15-second camera-path recording.
 - **Character posing and animation**: looping presets, camera-motion-driven playback, video motion extraction, image pose extraction, direct rig editing, and an AnimoFlow text-to-motion entry point.
-- **Local facial animation**: record a 5, 10, or 15-second desktop webcam performance, bind it to the selected character, and loop it through either FaceCap 52 or GNM Head. Only motion data is stored; webcam pixels are discarded.
+- **Dedicated facial-capture actor**: regular characters retain their original appearance. Add a complete facial-capture actor, record a 5, 10, or 15-second webcam performance, and loop it through FaceCap 52 or GNM Head. Only motion data is stored.
 - **Agent-assisted scene building**: a local agent creates characters, props, blocking, and cameras through a strict JSON tool whitelist.
 - **Reference-driven procedural props**: import an AI-authored ObjectSculptSpec as an editable, hierarchical, animation-ready prop with roughness, metalness, and opacity preserved.
 - **Allowlisted AI 3D factories**: register reviewed Codex / Img2ThreeJS models as safe reusable assets. The first factory continuously transforms a sports car into a robot and renders consistently in desktop, phone, and recorded views.
@@ -196,7 +197,7 @@ npm run package:win
 
 ### Facial Animation
 
-Select a built-in UE4 mannequin and open the **Face** tab. Start the camera, calibrate a neutral expression, choose 5, 10, or 15 seconds, and record. The resulting clip binds only to that character and loops alongside body animation. Complete projects, scene commands, character packages, and standalone `storyai-face-animation` files preserve the clip; GNM Studio motion JSON can also be imported.
+Add a **Facial Capture Actor** from the character menu, then open its **Face** tab. Regular UE4 characters are never given replacement heads. Start the camera, calibrate a neutral expression, choose 5, 10, or 15 seconds, and record. The resulting clip binds only to that actor and loops alongside body animation. Complete projects, scene commands, character packages, and standalone `storyai-face-animation` files preserve the clip; GNM Studio motion JSON can also be imported.
 
 See the [English User Guide](docs/USER_GUIDE_EN.md) for detailed instructions.
 

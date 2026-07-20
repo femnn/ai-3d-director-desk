@@ -32,7 +32,7 @@ apply_scene_script 直接导入的 JSON 对象。
 - 坐标：`[x, y, z]`，Y 轴向上，常用人物脚底高度为 `y=0`。
 - 旋转：弧度，90 度为 `1.5708`，180 度为 `3.1416`，一圈为 `6.2832`。
 - 基础体：`box`、`rounded-box`、`sphere`、`ellipsoid`、`hemisphere`、`capsule`、`cylinder`、`pipe`、`disc`、`plane`、`plane-card`、`wedge`、`torus`、`cone`、`pyramid`。
-- 角色体型：`mannequin`、`female`、`broad`、`muscular`、`slim`、`teen`、`child`、`chibi`。
+- 角色体型：`mannequin`、`female`、`broad`、`muscular`、`slim`、`teen`、`child`、`chibi`、`face-capture`。需要面部动画时必须新建 `face-capture` 面捕演员，普通角色保持原始头部。
 - 角色动作：`still`、`idle`、`sit`、`drink-tea`、`talk`、`walk`、`run`、`turn`、`look`、`wave`、`bow`、`think`、`reach`、`push`、`fight`、`dance`、`light-dance`、`phone`。其中 `light-dance` 是带交叉步、抬腿、连续蹲跳、摆臂和过头动作的 15 秒编舞，不能压缩为 5 秒。
 
 ## 场景 JSON 示例

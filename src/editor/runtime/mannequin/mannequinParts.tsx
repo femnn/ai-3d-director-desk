@@ -44,6 +44,7 @@ interface TorsoProps {
   chestScale: [number, number, number];
   color: string;
   pelvisPosition: [number, number, number];
+  pelvisColor?: string;
   pelvisRadius: number;
   pelvisScale: [number, number, number];
   torsoLowerHeight: number;
@@ -150,6 +151,7 @@ export function Torso({
   chestScale,
   color,
   pelvisPosition,
+  pelvisColor,
   pelvisRadius,
   pelvisScale,
   torsoLowerHeight,
@@ -190,7 +192,7 @@ export function Torso({
       </mesh>
       <mesh name="humanoid-pelvis" position={pelvisPosition} scale={pelvisScale}>
         <sphereGeometry args={[pelvisRadius, 24, 20]} />
-        <HumanoidMaterial color={color} />
+        <HumanoidMaterial color={pelvisColor ?? color} />
       </mesh>
     </>
   );
