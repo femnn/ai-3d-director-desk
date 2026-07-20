@@ -19,6 +19,14 @@ export const GEOMETRY_PRIMITIVE_OPTIONS = [
   { type: "pyramid", label: "棱锥" },
 ] as const;
 export type GeometryPrimitiveType = (typeof GEOMETRY_PRIMITIVE_OPTIONS)[number]["type"];
+export const PROCEDURAL_FACTORY_OPTIONS = [
+  { id: "crimson-transformer", label: "赤曜变形机甲" },
+] as const;
+export type ProceduralFactoryId = (typeof PROCEDURAL_FACTORY_OPTIONS)[number]["id"];
+export interface DirectorProceduralFactorySettings {
+  id: ProceduralFactoryId;
+  parameters?: Record<string, string | number | boolean>;
+}
 export type CharacterRigType = "mannequin" | "ue4-mannequin" | "mixamo" | "vrm" | "custom-humanoid";
 export type CharacterActionId =
   | "still"
@@ -239,6 +247,8 @@ export interface DirectorObject {
   /** Visual mesh dimensions, intentionally separate from the node transform inherited by children. */
   geometrySize?: [number, number, number];
   material?: DirectorMaterialSettings;
+  /** Allowlisted code-generated Three.js factory. Scene JSON can reference it but cannot execute code. */
+  proceduralFactory?: DirectorProceduralFactorySettings;
   /** Viewport clicks resolve to this root so a generated vehicle or building moves as one assembly. */
   assemblyRootId?: string | null;
   assemblySelectionMode?: "whole" | "parts";

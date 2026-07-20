@@ -51,6 +51,7 @@ Click a poster to play the MP4. The demos cover synchronized phone camera contro
 - **角色姿势与动画**：提供循环动作、镜头移动驱动动作、视频动作提取、图片姿势提取、骨骼编辑和 AnimoFlow 文字动作入口。
 - **AI 快速布景**：Agent 通过白名单 JSON 命令创建角色、道具、站位和机位，不执行任意脚本。
 - **参考图程序化场景**：兼容 ObjectSculptSpec，AI 可在同一布景命令中生成汽车、火车、飞机或建筑总成；画面点击整体移动，对象树展开后精修零件，并保留材质与动画。
+- **可注册的 AI 3D 模型工厂**：把 Codex / Img2ThreeJS 生成并审查过的复杂模型注册为安全白名单资产；首个示例支持红色跑车连续变形成机甲，并在电脑监看、手机预览和录像中保持一致。
 - **一键保存与恢复**：支持完整工程 JSON、可复用布景命令、导入模型、角色姿势和摄像机动画。
 - **组合与物体动画**：手动组合道具，编辑关键帧和编号路径点，并让整体或子部件分别运动。
 - **统一 AI 动画时间轴**：用同一时钟驱动角色、组合道具和局部部件，支持手动播放、录制时播放和随镜头运动。
@@ -96,6 +97,7 @@ npm run dev
 白名单工具包括：
 
 - `get_scene`
+- `list_procedural_factories`
 - `apply_scene_script`
 - `add_character` / `update_character`
 - `add_camera` / `set_camera_view`
@@ -112,6 +114,8 @@ npm run dev
 `apply_scene_script` 直接支持 `proceduralObjects`，也支持递归 `groups[].children`，以及 `repeat`、`mirror`、`pathCopy`。程序化总成使用独立网格尺寸，车身不会再次拉伸车轮或车窗；任意整体或部件均可添加 5 / 10 / 15 秒的位置、旋转、缩放或路径动画。
 
 参考图生成复杂场景时，可让 Codex 按 [ObjectSculptSpec 导入指南](docs/AI_SCENE_SCRIPT_GUIDE.md#从参考图生成更真实的程序化道具) 输出 `proceduralObjects`，再在 AI 布景面板直接导入。汽车和列车验收示例见 [`procedural-vehicle-yard.json`](examples/scene-scripts/procedural-vehicle-yard.json)。导演台只解析白名单结构，不执行 AI 生成的任意 JavaScript。
+
+需要保留 Img2ThreeJS / Codex 专用造型代码和连续机械形变时，使用[程序化模型工厂接入指南](docs/IMG2THREEJS_FACTORY_INTEGRATION.md)。可直接导入的变形跑车/机甲示例见 [`crimson-transformer-showcase.json`](examples/scene-scripts/crimson-transformer-showcase.json)。
 
 ### 致谢与来源
 
@@ -131,6 +135,7 @@ npm run dev
 - **Character posing and animation**: looping presets, camera-motion-driven playback, video motion extraction, image pose extraction, direct rig editing, and an AnimoFlow text-to-motion entry point.
 - **Agent-assisted scene building**: a local agent creates characters, props, blocking, and cameras through a strict JSON tool whitelist.
 - **Reference-driven procedural props**: import an AI-authored ObjectSculptSpec as an editable, hierarchical, animation-ready prop with roughness, metalness, and opacity preserved.
+- **Allowlisted AI 3D factories**: register reviewed Codex / Img2ThreeJS models as safe reusable assets. The first factory continuously transforms a sports car into a robot and renders consistently in desktop, phone, and recorded views.
 - **Save and restore**: export complete project JSON or reusable scene commands, including imported assets, edited poses, cameras, and camera animations.
 - **Grouped prop animation**: group props manually, edit keyframes and numbered path points, and animate assemblies or child parts independently.
 - **Multi-phone production**: multiple phones can join simultaneously and control separate cameras; missing cameras are created automatically.

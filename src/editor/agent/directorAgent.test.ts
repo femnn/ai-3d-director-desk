@@ -8,6 +8,7 @@ import {
   importCharacterAnimationPackage,
   importCharacterPackage,
   reviewAnimationSequence,
+  updateProp,
 } from "./directorAgent";
 import {
   getCharacterActionElapsed,
@@ -20,6 +21,7 @@ import { getAnimationSequenceRuntimeSnapshot, resetAnimationSequenceRuntime } fr
 import danceExample from "../../../examples/animation-sequences/ai-dance-15s.json";
 import fightExample from "../../../examples/animation-sequences/two-person-fight-10s.json";
 import carJumpExample from "../../../examples/animation-sequences/car-jump-train-breakup-10s.json";
+import transformerExample from "../../../examples/scene-scripts/crimson-transformer-showcase.json";
 
 beforeEach(() => {
   useDirectorStore.setState({
@@ -110,6 +112,33 @@ it("round-trips manually edited pose controls through scene scripts", () => {
     "rightElbow.bend": 64,
     "head.yaw": -18,
   });
+});
+
+it("round-trips an allowlisted procedural factory without importing executable code", () => {
+  applySceneScript(transformerExample as never);
+
+  updateProp({
+    name: "赤曜变形机甲",
+    factoryId: "crimson-transformer",
+    factoryParameters: { morph: 0.35, autoTransform: true, transformDuration: 15 },
+    position: [1, 0, -2],
+  });
+
+  const created = useDirectorStore.getState().project.objects.find((object) => object.name === "赤曜变形机甲");
+  expect(created?.proceduralFactory).toEqual({
+    id: "crimson-transformer",
+    parameters: { morph: 0.35, autoTransform: true, transformDuration: 15 },
+  });
+
+  const exported = exportSceneScript();
+  expect(exported.props?.[0]).toMatchObject({
+    factoryId: "crimson-transformer",
+    factoryParameters: { morph: 0.35, autoTransform: true, transformDuration: 15 },
+  });
+
+  applySceneScript(exported);
+  const restored = useDirectorStore.getState().project.objects.find((object) => object.name === "赤曜变形机甲");
+  expect(restored?.proceduralFactory?.id).toBe("crimson-transformer");
 });
 
 it("round-trips a reusable character package with color, pose, and video motion frames", () => {

@@ -54,6 +54,20 @@ it("renders the prop inspector fields for imported models", () => {
   expect(screen.getByLabelText("模型颜色 HEX")).toBeInTheDocument();
 });
 
+it("exposes safe transformer parameters for a registered procedural model", () => {
+  useDirectorStore.getState().setObjectProceduralFactory("prop_model_1", {
+    id: "crimson-transformer",
+    parameters: { morph: 0.25, autoTransform: true, transformDuration: 10 },
+  });
+
+  render(<PropPanel />);
+
+  expect(screen.getByText("程序化模型")).toBeInTheDocument();
+  expect(screen.getByLabelText("程序化模型变形方式")).toHaveTextContent("自动往返变形");
+  expect(screen.getByLabelText("程序化模型变形进度数值")).toHaveValue(0.25);
+  expect(screen.getByLabelText("程序化模型自动变形时长")).toHaveTextContent("10秒");
+});
+
 it("updates the selected prop name, uniform scale, and color", async () => {
   const user = userEvent.setup();
   render(<PropPanel />);

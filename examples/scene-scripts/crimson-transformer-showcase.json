@@ -1,0 +1,41 @@
+{
+  "reset": true,
+  "scene": {
+    "backgroundColor": "#17202a",
+    "groundColor": "#27313a",
+    "showGrid": true,
+    "showCameraPaths": false
+  },
+  "characters": [],
+  "props": [
+    {
+      "id": "crimson-transformer",
+      "name": "赤曜变形机甲",
+      "factoryId": "crimson-transformer",
+      "factoryParameters": {
+        "morph": 0,
+        "autoTransform": true,
+        "transformDuration": 10
+      },
+      "color": "#a62934",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.82, 0.82, 0.82]
+    }
+  ],
+  "cameras": [
+    {
+      "id": "transformer-camera",
+      "name": "变形展示机位",
+      "position": [7.5, 4.1, 8.5],
+      "lookAt": [0, 2.1, 0],
+      "fov": 42
+    }
+  ],
+  "directorView": {
+    "position": [8.5, 5.2, 10],
+    "lookAt": [0, 2, 0],
+    "fov": 45
+  },
+  "activeCameraId": "transformer-camera"
+}

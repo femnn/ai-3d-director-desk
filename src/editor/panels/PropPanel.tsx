@@ -11,6 +11,7 @@ import {
 } from "./InspectorControls";
 import { useDirectorStore } from "../store/directorStore";
 import type { ObjectAnimationTrack } from "../schema/directorProject";
+import { getCrimsonTransformerParameters } from "../runtime/proceduralFactories/proceduralFactoryRegistry";
 
 function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: number): [number, number, number] {
   return tuple.map((item, index) => (index === axis ? value : item)) as [number, number, number];
@@ -38,6 +39,7 @@ export function PropPanel() {
   const updateUniformScale = useDirectorStore((state) => state.updateUniformScale);
   const updateObjectColor = useDirectorStore((state) => state.updateObjectColor);
   const updateObjectMaterial = useDirectorStore((state) => state.updateObjectMaterial);
+  const setObjectProceduralFactory = useDirectorStore((state) => state.setObjectProceduralFactory);
   const updateObjectGeometrySize = useDirectorStore((state) => state.updateObjectGeometrySize);
   const updateObjectPivot = useDirectorStore((state) => state.updateObjectPivot);
   const setObjectParent = useDirectorStore((state) => state.setObjectParent);
@@ -60,6 +62,18 @@ export function PropPanel() {
   const updateAnimation = (patch: Partial<ObjectAnimationTrack>) =>
     setObjectAnimationTrack(prop.id, { ...animationTrack, ...patch, loop: true });
   const pivot = prop.pivot ?? [0, 0, 0];
+  const transformerParameters = prop.proceduralFactory?.id === "crimson-transformer"
+    ? getCrimsonTransformerParameters(prop.proceduralFactory)
+    : null;
+  const updateTransformerParameters = (
+    patch: Partial<NonNullable<typeof transformerParameters>>
+  ) => {
+    if (!prop.proceduralFactory || !transformerParameters) return;
+    setObjectProceduralFactory(prop.id, {
+      id: prop.proceduralFactory.id,
+      parameters: { ...transformerParameters, ...patch },
+    });
+  };
   const parentOptions = objects.filter(
     (item) => item.id !== prop.id && item.kind !== "camera" && item.parentId !== prop.id
   );
@@ -203,6 +217,37 @@ export function PropPanel() {
         value={prop.transform.scale[0]}
         onValueChange={(value) => updateUniformScale(prop.id, Number(value))}
       />
+      {transformerParameters ? (
+        <InspectorSection title="程序化模型">
+          <InspectorSelectField
+            label="变形方式"
+            ariaLabel="程序化模型变形方式"
+            value={transformerParameters.autoTransform ? "auto" : "static"}
+            options={[
+              { value: "static", label: "手动固定形态" },
+              { value: "auto", label: "自动往返变形" },
+            ]}
+            onChange={(value) => updateTransformerParameters({ autoTransform: value === "auto" })}
+          />
+          <InspectorRangeNumberField
+            label="汽车 / 机器人"
+            rangeAriaLabel="程序化模型变形进度"
+            numberAriaLabel="程序化模型变形进度数值"
+            min="0"
+            max="1"
+            step="0.01"
+            value={transformerParameters.morph}
+            onValueChange={(value) => updateTransformerParameters({ morph: Number(value) })}
+          />
+          <InspectorSelectField
+            label="往返时长"
+            ariaLabel="程序化模型自动变形时长"
+            value={String(transformerParameters.transformDuration)}
+            options={[5, 10, 15].map((duration) => ({ value: String(duration), label: `${duration}秒` }))}
+            onChange={(value) => updateTransformerParameters({ transformDuration: Number(value) as 5 | 10 | 15 })}
+          />
+        </InspectorSection>
+      ) : null}
       {prop.kind !== "group" ? <InspectorColorField
         label="颜色"
         colorAriaLabel="模型颜色"

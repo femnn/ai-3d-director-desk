@@ -29,6 +29,7 @@ import type {
   PanoramaProjectionMode,
   ScenePlan,
 } from "../schema/directorProject";
+import { PROCEDURAL_FACTORY_OPTIONS } from "../schema/directorProject";
 import {
   convertObjectSculptSpecToSceneScript,
   isObjectSculptSpec,
@@ -46,6 +47,7 @@ import {
   playAnimationSequence,
   scrubAnimationSequence,
 } from "../animation/animationSequence";
+import { normalizeProceduralFactorySettings } from "../runtime/proceduralFactories/proceduralFactoryRegistry";
 
 type NumberTuple3 = [number, number, number];
 
@@ -108,6 +110,9 @@ export interface SceneScriptProp {
   geometryAnchor?: "base" | "center";
   geometrySize?: number[];
   material?: DirectorMaterialSettings;
+  /** References reviewed source code in the local factory registry. Imported JSON never contains executable code. */
+  factoryId?: string | null;
+  factoryParameters?: Record<string, unknown>;
   parentId?: string | null;
   pivot?: number[];
   animation?: SceneScriptObjectAnimation;
@@ -546,7 +551,7 @@ export function updateCharacter(input: SceneScriptCharacter & { id?: string; nam
 
 export function addProp(input: SceneScriptProp = {}) {
   const preset = PROP_PRESETS[String(input.type ?? "").toLowerCase()];
-  const geometryType = input.geometryType ?? preset?.geometryType ?? "box";
+  const geometryType = input.geometryType ?? preset?.geometryType ?? (input.factoryId ? "rounded-box" : "box");
   const store = useDirectorStore.getState();
   store.addGeometryPrimitive(geometryType);
 
@@ -558,6 +563,12 @@ export function addProp(input: SceneScriptProp = {}) {
   nextState.updateObjectName(prop.id, input.name ?? preset?.name ?? prop.name);
   if (input.color ?? preset?.color) nextState.updateObjectColor(prop.id, input.color ?? preset?.color ?? prop.color ?? "#d7e7ff");
   if (input.material) nextState.updateObjectMaterial(prop.id, input.material);
+  if (input.factoryId) {
+    nextState.setObjectProceduralFactory(
+      prop.id,
+      normalizeProceduralFactorySettings(input.factoryId, input.factoryParameters)
+    );
+  }
   if (input.geometryAnchor) nextState.updateObjectGeometryAnchor(prop.id, input.geometryAnchor);
   if (input.geometrySize) nextState.updateObjectGeometrySize(prop.id, toScaleTuple(input.geometrySize, [1, 1, 1]));
   nextState.updateObjectTransform(prop.id, {
@@ -599,6 +610,12 @@ export function updateProp(input: SceneScriptProp & { id?: string; name?: string
   if (input.name && input.name !== target.name) store.updateObjectName(target.id, input.name);
   if (input.color) store.updateObjectColor(target.id, input.color);
   if (input.material) store.updateObjectMaterial(target.id, input.material);
+  if (input.factoryId !== undefined) {
+    store.setObjectProceduralFactory(
+      target.id,
+      input.factoryId ? normalizeProceduralFactorySettings(input.factoryId, input.factoryParameters) : null
+    );
+  }
   if (input.geometryAnchor) store.updateObjectGeometryAnchor(target.id, input.geometryAnchor);
   if (input.geometrySize) store.updateObjectGeometrySize(target.id, toScaleTuple(input.geometrySize, target.geometrySize ?? [1, 1, 1]));
   store.updateObjectTransform(target.id, getTransformPatch(input, target.transform));
@@ -977,6 +994,8 @@ export function exportSceneScript(): SceneScript {
       geometryAnchor: object.geometryAnchor,
       geometrySize: object.geometrySize,
       material: object.material,
+      factoryId: object.proceduralFactory?.id,
+      factoryParameters: object.proceduralFactory?.parameters,
       animation: animationFromObject(object),
       children,
     };
@@ -1209,6 +1228,19 @@ export function deleteObject(input: { id?: string; name?: string }) {
 
 export async function executeDirectorAgentTool(tool: string, args: unknown = {}): Promise<AgentToolResult> {
   switch (tool) {
+    case "list_procedural_factories":
+      return {
+        factories: PROCEDURAL_FACTORY_OPTIONS.map((factory) => ({
+          ...factory,
+          parameters: factory.id === "crimson-transformer"
+            ? {
+                morph: "0 到 1；0 为汽车，1 为机器人",
+                autoTransform: "true 时自动往返变形",
+                transformDuration: [5, 10, 15],
+              }
+            : {},
+        })),
+      };
     case "get_scene":
       return {
         selectedObjectId: useDirectorStore.getState().selectedObjectId,

@@ -10,6 +10,7 @@ const RESULT_TIMEOUT_MS = 10_000;
 
 const tools = [
   "get_scene",
+  "list_procedural_factories",
   "reset_scene",
   "apply_scene_script",
   "validate_scene_plan",

@@ -15,6 +15,7 @@ import type {
   DirectorAnimationSequence,
   DirectorObject,
   DirectorMaterialSettings,
+  DirectorProceduralFactorySettings,
   DirectorProject,
   DirectorTransform,
   GeometryPrimitiveType,
@@ -127,6 +128,7 @@ export interface DirectorActions {
   updateCrowdLabel: (crowdId: string, label: string) => void;
   updateObjectColor: (id: string, color: string) => void;
   updateObjectMaterial: (id: string, material: DirectorMaterialSettings) => void;
+  setObjectProceduralFactory: (id: string, settings: DirectorProceduralFactorySettings | null) => void;
   updateObjectGeometryAnchor: (id: string, anchor: "base" | "center") => void;
   updateObjectGeometrySize: (id: string, size: [number, number, number]) => void;
   setObjectAssemblyMetadata: (
@@ -1807,6 +1809,19 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
         project: {
           ...state.project,
           objects: updateObjectById(state.project.objects, id, (item) => ({ ...item, material })),
+        },
+      })),
+    setObjectProceduralFactory: (id, settings) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) => ({
+            ...item,
+            proceduralFactory: settings
+              ? { ...settings, parameters: settings.parameters ? { ...settings.parameters } : undefined }
+              : undefined,
+          })),
         },
       })),
     updateObjectGeometryAnchor: (id, geometryAnchor) =>

@@ -39,6 +39,8 @@ import {
   sampleSequenceObject,
   useAnimationSequenceRuntime,
 } from "../animation/animationSequence";
+import { ProceduralFactoryModel } from "../runtime/proceduralFactories/ProceduralFactoryModel";
+import { isProceduralFactoryId } from "../runtime/proceduralFactories/proceduralFactoryRegistry";
 
 export { getEffectiveGroundOpacity, getPanoramaRotationRadians } from "./panoramaMath";
 
@@ -1276,7 +1278,9 @@ function ObjectSceneNode({
         <ObjectAnimationRig animationSequence={animationSequence} item={item} targetRef={groupRef} />
       ) : null}
       <group position={[-pivot[0], -pivot[1], -pivot[2]]}>
-      {isImportedModel && asset ? (
+      {item.proceduralFactory && isProceduralFactoryId(item.proceduralFactory.id) ? (
+        <ProceduralFactoryModel color={item.color} settings={item.proceduralFactory} />
+      ) : isImportedModel && asset ? (
         <ImportedModelBoundary key={`${asset.id}:${asset.url}`} fallback={<ImportedModelFallback color={item.color} />}>
           <Suspense fallback={<ImportedModelFallback color={item.color} />}>
             <ImportedModel

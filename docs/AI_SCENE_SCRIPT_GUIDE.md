@@ -21,6 +21,7 @@ apply_scene_script 直接导入的 JSON 对象。
 10. characters 必须明确 name、bodyType、color、pose/poseControls、position、rotation、scale 和 action。
 11. 相对站位要留出人体和道具尺寸，避免角色、桌椅、墙体互相穿插。
 12. 至少创建一个 cameras 条目，并提供 directorView；position 与 lookAt 必须能完整看见所有主体。
+13. 如需使用导演台已注册的高精度程序化模型，先调用 list_procedural_factories，再在 props 中使用 factoryId 和 factoryParameters；不得输出 JavaScript。
 
 生成前先在 scenePlan 中写清楚意图、角色关系、环境、组合物体及动作；再输出具体部件。
 输出前自检：层级正确、ID 唯一、父子局部坐标合理、路径点数量足够、机位能看见主体。
@@ -118,6 +119,28 @@ apply_scene_script 直接导入的 JSON 对象。
 
 - 以上 `normal / recording-sync / camera-driven` 仅用于兼容旧的单物体动画字段。新的 AI 联动动画应使用文末统一动画序列及 `manual / recording / camera-motion`。
 - 同时设置 `keyframes` 和 `path` 时，路径负责位置，关键帧继续控制旋转和缩放。
+
+## 已注册程序化模型工厂
+
+程序化模型工厂适合保存 Codex 已生成并验证的复杂 Three.js 模型。它与 `proceduralObjects` 的区别是：前者保持专用模型代码和连续形变，后者保持由基础体组成的可展开部件树。
+
+```json
+{
+  "name": "赤曜变形机甲",
+  "factoryId": "crimson-transformer",
+  "factoryParameters": {
+    "morph": 0,
+    "autoTransform": true,
+    "transformDuration": 10
+  },
+  "color": "#a62934",
+  "position": [0, 0, 0],
+  "rotation": [0, 0, 0],
+  "scale": [0.82, 0.82, 0.82]
+}
+```
+
+当前 `crimson-transformer` 支持汽车到机器人的连续变形。详细扩展方式见 [Img2ThreeJS 程序化模型工厂接入指南](IMG2THREEJS_FACTORY_INTEGRATION.md)。未知 `factoryId` 会被拒绝，JSON 中的代码字段不会被执行。
 
 ## 角色 JSON
 
