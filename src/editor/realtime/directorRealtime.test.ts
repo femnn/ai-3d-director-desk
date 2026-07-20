@@ -150,3 +150,31 @@ it("syncs face clips once and invalidates the phone preview when their content c
   expect(createPhonePreviewProject(faceProject).characterFaceClips).toEqual([faceClip]);
   expect(getPhonePreviewFingerprint(revisedProject)).not.toBe(getPhonePreviewFingerprint(faceProject));
 });
+
+it("keeps a dedicated facial capture actor and its binding in the phone scene", () => {
+  const faceActor = {
+    id: "face-actor-1",
+    name: "面捕演员01",
+    kind: "character" as const,
+    visible: true,
+    locked: false,
+    bodyType: "face-capture" as const,
+    color: "#315C78",
+    transform: {
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: [1, 1, 1] as [number, number, number],
+    },
+    characterRig: { rigType: "ue4-mannequin" as const, posePresetId: "stand", controls: {} },
+    characterFaceTrack: { clipId: null, profile: "facecap52" as const, enabled: false, loop: true },
+  };
+  const faceProject: DirectorProject = { ...project, objects: [...project.objects, faceActor] };
+  const preview = createPhonePreviewProject(faceProject);
+
+  expect(preview.objects.find((object) => object.id === faceActor.id)).toMatchObject({
+    bodyType: "face-capture",
+    characterRig: { rigType: "ue4-mannequin" },
+    characterFaceTrack: { profile: "facecap52" },
+  });
+  expect(getPhonePreviewFingerprint(faceProject)).toContain("face-capture");
+});

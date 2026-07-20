@@ -750,7 +750,7 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
         return {
           ...normalizedObject,
           characterRig: {
-            rigType: "mannequin",
+            rigType: "ue4-mannequin",
             posePresetId: rig?.posePresetId ?? "stand",
             controls: rig?.controls ?? {},
           },
@@ -1037,7 +1037,7 @@ function buildPresetCharacterObject(
     crowdLabel: crowdMetadata?.crowdLabel,
     transform: createTransform(position),
     characterRig: {
-      rigType: isFaceCaptureActor ? "mannequin" as const : "ue4-mannequin" as const,
+      rigType: "ue4-mannequin" as const,
       posePresetId: "stand",
       controls: {},
     },
@@ -1931,8 +1931,7 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
     updateCharacterBodyType: (id, bodyType) =>
       commitMutation((state) => {
         const normalizedBodyType = normalizeBodyType(bodyType);
-        const nextRigType: "mannequin" | "ue4-mannequin" =
-          normalizedBodyType === "face-capture" ? "mannequin" : "ue4-mannequin";
+        const nextRigType: "ue4-mannequin" = "ue4-mannequin";
         const currentObject = state.project.objects.find((item) => item.id === id);
         const nextObject =
           currentObject?.kind === "character"

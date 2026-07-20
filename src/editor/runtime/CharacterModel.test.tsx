@@ -3,8 +3,8 @@ import { vi } from "vitest";
 import { CharacterModel } from "./CharacterModel";
 
 vi.mock("./UE4MannequinModel", () => ({
-  UE4MannequinModel: ({ bodyType }: { bodyType?: string }) => (
-    <div data-body-type={bodyType} data-testid="mock-ue4-mannequin" />
+  UE4MannequinModel: ({ bodyType, faceProfile }: { bodyType?: string; faceProfile?: string }) => (
+    <div data-body-type={bodyType} data-face-profile={faceProfile} data-testid="mock-ue4-mannequin" />
   ),
 }));
 
@@ -46,7 +46,7 @@ it("keeps the procedural mannequin fallback for non-UE4 rigs", () => {
   expect(screen.queryByTestId("mock-ue4-mannequin")).not.toBeInTheDocument();
 });
 
-it("renders the dedicated face-capture actor without replacing a UE4 mannequin head", () => {
+it("renders the dedicated face-capture actor on the calibrated UE4 body rig", () => {
   render(
     <CharacterModel
       bodyType="face-capture"
@@ -56,6 +56,7 @@ it("renders the dedicated face-capture actor without replacing a UE4 mannequin h
     />
   );
 
-  expect(screen.getByTestId("mock-procedural-mannequin")).toHaveAttribute("data-body-type", "face-capture");
-  expect(screen.queryByTestId("mock-ue4-mannequin")).not.toBeInTheDocument();
+  expect(screen.getByTestId("mock-ue4-mannequin")).toHaveAttribute("data-body-type", "face-capture");
+  expect(screen.getByTestId("mock-ue4-mannequin")).toHaveAttribute("data-face-profile", "facecap52");
+  expect(screen.queryByTestId("mock-procedural-mannequin")).not.toBeInTheDocument();
 });

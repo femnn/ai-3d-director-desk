@@ -75,10 +75,18 @@ export function ProceduralMannequin({
   const kneeY = -(p.thighLength + p.thighRadius + p.kneeRadius);
   const ankleY = -(p.calfLength + p.calfRadius + p.ankleRadius);
   const footY = ankleY - p.footRadius - 0.045;
+  const faceCaptureGroundOffset = isFaceCaptureActor
+    ? -(legOriginY + kneeY + footY) + p.footRadius * p.footScale[1]
+    : 0;
   const jointScale: [number, number, number] = [p.jointRadiusScale, p.jointRadiusScale, p.jointRadiusScale];
 
   return (
-    <group name={`procedural-${preset.bodyType}`} rotation={bodyRotation} scale={preset.defaultScale}>
+    <group
+      name={`procedural-${preset.bodyType}`}
+      position={[0, faceCaptureGroundOffset, 0]}
+      rotation={bodyRotation}
+      scale={preset.defaultScale}
+    >
       <group rotation={torsoRotation}>
         <Torso
           abdomenPosition={[0, abdomenY, 0]}

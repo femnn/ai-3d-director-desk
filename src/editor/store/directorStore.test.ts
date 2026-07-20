@@ -254,7 +254,7 @@ it("creates a dedicated face-capture actor while leaving normal roles on the UE4
     name: "面捕演员01",
     bodyType: "face-capture",
     color: "#315C78",
-    characterRig: { rigType: "mannequin" },
+    characterRig: { rigType: "ue4-mannequin" },
   });
 });
 

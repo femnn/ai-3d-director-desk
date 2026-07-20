@@ -47,8 +47,6 @@ export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJoi
     />
   );
 
-  if (bodyType === "face-capture") return fallback;
-
   if (rigState?.rigType !== "ue4-mannequin") {
     return fallback;
   }
@@ -58,6 +56,8 @@ export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJoi
       <UE4MannequinModel
         bodyType={bodyType}
         color={color}
+        faceProfile={bodyType === "face-capture" ? faceProfile : undefined}
+        faceSample={bodyType === "face-capture" ? faceSample : undefined}
         onJointPositionsChange={onJointPositionsChange}
         onLabelAnchorYChange={onLabelAnchorYChange}
         rigState={rigState}

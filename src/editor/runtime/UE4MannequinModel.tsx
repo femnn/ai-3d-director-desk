@@ -13,7 +13,8 @@ import {
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import type { CharacterRigState } from "../schema/directorProject";
+import type { CharacterFaceSample } from "../animation/characterFaceAnimation";
+import type { CharacterFaceProfile, CharacterRigState } from "../schema/directorProject";
 import { VIEWPORT_OBJECT_LABEL_VERTICAL_GAP } from "../schema/viewportLabels";
 import type { CharacterBodyType } from "./mannequin/bodyTypes";
 import {
@@ -22,10 +23,13 @@ import {
   getUE4ModelScale,
 } from "./ue4Mannequin/ue4MannequinRig";
 import { applyUE4RestPoseAndRig, captureUE4RestPose } from "./ue4Mannequin/ue4MannequinPoseApplication";
+import { FaceHeadAttachment } from "./FaceHeadAttachment";
 
 interface UE4MannequinModelProps {
   bodyType?: CharacterBodyType;
   color?: string;
+  faceProfile?: CharacterFaceProfile;
+  faceSample?: CharacterFaceSample;
   onLabelAnchorYChange?: (anchorY: number) => void;
   onJointPositionsChange?: (positions: Record<string, [number, number, number]>) => void;
   rigState?: CharacterRigState;
@@ -129,6 +133,8 @@ export function alignUE4MannequinToGround(scene: Object3D) {
 export function UE4MannequinModel({
   bodyType = "mannequin",
   color = "#F3F5F7",
+  faceProfile,
+  faceSample,
   onLabelAnchorYChange,
   onJointPositionsChange,
   rigState,
@@ -137,6 +143,7 @@ export function UE4MannequinModel({
   const scene = useMemo(() => cloneSkeleton(gltf.scene) as Group, [gltf.scene]);
   const restPose = useMemo(() => captureUE4RestPose(scene), [scene]);
   const modelScale = getUE4ModelScale(bodyType);
+  const headBone = scene.getObjectByName(UE4_MANNEQUIN_BONE_MAP.head);
 
   useLayoutEffect(() => {
     isolateAndTintUE4MannequinMaterials(scene, color);
@@ -182,6 +189,14 @@ export function UE4MannequinModel({
   return (
     <group name={`ue-retopology-mannequin-${bodyType}`} scale={modelScale}>
       <primitive object={scene} />
+      {bodyType === "face-capture" && headBone && faceProfile && faceSample ? (
+        <FaceHeadAttachment
+          mannequinScene={scene}
+          headBone={headBone}
+          profile={faceProfile}
+          sample={faceSample}
+        />
+      ) : null}
     </group>
   );
 }

@@ -569,7 +569,7 @@ it("keeps face clips on dedicated actors through character export and import", (
   const imported = project.objects.find((object) => object.id === result.id)!;
   const importedClip = project.characterFaceClips?.find((clip) => clip.characterId === imported.id);
 
-  expect(imported).toMatchObject({ bodyType: "face-capture", characterRig: { rigType: "mannequin" } });
+  expect(imported).toMatchObject({ bodyType: "face-capture", characterRig: { rigType: "ue4-mannequin" } });
   expect(imported.characterFaceTrack).toMatchObject({ clipId: importedClip?.id, enabled: true, loop: true });
   expect(importedClip).toMatchObject({ name: "专用演员表情", channels: ["jawOpen"] });
 });
