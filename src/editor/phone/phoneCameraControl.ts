@@ -58,9 +58,11 @@ type LiveVideoCapture = {
   chunks: BlobPart[];
   frameRate: number;
   frameRequestTrack: FrameRequestVideoTrack | null;
+  maxDurationSeconds: number;
   nextFrameRequestAt: number;
   recorder: MediaRecorder;
   stream: MediaStream;
+  watchdogTimer: number;
 };
 type RecordedVideo = {
   status: "capturing" | "processing" | "ready" | "failed";
@@ -328,7 +330,9 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
   }
 
   try {
-    const frameRate = getVideoCaptureFrameRate(requestedLiveVideoDurationByCameraId.get(cameraId));
+    const requestedDuration = requestedLiveVideoDurationByCameraId.get(cameraId);
+    const maxDurationSeconds = requestedDuration === 10 || requestedDuration === 15 ? requestedDuration : 5;
+    const frameRate = getVideoCaptureFrameRate(maxDurationSeconds);
     let stream = canvas.captureStream(0);
     let videoTrack = stream.getVideoTracks()[0] as FrameRequestVideoTrack | undefined;
     let frameRequestTrack = typeof videoTrack?.requestFrame === "function" ? videoTrack : null;
@@ -345,9 +349,11 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
       chunks: [],
       frameRate,
       frameRequestTrack,
+      maxDurationSeconds,
       nextFrameRequestAt: 0,
       recorder,
       stream,
+      watchdogTimer: 0,
     };
     liveVideoCapturesByCameraId.set(cameraId, capture);
     recorder.addEventListener("dataavailable", (event) => {
@@ -356,6 +362,11 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     // Flush once per second so 10/15-second recordings do not build one growing
     // encoder buffer. This is infrequent enough to stay off the render hot path.
     recorder.start(1000);
+    capture.watchdogTimer = window.setTimeout(() => {
+      if (capture.recorder.state !== "recording") return;
+      capture.recorder.requestData();
+      capture.recorder.pause();
+    }, maxDurationSeconds * 1000 + 250);
     const project = useDirectorStore.getState().project;
     beginAnimationSequenceRecording(
       cameraId,
@@ -379,6 +390,7 @@ function cancelLiveVideoCapture(cameraId: string) {
   requestedLiveVideoCameraIds.delete(cameraId);
   requestedLiveVideoDurationByCameraId.delete(cameraId);
   const capture = liveVideoCapturesByCameraId.get(cameraId);
+  if (capture?.watchdogTimer) window.clearTimeout(capture.watchdogTimer);
   if (capture && capture.recorder.state !== "inactive") capture.recorder.stop();
   capture?.stream.getTracks().forEach((track) => track.stop());
   liveVideoCapturesByCameraId.delete(cameraId);
@@ -400,6 +412,11 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
     return;
   }
 
+  if (capture.watchdogTimer) {
+    window.clearTimeout(capture.watchdogTimer);
+    capture.watchdogTimer = 0;
+  }
+
   recordedVideoByAnimationId.set(animationId, { status: "processing" });
   emitLiveVideoChange();
   const finishCapture = () => {
@@ -412,7 +429,7 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
       emitLiveVideoChange();
       return;
     }
-    void convertVideoToMp4(source, capture.frameRate)
+    void convertVideoToMp4(source, capture.frameRate, capture.maxDurationSeconds)
       .then((blob) => {
         recordedVideoByAnimationId.set(animationId, { status: "ready", blob });
         emitLiveVideoChange();
@@ -684,12 +701,13 @@ function createVideoRecorder(stream: MediaStream) {
   return new MediaRecorder(stream, { videoBitsPerSecond: VIDEO_CAPTURE_BIT_RATE });
 }
 
-async function convertVideoToMp4(video: Blob, captureFrameRate: number) {
+async function convertVideoToMp4(video: Blob, captureFrameRate: number, maxDurationSeconds: number) {
   const response = await fetch("/api/video/convert", {
     method: "POST",
     headers: {
       "content-type": video.type || "video/webm",
       "x-capture-frame-rate": String(captureFrameRate),
+      "x-recording-duration": String(maxDurationSeconds),
     },
     body: video,
   });

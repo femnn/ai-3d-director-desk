@@ -1,5 +1,5 @@
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { Component, Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { Box3, Group, Matrix4, Mesh, Quaternion, Vector3, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
@@ -36,8 +36,6 @@ function getInfluence(sample: CharacterFaceSample, ...names: string[]) {
 }
 
 function FallbackFaceHead({ sample }: { sample: CharacterFaceSample }) {
-  const trackingRef = useRef<Group>(null!);
-  const trackedRotation = useMemo(() => new Quaternion(), []);
   const jawOpen = getInfluence(sample, "jawOpen", "mouthOpen");
   const smile = Math.max(
     getInfluence(sample, "mouthSmileLeft", "mouthSmile_L", "smileLeft"),
@@ -46,13 +44,8 @@ function FallbackFaceHead({ sample }: { sample: CharacterFaceSample }) {
   const leftBlink = getInfluence(sample, "eyeBlinkLeft", "eyeBlink_L", "blinkLeft");
   const rightBlink = getInfluence(sample, "eyeBlinkRight", "eyeBlink_R", "blinkRight");
 
-  useFrame(() => {
-    trackedRotation.fromArray(sample.headRotation).normalize();
-    trackingRef.current?.quaternion.copy(trackedRotation);
-  });
-
   return (
-    <group ref={trackingRef} name="face-capture-fallback-head">
+    <group quaternion={sample.headRotation} name="face-capture-fallback-head">
       <mesh scale={[0.84, 1, 0.78]}>
         <sphereGeometry args={[0.17, 28, 24]} />
         <meshStandardMaterial color="#D8DDE5" metalness={0.02} roughness={0.82} />
@@ -99,39 +92,40 @@ function RiggedFaceAnchor({
   const ignoredScale = useMemo(() => new Vector3(), []);
   const inverseRestRotation = useMemo(() => new Quaternion(), []);
 
-  useEffect(() => () => {
-    headBone.scale.copy(originalHeadScale);
+  useLayoutEffect(() => {
+    headBone.scale.setScalar(0.001);
     mannequinScene.updateMatrixWorld(true);
+    return () => {
+      headBone.scale.copy(originalHeadScale);
+      mannequinScene.updateMatrixWorld(true);
+    };
   }, [headBone, mannequinScene, originalHeadScale]);
 
   useFrame(() => {
     const anchor = anchorRef.current;
     if (!anchor) return;
 
-    headBone.scale.copy(originalHeadScale);
-    mannequinScene.updateMatrixWorld(true);
+    headBone.scale.setScalar(0.001);
+    headBone.updateWorldMatrix(true, false);
     inverse.copy(mannequinScene.matrixWorld).invert();
     localMatrix.multiplyMatrices(inverse, headBone.matrixWorld).decompose(position, quaternion, ignoredScale);
     if (!restHeadQuaternion.current) restHeadQuaternion.current = quaternion.clone();
     inverseRestRotation.copy(restHeadQuaternion.current).invert();
     anchor.position.copy(position);
     anchor.quaternion.copy(quaternion).multiply(inverseRestRotation);
-
-    headBone.scale.setScalar(0.001);
-    mannequinScene.updateMatrixWorld(true);
   });
 
   return (
     <group ref={anchorRef} name="face-capture-rigged-anchor">
-      <mesh name="face-capture-rigged-neck" position={[0, -0.18, 0]}>
-        <cylinderGeometry args={[0.066, 0.076, 0.14, 24]} />
+      <mesh name="face-capture-rigged-neck" position={[0, -0.075, 0]}>
+        <cylinderGeometry args={[0.066, 0.082, 0.31, 24]} />
         <meshStandardMaterial color="#D8DDE5" metalness={0.02} roughness={0.82} />
       </mesh>
-      <mesh name="face-capture-rigged-collar" position={[0, -0.245, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.085, 0.018, 10, 32]} />
+      <mesh name="face-capture-rigged-collar" position={[0, -0.225, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.092, 0.018, 10, 32]} />
         <meshStandardMaterial color="#D9E2EE" metalness={0.02} roughness={0.78} />
       </mesh>
-      {children}
+      <group position={[0, 0.105, 0]}>{children}</group>
     </group>
   );
 }
@@ -160,7 +154,7 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
     const bounds = new Box3().setFromObject(scene, true);
     const center = bounds.getCenter(new Vector3());
     const size = bounds.getSize(new Vector3());
-    const desiredHeight = profile === "facecap52" ? 0.34 : 0.33;
+    const desiredHeight = 0.3;
     const scale = desiredHeight / Math.max(0.001, size.y);
     scene.position.copy(center).multiplyScalar(-1);
     const container = new Group();
@@ -169,10 +163,8 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
     container.add(scene);
     return { container, meshes: collectMorphMeshes(scene) };
   }, [gltf.scene, profile]);
-  const trackedRotation = useMemo(() => new Quaternion(), []);
-
-  useFrame(() => {
-    trackedRotation.fromArray(sample.headRotation).normalize();
+  useLayoutEffect(() => {
+    const trackedRotation = new Quaternion().fromArray(sample.headRotation).normalize();
     trackingRef.current?.quaternion.copy(trackedRotation);
     prepared.meshes.forEach((face) => {
       const dictionary = face.morphTargetDictionary;
@@ -184,7 +176,7 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
         if (index !== undefined) influences[index] = value;
       });
     });
-  });
+  }, [prepared.meshes, sample]);
 
   return (
     <group ref={trackingRef} name="face-capture-tracking-root">

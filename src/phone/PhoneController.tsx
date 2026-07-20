@@ -16,6 +16,7 @@ import {
   getMotionCameraTarget,
   smoothMotionCameraAngles,
 } from "./phoneMotion";
+import { shouldApplyPhonePreview } from "./phonePreviewSync";
 
 type Tuple3 = [number, number, number];
 
@@ -42,6 +43,7 @@ interface DesktopStateMessage {
   phoneAssignments?: Record<string, string>;
   phoneCameraOwners?: Record<string, string>;
   phonePreviewRevision?: number;
+  phonePreviewToken?: string;
   phonePreviewProject?: DirectorProject;
   phonePreviewPending?: boolean;
   phonePreviewError?: string | null;
@@ -206,7 +208,7 @@ export function PhoneController() {
   const motionFrameRef = useRef(0);
   const orientationHandlerRef = useRef<(event: DeviceOrientationEvent) => void>(() => {});
   const orientationListenerRef = useRef<(event: DeviceOrientationEvent) => void>((event) => orientationHandlerRef.current(event));
-  const previewRevisionRef = useRef(-1);
+  const previewVersionRef = useRef({ revision: -1, token: "" });
   const lastSentAtRef = useRef(0);
   const cameraTopologySignatureRef = useRef("");
   const cameraOwnerSignatureRef = useRef("");
@@ -384,8 +386,12 @@ export function PhoneController() {
             }
           }
           const previewRevision = message.state.phonePreviewRevision ?? 0;
-          if (message.state.phonePreviewProject && previewRevision > previewRevisionRef.current) {
-            previewRevisionRef.current = previewRevision;
+          const previewToken = message.state.phonePreviewToken;
+          if (
+            message.state.phonePreviewProject &&
+            shouldApplyPhonePreview(previewVersionRef.current, previewToken, previewRevision)
+          ) {
+            previewVersionRef.current = { revision: previewRevision, token: previewToken ?? "" };
             useDirectorStore.getState().replaceProject(message.state.phonePreviewProject);
             if (message.state.objectAnimationElapsed) {
               setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);

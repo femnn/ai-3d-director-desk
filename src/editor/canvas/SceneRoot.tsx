@@ -1181,16 +1181,22 @@ function ObjectSceneNode({
     ? faceClips.find((clip) => clip.id === item.characterFaceTrack?.clipId && clip.characterId === item.id)
     : undefined;
   const isFaceCaptureActor = item.bodyType === "face-capture";
-  const faceSample = isFaceCaptureActor && item.characterFaceTrack?.enabled && faceClip
-    ? sampleCharacterFaceClip(
-        faceClip,
-        item.characterFaceTrack.profile,
-        animatedCharacter.elapsed,
-        item.characterFaceTrack.loop
-      )
-    : isFaceCaptureActor
-      ? NEUTRAL_CHARACTER_FACE_SAMPLE
-      : undefined;
+  const faceSampleTime = faceClip
+    ? Math.floor(animatedCharacter.elapsed * Math.max(1, faceClip.fps)) / Math.max(1, faceClip.fps)
+    : 0;
+  const faceSample = useMemo(
+    () => isFaceCaptureActor && item.characterFaceTrack?.enabled && faceClip
+      ? sampleCharacterFaceClip(
+          faceClip,
+          item.characterFaceTrack.profile,
+          faceSampleTime,
+          item.characterFaceTrack.loop
+        )
+      : isFaceCaptureActor
+        ? NEUTRAL_CHARACTER_FACE_SAMPLE
+        : undefined,
+    [faceClip, faceSampleTime, isFaceCaptureActor, item.characterFaceTrack]
+  );
   const sequenceRuntime = useAnimationSequenceRuntime();
   const sequenceControlsScene = Boolean(animationSequence && sequenceRuntime.sequenceId === animationSequence.id);
   const sequenceCharacterTrack = animationSequence && sequenceControlsScene

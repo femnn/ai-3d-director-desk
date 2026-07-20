@@ -6,6 +6,7 @@ import { SceneRoot } from "../editor/canvas/SceneRoot";
 import type { DirectorProject } from "../editor/schema/directorProject";
 import { useDirectorStore } from "../editor/store/directorStore";
 import { PhoneModeNav } from "./PhoneModeNav";
+import { shouldApplyPhonePreview } from "./phonePreviewSync";
 
 type CharacterOption = { id: string; name: string };
 type ViewState = { yaw: number; pitch: number; distance: number };
@@ -52,7 +53,7 @@ export function PhonePoseEditor() {
   const [characterId, setCharacterId] = useState("");
   const [previewReady, setPreviewReady] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
-  const previewRevisionRef = useRef(-1);
+  const previewVersionRef = useRef({ revision: -1, token: "" });
   const phoneIdRef = useRef(getPhonePoseId());
   const characterIdRef = useRef("");
   const viewRef = useRef<ViewState>({ yaw: 0.55, pitch: 0.12, distance: 4.6 });
@@ -84,7 +85,7 @@ export function PhonePoseEditor() {
         send(socket, { type: "client_hello", clientType: "phone" });
       });
       socket.addEventListener("message", (event) => {
-        let message: { type?: string; state?: { mocapCharacters?: CharacterOption[]; phonePreviewProject?: DirectorProject; phonePreviewRevision?: number } };
+        let message: { type?: string; state?: { mocapCharacters?: CharacterOption[]; phonePreviewProject?: DirectorProject; phonePreviewRevision?: number; phonePreviewToken?: string } };
         try {
           message = JSON.parse(String(event.data));
         } catch {
@@ -99,8 +100,12 @@ export function PhonePoseEditor() {
         characterIdRef.current = nextCharacterId;
         setCharacterId(nextCharacterId);
         const revision = message.state.phonePreviewRevision ?? 0;
-        if (message.state.phonePreviewProject && revision > previewRevisionRef.current) {
-          previewRevisionRef.current = revision;
+        const previewToken = message.state.phonePreviewToken;
+        if (
+          message.state.phonePreviewProject &&
+          shouldApplyPhonePreview(previewVersionRef.current, previewToken, revision)
+        ) {
+          previewVersionRef.current = { revision, token: previewToken ?? "" };
           useDirectorStore.getState().replaceProject(message.state.phonePreviewProject);
           if (nextCharacterId) {
             useDirectorStore.getState().selectObject(nextCharacterId);

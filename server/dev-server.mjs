@@ -88,7 +88,7 @@ function getVideoFilter(captureFrameRate) {
     : "fps=60";
 }
 
-function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60) {
+function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60, maxDurationSeconds = 5) {
   return new Promise((resolve, reject) => {
     execFile(
       FFMPEG_PATH,
@@ -96,6 +96,8 @@ function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60) {
         "-y",
         "-i",
         inputPath,
+        "-t",
+        String(maxDurationSeconds),
         "-vf",
         getVideoFilter(captureFrameRate),
         "-vsync",
@@ -819,11 +821,13 @@ async function handleApi(req, res, context) {
     const outputPath = path.join(VIDEO_TEMP_DIR, `${id}.mp4`);
     try {
       const captureFrameRate = Number(req.headers["x-capture-frame-rate"]) === 30 ? 30 : 60;
+      const requestedDuration = Number(req.headers["x-recording-duration"]);
+      const maxDurationSeconds = requestedDuration === 10 || requestedDuration === 15 ? requestedDuration : 5;
       const video = await readBuffer(req);
       if (!video.length) throw new Error("Video is empty");
       fs.mkdirSync(VIDEO_TEMP_DIR, { recursive: true, mode: 0o700 });
       await fs.promises.writeFile(inputPath, video);
-      await convertWebmToMp4(inputPath, outputPath, captureFrameRate);
+      await convertWebmToMp4(inputPath, outputPath, captureFrameRate, maxDurationSeconds);
       const mp4 = await fs.promises.readFile(outputPath);
       res.writeHead(200, {
         "content-type": "video/mp4",

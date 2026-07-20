@@ -19,6 +19,8 @@ import type { DirectorProject } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 
 let phonePreviewRevision = 0;
+const phonePreviewSessionId =
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 let phonePreviewProject: DirectorProject | null = null;
 let phonePreviewPending = false;
 let phonePreviewError: string | null = null;
@@ -170,6 +172,10 @@ function getPhonePreviewUpdate(project: DirectorProject) {
   return { phonePreviewRevision, phonePreviewProject, phonePreviewPending, phonePreviewError };
 }
 
+export function createPhonePreviewToken(sessionId: string, revision: number) {
+  return `${sessionId}:${revision}`;
+}
+
 function getWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/realtime`;
@@ -221,6 +227,7 @@ function buildDesktopState(forcePhonePreview = false) {
       .map((camera) => camera.id),
     viewportAspectRatio: state.viewportAspectRatio,
     phonePreviewRevision: phonePreviewUpdate.phonePreviewRevision,
+    phonePreviewToken: createPhonePreviewToken(phonePreviewSessionId, phonePreviewUpdate.phonePreviewRevision),
     phonePreviewPending: phonePreviewUpdate.phonePreviewPending,
     phonePreviewError: phonePreviewUpdate.phonePreviewError,
     ...(includePhonePreview ? { phonePreviewProject: phonePreviewUpdate.phonePreviewProject } : {}),

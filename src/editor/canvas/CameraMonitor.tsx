@@ -25,9 +25,14 @@ const MONITOR_SCREEN_MARGIN = 12;
 // is a useful quality increase without the 16x render cost of jumping straight
 // from DPR 1 to a 1280x720 backing canvas.
 const MONITOR_CAPTURE_DPR = 3;
+const MONITOR_CAPTURE_WIDTH = 960;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+export function getMonitorCaptureDpr(width: number) {
+  return clamp(MONITOR_CAPTURE_WIDTH / Math.max(1, width), 1, MONITOR_CAPTURE_DPR);
 }
 
 function CameraMonitorViewCamera({ view }: { view: CameraViewSnapshot }) {
@@ -167,6 +172,7 @@ export function CameraMonitor() {
   const panoramaAsset = assets.find((item) => item.id === panoramaAssetId);
   const monitorAspect = getViewportAspectRatioValue(viewportAspectRatio) ?? MONITOR_ASPECT;
   const height = Math.round(layout.width / monitorAspect);
+  const captureDpr = getMonitorCaptureDpr(layout.width);
 
   function beginInteraction(mode: "move" | "resize", clientX: number, clientY: number) {
     dragRef.current = {
@@ -257,7 +263,7 @@ export function CameraMonitor() {
       <Canvas
         className="camera-monitor-canvas"
         camera={{ position: cameraView.position, fov: cameraView.fov }}
-        dpr={MONITOR_CAPTURE_DPR}
+        dpr={captureDpr}
         frameloop="always"
         gl={{ antialias: false, powerPreference: "high-performance" }}
         onCreated={({ gl }) => {

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { DirectorProject } from "../schema/directorProject";
-import { createPhonePreviewProject, getPhonePreviewFingerprint } from "./directorRealtime";
+import { createPhonePreviewProject, createPhonePreviewToken, getPhonePreviewFingerprint } from "./directorRealtime";
 
 const project: DirectorProject = {
   version: 1,
@@ -177,4 +177,9 @@ it("keeps a dedicated facial capture actor and its binding in the phone scene", 
     characterFaceTrack: { profile: "facecap52" },
   });
   expect(getPhonePreviewFingerprint(faceProject)).toContain("face-capture");
+});
+
+it("gives every desktop scene revision a session-qualified phone preview token", () => {
+  expect(createPhonePreviewToken("desktop-a", 2)).toBe("desktop-a:2");
+  expect(createPhonePreviewToken("desktop-a", 2)).not.toBe(createPhonePreviewToken("desktop-b", 2));
 });
