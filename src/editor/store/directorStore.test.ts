@@ -57,6 +57,29 @@ it("seeds the demo with one mannequin role and one camera", () => {
   expect(state.project.cameras).toHaveLength(1);
 });
 
+it("keeps face clips bound to their own character and clears the track on deletion", () => {
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  const clipId = useDirectorStore.getState().addCharacterFaceClip({
+    characterId: character.id,
+    name: "面部表演",
+    duration: 5,
+    fps: 30,
+    channels: ["jawOpen"],
+    frames: [{ time: 0, values: [0.5], headRotation: [0, 0, 0, 1] }],
+    checksum: "face_test",
+  });
+  useDirectorStore.getState().setCharacterFaceTrack(character.id, {
+    clipId,
+    profile: "facecap52",
+    enabled: true,
+    loop: true,
+  });
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === character.id)?.characterFaceTrack?.clipId).toBe(clipId);
+  useDirectorStore.getState().deleteCharacterFaceClip(clipId);
+  expect(useDirectorStore.getState().project.characterFaceClips).toEqual([]);
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === character.id)?.characterFaceTrack).toBeUndefined();
+});
+
 it("updates the viewport aspect ratio selection in ui state", () => {
   useDirectorStore.setState(createInitialDirectorState());
 

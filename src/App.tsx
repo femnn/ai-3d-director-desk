@@ -37,8 +37,13 @@ export default function App() {
   );
   const normalActionSignature = useDirectorStore((state) =>
     state.project.objects
-      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
-      .map((object) => `${object.id}:${object.characterActionTrack?.actionId}:${object.characterActionTrack?.duration}`)
+      .filter((object) =>
+        object.kind === "character" &&
+        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+      )
+      .map((object) =>
+        `${object.id}:${object.characterActionTrack?.actionId ?? ""}:${object.characterActionTrack?.duration ?? ""}:${object.characterFaceTrack?.clipId ?? ""}:${object.characterFaceTrack?.enabled ?? false}`
+      )
       .join("|")
   );
   const isPhoneRoute = window.location.pathname === "/phone";
@@ -64,7 +69,10 @@ export default function App() {
   useEffect(() => {
     if (isPhoneRoute) return;
     const characterIds = useDirectorStore.getState().project.objects
-      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
+      .filter((object) =>
+        object.kind === "character" &&
+        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+      )
       .map((object) => object.id);
     syncNormalCharacterAnimations(characterIds);
     return stopNormalCharacterAnimations;

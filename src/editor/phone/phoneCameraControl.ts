@@ -50,6 +50,7 @@ let phoneFlushTimer = 0;
 let activePlaybackId: number | null = null;
 const VIDEO_FRAME_RATE = 60;
 const LONG_RECORDING_FRAME_RATE = 30;
+const VIDEO_CAPTURE_BIT_RATE = 6_000_000;
 let cameraMonitorCanvas: HTMLCanvasElement | null = null;
 type FrameRequestVideoTrack = MediaStreamTrack & { requestFrame?: () => void };
 type LiveVideoCapture = {
@@ -675,12 +676,12 @@ function createVideoRecorder(stream: MediaStream) {
   for (const mimeType of candidates) {
     if (!MediaRecorder.isTypeSupported(mimeType)) continue;
     try {
-      return new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3_000_000 });
+      return new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_CAPTURE_BIT_RATE });
     } catch {
       // Try the next supported codec when the platform cannot initialize this encoder.
     }
   }
-  return new MediaRecorder(stream, { videoBitsPerSecond: 3_000_000 });
+  return new MediaRecorder(stream, { videoBitsPerSecond: VIDEO_CAPTURE_BIT_RATE });
 }
 
 async function convertVideoToMp4(video: Blob, captureFrameRate: number) {

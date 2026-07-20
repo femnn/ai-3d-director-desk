@@ -4,6 +4,7 @@ import {
   exportAnimationSequencePackage,
   exportCharacterPackage,
   exportSceneScript,
+  executeDirectorAgentTool,
   importAnimationSequencePackage,
   importCharacterAnimationPackage,
   importCharacterPackage,
@@ -511,4 +512,32 @@ it("applies a complete AI scene and its animation sequences as one undo batch", 
   useDirectorStore.getState().undo();
   expect(useDirectorStore.getState().project.objects).toEqual(before.objects);
   expect(useDirectorStore.getState().project.animationSequences).toEqual(before.animationSequences);
+});
+
+it("lets the agent list, assign, switch, and export character face clips", async () => {
+  const character = useDirectorStore.getState().project.objects.find((item) => item.kind === "character")!;
+  const clipId = useDirectorStore.getState().addCharacterFaceClip({
+    characterId: character.id,
+    name: "表情片段",
+    duration: 5,
+    fps: 30,
+    channels: ["jawOpen"],
+    frames: [{ time: 0, values: [0.4], headRotation: [0, 0, 0, 1] }],
+    checksum: "face_agent",
+  });
+  await executeDirectorAgentTool("assign_face_clip", {
+    characterId: character.id,
+    clipId,
+    profile: "gnm21",
+  });
+  expect(useDirectorStore.getState().project.objects.find((item) => item.id === character.id)?.characterFaceTrack).toMatchObject({
+    clipId,
+    profile: "gnm21",
+    enabled: true,
+    loop: true,
+  });
+  const listed = await executeDirectorAgentTool("list_face_clips") as { clips: Array<{ id: string }> };
+  expect(listed.clips.map((clip) => clip.id)).toContain(clipId);
+  const exported = await executeDirectorAgentTool("export_face_clip", { clipId }) as { faceAnimationPackage: { format: string } };
+  expect(exported.faceAnimationPackage.format).toBe("storyai-face-animation");
 });

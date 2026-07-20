@@ -25,3 +25,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## GNM Studio, Google GNM and MediaPipe
+
+The local face-capture worker, neutral-relative tracking flow, GNM semantic
+retargeting, and bundled GNM runtime head are adapted from
+[Saganaki22/GNM-Studio](https://github.com/Saganaki22/GNM-Studio) and
+[Google GNM](https://github.com/google/GNM). GNM Studio, Google GNM, and
+MediaPipe Tasks are distributed under Apache License 2.0. Preserved license
+copies are available in `third_party/gnm-studio/LICENSE` and
+`third_party/google-gnm/LICENSE`.
+
+## FaceCap 52 avatar
+
+The bundled `public/face-capture/facecap.glb` is the Face Cap 52-morph avatar
+distributed with Three.js r184. It is credited to Face Cap and is MIT-licensed.
+The asset is pinned to the same source used by GNM Studio:
+<https://github.com/mrdoob/three.js/blob/r184/examples/models/gltf/facecap.glb>.

@@ -609,7 +609,10 @@ function handleSocketMessage(client, raw) {
   if (message.type === "desktop_state" && client.type === "desktop") {
     if (getActiveDesktopClient()?.id !== client.id) return;
     latestDesktopState = message.state ? { ...(latestDesktopState ?? {}), ...message.state } : null;
-    broadcastToType("phone", { type: "desktop_state", state: latestDesktopState });
+    // Current phones only need the fields sent by this frame. The server keeps
+    // the merged state so a newly connected phone still receives the latest
+    // scene preview without retransmitting large motion clips at animation FPS.
+    broadcastToType("phone", { type: "desktop_state", state: message.state });
     return;
   }
 

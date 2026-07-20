@@ -26,6 +26,7 @@ let phonePreviewBuildId = 0;
 let requestPhonePreviewBroadcast: (() => void) | null = null;
 const phonePreviewAssetSignatures = new Map<string, string>();
 let phonePreviewFingerprint: string | null = null;
+let lastSentPhonePreviewRevision = -1;
 
 export function createPhonePreviewProject(project: DirectorProject): DirectorProject {
   const objects = project.objects.filter((object) => object.kind !== "camera");
@@ -44,6 +45,7 @@ export function createPhonePreviewProject(project: DirectorProject): DirectorPro
     cameras: [],
     cameraAnimations: [],
     characterMotionClips: project.characterMotionClips ?? [],
+    characterFaceClips: project.characterFaceClips ?? [],
     animationSequences: project.animationSequences ?? [],
     activeAnimationSequenceId: project.activeAnimationSequenceId ?? null,
     activeCameraId: null,
@@ -85,6 +87,8 @@ export function getPhonePreviewFingerprint(project: DirectorProject) {
     ]),
     objects: preview.objects,
     animationSequences: preview.animationSequences,
+    characterMotionClips: (preview.characterMotionClips ?? []).map((clip) => [clip.id, clip.characterId, clip.duration, clip.frames.length]),
+    characterFaceClips: (preview.characterFaceClips ?? []).map((clip) => [clip.id, clip.characterId, clip.checksum, clip.frames.length]),
     activeAnimationSequenceId: preview.activeAnimationSequenceId,
   });
 }
@@ -176,9 +180,11 @@ function sendJson(socket: WebSocket | null, payload: unknown) {
   socket.send(JSON.stringify(payload));
 }
 
-function buildDesktopState() {
+function buildDesktopState(forcePhonePreview = false) {
   const state = useDirectorStore.getState();
   const phonePreviewUpdate = getPhonePreviewUpdate(state.project);
+  const includePhonePreview = forcePhonePreview || phonePreviewUpdate.phonePreviewRevision !== lastSentPhonePreviewRevision;
+  if (includePhonePreview) lastSentPhonePreviewRevision = phonePreviewUpdate.phonePreviewRevision;
   return {
     activeCameraId: state.project.activeCameraId,
     cameras: state.project.cameras.map((camera) => ({
@@ -214,7 +220,10 @@ function buildDesktopState() {
       )
       .map((camera) => camera.id),
     viewportAspectRatio: state.viewportAspectRatio,
-    ...phonePreviewUpdate,
+    phonePreviewRevision: phonePreviewUpdate.phonePreviewRevision,
+    phonePreviewPending: phonePreviewUpdate.phonePreviewPending,
+    phonePreviewError: phonePreviewUpdate.phonePreviewError,
+    ...(includePhonePreview ? { phonePreviewProject: phonePreviewUpdate.phonePreviewProject } : {}),
   };
 }
 
@@ -227,17 +236,17 @@ export function startDirectorDeskRealtime() {
   let unsubscribeAnimationRuntime: (() => void) | null = null;
   let unsubscribeSequenceRuntime: (() => void) | null = null;
 
-  function sendDesktopState() {
+  function sendDesktopState(forcePhonePreview = false) {
     desktopStateFrame = 0;
     sendJson(socket, {
       type: "desktop_state",
-      state: buildDesktopState(),
+      state: buildDesktopState(forcePhonePreview),
     });
   }
 
   function scheduleDesktopState() {
     if (desktopStateFrame) return;
-    desktopStateFrame = window.requestAnimationFrame(sendDesktopState);
+    desktopStateFrame = window.requestAnimationFrame(() => sendDesktopState(false));
   }
 
   requestPhonePreviewBroadcast = scheduleDesktopState;
@@ -253,7 +262,8 @@ export function startDirectorDeskRealtime() {
         visibilityState: document.visibilityState,
         hasFocus: document.hasFocus(),
       });
-      sendDesktopState();
+      lastSentPhonePreviewRevision = -1;
+      sendDesktopState(true);
     });
 
     socket.addEventListener("message", (event) => {

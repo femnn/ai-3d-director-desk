@@ -14,6 +14,8 @@ import {
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { CharacterRigState } from "../schema/directorProject";
+import type { CharacterFaceSample } from "../animation/characterFaceAnimation";
+import type { CharacterFaceProfile } from "../schema/directorProject";
 import { VIEWPORT_OBJECT_LABEL_VERTICAL_GAP } from "../schema/viewportLabels";
 import type { CharacterBodyType } from "./mannequin/bodyTypes";
 import {
@@ -22,6 +24,7 @@ import {
   getUE4ModelScale,
 } from "./ue4Mannequin/ue4MannequinRig";
 import { applyUE4RestPoseAndRig, captureUE4RestPose } from "./ue4Mannequin/ue4MannequinPoseApplication";
+import { FaceHeadAttachment } from "./FaceHeadAttachment";
 
 interface UE4MannequinModelProps {
   bodyType?: CharacterBodyType;
@@ -29,6 +32,8 @@ interface UE4MannequinModelProps {
   onLabelAnchorYChange?: (anchorY: number) => void;
   onJointPositionsChange?: (positions: Record<string, [number, number, number]>) => void;
   rigState?: CharacterRigState;
+  faceProfile?: CharacterFaceProfile;
+  faceSample?: CharacterFaceSample;
 }
 
 interface LoadedGLTF {
@@ -132,11 +137,14 @@ export function UE4MannequinModel({
   onLabelAnchorYChange,
   onJointPositionsChange,
   rigState,
+  faceProfile,
+  faceSample,
 }: UE4MannequinModelProps) {
   const gltf = useLoader(GLTFLoader, UE4_MANNEQUIN_MODEL_URL) as LoadedGLTF;
   const scene = useMemo(() => cloneSkeleton(gltf.scene) as Group, [gltf.scene]);
   const restPose = useMemo(() => captureUE4RestPose(scene), [scene]);
   const modelScale = getUE4ModelScale(bodyType);
+  const headBone = scene.getObjectByName(UE4_MANNEQUIN_BONE_MAP.head);
 
   useLayoutEffect(() => {
     isolateAndTintUE4MannequinMaterials(scene, color);
@@ -182,6 +190,14 @@ export function UE4MannequinModel({
   return (
     <group name={`ue-retopology-mannequin-${bodyType}`} scale={modelScale}>
       <primitive object={scene} />
+      {headBone && faceProfile && faceSample ? (
+        <FaceHeadAttachment
+          mannequinScene={scene}
+          headBone={headBone}
+          profile={faceProfile}
+          sample={faceSample}
+        />
+      ) : null}
     </group>
   );
 }

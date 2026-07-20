@@ -42,6 +42,13 @@ const tools = [
   "export_animation_sequence",
   "import_animation_sequence",
   "review_animation_sequence",
+  "list_face_clips",
+  "assign_face_clip",
+  "set_face_profile",
+  "play_face_clip",
+  "pause_face_clip",
+  "export_face_clip",
+  "import_face_clip",
   "screenshot",
 ].map((name) => ({
   name,

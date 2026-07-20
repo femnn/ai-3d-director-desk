@@ -6,6 +6,8 @@ import type {
   DirectorAssetSource,
   CharacterBodyType,
   CharacterActionTrack,
+  CharacterFaceClip,
+  CharacterFaceTrack,
   CharacterMotionClip,
   DirectorAssetKind,
   DirectorCameraAnimation,
@@ -35,6 +37,7 @@ import {
 import type { ViewportAspectRatio } from "../schema/viewportAspectRatio";
 import { resetObjectAnimationRuntime } from "../animation/objectAnimation";
 import { resetAnimationSequenceRuntime } from "../animation/animationSequence";
+import { createFaceClipChecksum } from "../animation/characterFaceAnimation";
 
 export type TransformMode = "translate" | "rotate" | "scale";
 
@@ -181,6 +184,9 @@ export interface DirectorActions {
   setCrowdCharacterActionTrack: (crowdId: string, track: CharacterActionTrack | null) => void;
   addCharacterMotionClip: (input: Omit<CharacterMotionClip, "id">) => string;
   deleteCharacterMotionClip: (clipId: string) => void;
+  setCharacterFaceTrack: (id: string, track: CharacterFaceTrack | null) => void;
+  addCharacterFaceClip: (input: Omit<CharacterFaceClip, "id">) => string;
+  deleteCharacterFaceClip: (clipId: string) => void;
   setScenePlan: (plan: ScenePlan | null) => void;
   setActiveCamera: (cameraId: string) => void;
   addCameraCaptures: (cameraId: string | null | undefined, dataUrls: string[]) => void;
@@ -474,6 +480,38 @@ function isSafeMotionClip(clip: unknown): clip is CharacterMotionClip {
   );
 }
 
+function isSafeFaceClip(clip: unknown): clip is CharacterFaceClip {
+  const value = clip as CharacterFaceClip | null;
+  return Boolean(
+    value &&
+      typeof value.id === "string" &&
+      typeof value.characterId === "string" &&
+      typeof value.name === "string" &&
+      typeof value.duration === "number" &&
+      value.duration > 0 &&
+      Number.isFinite(value.duration) &&
+      typeof value.fps === "number" &&
+      value.fps >= 1 &&
+      value.fps <= 120 &&
+      Array.isArray(value.channels) &&
+      value.channels.length > 0 &&
+      value.channels.length <= 256 &&
+      value.channels.every((channel) => typeof channel === "string" && channel.length > 0) &&
+      Array.isArray(value.frames) &&
+      value.frames.length > 0 &&
+      value.frames.every(
+        (frame) =>
+          frame &&
+          typeof frame.time === "number" &&
+          Number.isFinite(frame.time) &&
+          Array.isArray(frame.values) &&
+          frame.values.length === value.channels.length &&
+          frame.values.every((entry) => typeof entry === "number" && Number.isFinite(entry)) &&
+          isFiniteVector(frame.headRotation, 4)
+      )
+  );
+}
+
 function normalizeObjectAnimationTrack(track: unknown, objectId: string, objectName: string): ObjectAnimationTrack | undefined {
   if (!track || typeof track !== "object") return undefined;
   const value = track as Partial<ObjectAnimationTrack>;
@@ -661,6 +699,10 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
         Array.isArray(animation.keyframes)
     ),
     characterMotionClips: (project.characterMotionClips ?? []).filter(isSafeMotionClip),
+    characterFaceClips: (project.characterFaceClips ?? []).filter(isSafeFaceClip).map((clip) => ({
+      ...clip,
+      checksum: createFaceClipChecksum(clip),
+    })),
     animationSequences,
     activeAnimationSequenceId,
     scenePlan: project.scenePlan ?? null,
@@ -679,6 +721,16 @@ function migrateDirectorProject(project: DirectorProject | null | undefined): Di
               enabled: true,
             }
           : undefined,
+        characterFaceTrack:
+          object.characterFaceTrack &&
+          (object.characterFaceTrack.profile === "facecap52" || object.characterFaceTrack.profile === "gnm21")
+            ? {
+                clipId: typeof object.characterFaceTrack.clipId === "string" ? object.characterFaceTrack.clipId : null,
+                profile: object.characterFaceTrack.profile,
+                enabled: object.characterFaceTrack.enabled !== false,
+                loop: object.characterFaceTrack.loop !== false,
+              }
+            : undefined,
       };
       if (object.kind !== "character") return normalizedObject;
 
@@ -857,6 +909,7 @@ export function createDefaultDirectorProject({
     cameras: [camera],
     cameraAnimations: [],
     characterMotionClips: [],
+    characterFaceClips: [],
     animationSequences: [],
     activeAnimationSequenceId: null,
     activeCameraId: camera.id,
@@ -2562,6 +2615,9 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
             characterMotionClips: (state.project.characterMotionClips ?? []).filter((clip) =>
               nextObjects.some((object) => object.kind === "character" && object.id === clip.characterId)
             ),
+            characterFaceClips: (state.project.characterFaceClips ?? []).filter((clip) =>
+              nextObjects.some((object) => object.kind === "character" && object.id === clip.characterId)
+            ),
             activeCameraId: nextActiveCameraId,
           },
         };
@@ -2784,6 +2840,50 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
           objects: state.project.objects.map((object) =>
             object.characterActionTrack?.motionClipId === clipId
               ? { ...object, characterActionTrack: undefined }
+              : object
+          ),
+        },
+      })),
+    setCharacterFaceTrack: (id, track) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          objects: updateObjectById(state.project.objects, id, (item) =>
+            item.kind === "character"
+              ? { ...item, characterFaceTrack: track ? cloneJsonValue(track) : undefined }
+              : item
+          ),
+        },
+      })),
+    addCharacterFaceClip: (input) => {
+      let clipId = "";
+      commitMutation((state) => {
+        const clips = state.project.characterFaceClips ?? [];
+        clipId = getNextSequentialId(clips.map((clip) => clip.id), "face_", clips.length + 1);
+        const clip: CharacterFaceClip = {
+          ...cloneJsonValue(input),
+          id: clipId,
+          duration: Math.max(0.1, input.duration),
+          fps: Math.min(120, Math.max(1, input.fps)),
+        };
+        clip.checksum = createFaceClipChecksum(clip);
+        return {
+          ...state,
+          project: { ...state.project, characterFaceClips: [...clips, clip] },
+        };
+      });
+      return clipId;
+    },
+    deleteCharacterFaceClip: (clipId) =>
+      commitMutation((state) => ({
+        ...state,
+        project: {
+          ...state.project,
+          characterFaceClips: (state.project.characterFaceClips ?? []).filter((clip) => clip.id !== clipId),
+          objects: state.project.objects.map((object) =>
+            object.characterFaceTrack?.clipId === clipId
+              ? { ...object, characterFaceTrack: undefined }
               : object
           ),
         },

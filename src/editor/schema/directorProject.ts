@@ -155,6 +155,32 @@ export interface CharacterMotionClip {
   frames: CharacterMotionFrame[];
 }
 
+export type CharacterFaceProfile = "facecap52" | "gnm21";
+
+export interface CharacterFaceFrame {
+  time: number;
+  values: number[];
+  headRotation: [number, number, number, number];
+}
+
+export interface CharacterFaceClip {
+  id: string;
+  characterId: string;
+  name: string;
+  duration: number;
+  fps: number;
+  channels: string[];
+  frames: CharacterFaceFrame[];
+  checksum: string;
+}
+
+export interface CharacterFaceTrack {
+  clipId: string | null;
+  profile: CharacterFaceProfile;
+  enabled: boolean;
+  loop: boolean;
+}
+
 export interface DirectorAnimationBinding {
   alias: string;
   objectId: string;
@@ -259,6 +285,7 @@ export interface DirectorObject {
   linkedCameraId?: string | null;
   characterRig?: CharacterRigState;
   characterActionTrack?: CharacterActionTrack;
+  characterFaceTrack?: CharacterFaceTrack;
   objectAnimationTrack?: ObjectAnimationTrack;
 }
 
@@ -303,6 +330,7 @@ export interface DirectorProject {
   cameras: DirectorCameraShot[];
   cameraAnimations: DirectorCameraAnimation[];
   characterMotionClips?: CharacterMotionClip[];
+  characterFaceClips?: CharacterFaceClip[];
   animationSequences?: DirectorAnimationSequence[];
   activeAnimationSequenceId?: string | null;
   activeCameraId: string | null;

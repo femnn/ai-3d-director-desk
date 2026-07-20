@@ -20,6 +20,7 @@ import { AnimoFlowActionGenerator } from "../animation/AnimoFlowActionGenerator"
 import { resetAnimationSequenceRuntime } from "../animation/animationSequence";
 import { CharacterJsonControls } from "./CharacterJsonControls";
 import { PoseImageImporter, PoseVideoImporter } from "../mocap/PoseMediaImporter";
+import { FaceCaptureRecorder } from "../mocap/FaceCaptureRecorder";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
 import type { CharacterActionTrack } from "../schema/directorProject";
 import { getCrowdAnchorTransform, useDirectorStore } from "../store/directorStore";
@@ -29,7 +30,8 @@ function replaceAxis(tuple: [number, number, number], axis: 0 | 1 | 2, value: nu
 }
 
 export function CharacterPanel() {
-  const [activeTab, setActiveTab] = useState<"properties" | "pose" | "animation">("properties");
+  const [activeTab, setActiveTab] = useState<"properties" | "pose" | "animation" | "face">("properties");
+  const [faceTargetId, setFaceTargetId] = useState("");
   const selectedCrowdId = useDirectorStore((state) => state.selectedCrowdId);
   const selectedObjectId = useDirectorStore((state) => state.selectedObjectId);
   const objects = useDirectorStore((state) => state.project.objects);
@@ -91,6 +93,7 @@ export function CharacterPanel() {
   const roleColor = selection.color;
   const transform = selection.crowdAnchor;
   const isCrowd = selection.mode === "crowd";
+  const faceTargetRole = selection.crowdMembers.find((member) => member.id === faceTargetId) ?? role;
   const actionTrack: CharacterActionTrack = role.characterActionTrack ?? {
     actionId: "idle" as const,
     duration: MIN_CHARACTER_ACTION_DURATION,
@@ -120,7 +123,13 @@ export function CharacterPanel() {
     const nextObjects = useDirectorStore.getState().project.objects;
     playNormalCharacterAnimations(
       nextObjects
-        .filter((item) => item.kind === "character" && item.characterActionTrack?.enabled && item.characterActionTrack.playbackMode === "normal")
+        .filter((item) =>
+          item.kind === "character" &&
+          (
+            (item.characterActionTrack?.enabled && item.characterActionTrack.playbackMode === "normal") ||
+            item.characterFaceTrack?.enabled
+          )
+        )
         .map((item) => item.id)
     );
   };
@@ -211,6 +220,7 @@ export function CharacterPanel() {
         { label: "属性", active: activeTab === "properties", onClick: () => setActiveTab("properties") },
         { label: "姿势", active: activeTab === "pose", onClick: () => setActiveTab("pose") },
         { label: "动作", active: activeTab === "animation", onClick: () => setActiveTab("animation") },
+        { label: "面部", active: activeTab === "face", onClick: () => setActiveTab("face") },
       ]}
     >
       {activeTab === "properties" ? (
@@ -454,7 +464,7 @@ export function CharacterPanel() {
             <p>该模型未识别到标准 humanoid 骨骼，暂不支持姿势编辑。</p>
           )}
         </InspectorSection>
-      ) : (
+      ) : activeTab === "animation" ? (
         <InspectorSection title="角色动作" className="pose-preset-section">
           {!isCrowd ? <AnimoFlowActionGenerator character={role} /> : null}
           <InspectorSelectField
@@ -517,6 +527,23 @@ export function CharacterPanel() {
               ))}
             </section>
           ) : null}
+        </InspectorSection>
+      ) : (
+        <InspectorSection title="GNM 面部动画" className="face-animation-section">
+          {isCrowd ? (
+            <InspectorSelectField
+              label="目标角色"
+              ariaLabel="面部动画目标角色"
+              value={faceTargetRole.id}
+              options={selection.crowdMembers.map((member) => ({ value: member.id, label: member.name }))}
+              onChange={setFaceTargetId}
+            />
+          ) : null}
+          {faceTargetRole.characterRig?.rigType === "ue4-mannequin" && !faceTargetRole.assetRefId ? (
+            <FaceCaptureRecorder key={faceTargetRole.id} character={faceTargetRole} />
+          ) : (
+            <p>面部动画第一版仅支持内置 UE4 假人角色。</p>
+          )}
         </InspectorSection>
       )}
     </InspectorPanel>

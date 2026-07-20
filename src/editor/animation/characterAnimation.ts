@@ -458,6 +458,11 @@ export function setCharacterAnimationElapsedSnapshot(snapshot: Record<string, nu
   emit();
 }
 
+export function resetCharacterAnimationElapsed(characterId: string) {
+  elapsedByCharacterId.set(characterId, 0);
+  emit();
+}
+
 export function subscribeCharacterAnimationRuntime(listener: () => void) {
   return subscribe(listener);
 }

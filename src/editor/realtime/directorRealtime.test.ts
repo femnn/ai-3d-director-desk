@@ -126,3 +126,27 @@ it("keeps the active unified animation sequence in the phone preview", () => {
   expect(preview.animationSequences).toEqual(animatedProject.animationSequences);
   expect(preview.activeAnimationSequenceId).toBe("sequence-1");
 });
+
+it("syncs face clips once and invalidates the phone preview when their content changes", () => {
+  const faceClip = {
+    id: "face-1",
+    characterId: "character-1",
+    name: "微笑",
+    duration: 5,
+    fps: 30,
+    channels: ["mouthSmileLeft", "mouthSmileRight"],
+    frames: [
+      { time: 0, values: [0, 0], headRotation: [0, 0, 0, 1] as [number, number, number, number] },
+      { time: 5, values: [1, 1], headRotation: [0, 0, 0, 1] as [number, number, number, number] },
+    ],
+    checksum: "face_initial",
+  };
+  const faceProject: DirectorProject = { ...project, characterFaceClips: [faceClip] };
+  const revisedProject: DirectorProject = {
+    ...faceProject,
+    characterFaceClips: [{ ...faceClip, checksum: "face_revised" }],
+  };
+
+  expect(createPhonePreviewProject(faceProject).characterFaceClips).toEqual([faceClip]);
+  expect(getPhonePreviewFingerprint(revisedProject)).not.toBe(getPhonePreviewFingerprint(faceProject));
+});

@@ -833,7 +833,7 @@ textarea:focus-visible {
 }
 
 .right-sidebar .character-inspector .right-inspector-tabs {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .right-sidebar .right-inspector-tabs button {
@@ -4098,6 +4098,151 @@ body.phone-immersive .phone-action-grid button {
 
 .mocap-clip-list > div button:first-child {
   flex: 1;
+}
+
+.face-capture-panel,
+.face-clip-list {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.face-capture-field {
+  display: grid;
+  gap: 5px;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 12px;
+}
+
+.face-capture-field select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgb(var(--border-rgb) / 0.7);
+  border-radius: 6px;
+  padding: 0 8px;
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--field-rgb));
+}
+
+.face-camera-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid rgb(var(--border-rgb) / 0.7);
+  border-radius: 6px;
+  background: #05070a;
+}
+
+.face-camera-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.face-camera-preview > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.face-camera-guide {
+  position: absolute;
+  top: 12%;
+  left: 25%;
+  width: 50%;
+  height: 72%;
+  border: 2px solid rgb(255 179 71 / 0.78);
+  border-radius: 48%;
+  pointer-events: none;
+}
+
+.face-camera-preview.has-face .face-camera-guide {
+  border-color: rgb(69 214 132 / 0.9);
+}
+
+.face-countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 54px;
+  background: rgb(0 0 0 / 0.28);
+}
+
+.face-status {
+  display: grid;
+  gap: 4px;
+}
+
+.face-status span,
+.face-status small {
+  color: rgb(var(--text-muted-rgb));
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.face-status span.is-ready {
+  color: rgb(54 190 112);
+}
+
+.face-capture-panel progress {
+  width: 100%;
+  height: 8px;
+  accent-color: rgb(var(--accent-rgb));
+}
+
+.face-button-row,
+.face-duration-row,
+.face-clip-list > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.face-button-row:has(> :nth-child(3)),
+.face-duration-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.face-button-row button,
+.face-duration-row button,
+.face-record-button,
+.face-clip-list button {
+  min-width: 0;
+  min-height: 36px;
+  overflow-wrap: anywhere;
+}
+
+.face-duration-row button.is-active,
+.face-clip-list button.is-active {
+  border-color: rgb(var(--accent-rgb) / 0.72);
+  background: rgb(var(--accent-rgb) / 0.18);
+}
+
+.face-record-button {
+  width: 100%;
+  border-color: rgb(236 77 77 / 0.7);
+}
+
+.face-loop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgb(var(--text-muted-rgb));
+  font-size: 12px;
+}
+
+.face-clip-list > div {
+  grid-template-columns: minmax(0, 1fr) 54px;
 }
 
 .pose-edit-launch {

@@ -12,6 +12,8 @@ import type {
   CharacterActionId,
   CharacterActionPlaybackMode,
   CharacterBodyType,
+  CharacterFaceClip,
+  CharacterFaceProfile,
   CharacterMotionFrame,
   CharacterMotionClip,
   CharacterMotionSource,
@@ -48,6 +50,8 @@ import {
   scrubAnimationSequence,
 } from "../animation/animationSequence";
 import { normalizeProceduralFactorySettings } from "../runtime/proceduralFactories/proceduralFactoryRegistry";
+import { exportFaceAnimationPackage, parseFaceAnimationFile } from "../animation/faceClipIo";
+import { playNormalCharacterAnimations, stopNormalCharacterAnimations } from "../animation/characterAnimation";
 
 type NumberTuple3 = [number, number, number];
 
@@ -74,6 +78,12 @@ export interface SceneScriptCharacter {
     motionClipId?: string | null;
   };
   motionClip?: SceneScriptCharacterMotionClip;
+  face?: {
+    profile?: CharacterFaceProfile;
+    enabled?: boolean;
+    loop?: boolean;
+    clip?: Omit<CharacterFaceClip, "id" | "characterId">;
+  };
   asset?: SceneScriptCharacterAsset | null;
 }
 
@@ -471,6 +481,24 @@ function findObject(idOrName: unknown, kind?: DirectorObject["kind"]) {
   );
 }
 
+function importCharacterFaceClip(characterId: string, input?: SceneScriptCharacter["face"]) {
+  if (!input) return;
+  const profile = input.profile === "gnm21" ? "gnm21" : "facecap52";
+  let clipId: string | null = null;
+  if (input.clip) {
+    clipId = useDirectorStore.getState().addCharacterFaceClip({
+      ...input.clip,
+      characterId,
+    });
+  }
+  useDirectorStore.getState().setCharacterFaceTrack(characterId, {
+    clipId,
+    profile,
+    enabled: input.enabled !== false && Boolean(clipId),
+    loop: input.loop !== false,
+  });
+}
+
 function getTransformPatch(
   input: {
     position?: number[];
@@ -521,6 +549,7 @@ export function addCharacter(input: SceneScriptCharacter = {}) {
     input.action ?? (motionClipId ? { id: "idle", source: "video", enabled: true } : undefined),
     motionClipId
   );
+  importCharacterFaceClip(character.id, input.face);
 
   return { id: character.id };
 }
@@ -545,6 +574,7 @@ export function updateCharacter(input: SceneScriptCharacter & { id?: string; nam
     input.action ?? (motionClipId ? { id: "idle", source: "video", enabled: true } : undefined),
     motionClipId
   );
+  if (input.face) importCharacterFaceClip(target.id, input.face);
 
   return { id: target.id };
 }
@@ -878,7 +908,10 @@ export function applySceneScript(script: SceneScript = {}) {
   if (scenePlan) useDirectorStore.getState().setScenePlan(scenePlan);
   syncNormalCharacterAnimations(
     useDirectorStore.getState().project.objects
-      .filter((object) => object.kind === "character" && object.characterActionTrack?.enabled)
+      .filter((object) =>
+        object.kind === "character" &&
+        (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+      )
       .map((object) => object.id)
   );
 
@@ -907,6 +940,9 @@ export function exportSceneScript(): SceneScript {
       const motionClip = object.characterActionTrack?.motionClipId
         ? (project.characterMotionClips ?? []).find((clip) => clip.id === object.characterActionTrack?.motionClipId)
         : undefined;
+      const faceClip = object.characterFaceTrack?.clipId
+        ? (project.characterFaceClips ?? []).find((clip) => clip.id === object.characterFaceTrack?.clipId)
+        : undefined;
       return {
         id: object.id,
         name: object.name,
@@ -931,6 +967,16 @@ export function exportSceneScript(): SceneScript {
           : undefined,
         motionClip: motionClip
           ? { name: motionClip.name, duration: motionClip.duration, frames: motionClip.frames }
+          : undefined,
+        face: object.characterFaceTrack
+          ? {
+              profile: object.characterFaceTrack.profile,
+              enabled: object.characterFaceTrack.enabled,
+              loop: object.characterFaceTrack.loop,
+              clip: faceClip
+                ? exportFaceAnimationPackage(faceClip).clip
+                : undefined,
+            }
           : undefined,
         asset: asset?.sourceType === "model"
           ? {
@@ -1258,6 +1304,96 @@ export async function executeDirectorAgentTool(tool: string, args: unknown = {})
         selectedObjectId: useDirectorStore.getState().selectedObjectId,
         project: useDirectorStore.getState().project,
       };
+    case "list_face_clips": {
+      const project = useDirectorStore.getState().project;
+      return {
+        clips: (project.characterFaceClips ?? []).map((clip) => ({
+          id: clip.id,
+          characterId: clip.characterId,
+          characterName: project.objects.find((object) => object.id === clip.characterId)?.name ?? clip.characterId,
+          name: clip.name,
+          duration: clip.duration,
+          fps: clip.fps,
+        })),
+      };
+    }
+    case "assign_face_clip": {
+      const input = args as { characterId?: string; characterName?: string; clipId?: string; profile?: CharacterFaceProfile; loop?: boolean };
+      const character = findObject(input.characterId ?? input.characterName, "character");
+      if (!character) throw new Error("找不到要绑定面部动画的角色");
+      const clip = (useDirectorStore.getState().project.characterFaceClips ?? []).find(
+        (candidate) => candidate.id === input.clipId && candidate.characterId === character.id
+      );
+      if (!clip) throw new Error("找不到属于该角色的面部动画片段");
+      useDirectorStore.getState().setCharacterFaceTrack(character.id, {
+        clipId: clip.id,
+        profile: input.profile === "gnm21" ? "gnm21" : "facecap52",
+        enabled: true,
+        loop: input.loop !== false,
+      });
+      syncNormalCharacterAnimations(
+        useDirectorStore.getState().project.objects
+          .filter((object) => object.kind === "character" && (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled))
+          .map((object) => object.id)
+      );
+      return { characterId: character.id, clipId: clip.id };
+    }
+    case "set_face_profile": {
+      const input = args as { characterId?: string; characterName?: string; profile?: CharacterFaceProfile };
+      const character = findObject(input.characterId ?? input.characterName, "character");
+      if (!character) throw new Error("找不到角色");
+      const current = character.characterFaceTrack ?? { clipId: null, enabled: false, loop: true, profile: "facecap52" as const };
+      useDirectorStore.getState().setCharacterFaceTrack(character.id, {
+        ...current,
+        profile: input.profile === "gnm21" ? "gnm21" : "facecap52",
+      });
+      return { characterId: character.id, profile: input.profile === "gnm21" ? "gnm21" : "facecap52" };
+    }
+    case "play_face_clip": {
+      const ids = useDirectorStore.getState().project.objects
+        .filter((object) =>
+          object.kind === "character" &&
+          (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+        )
+        .map((object) => object.id);
+      playNormalCharacterAnimations(ids);
+      return { characterIds: ids };
+    }
+    case "pause_face_clip":
+      stopNormalCharacterAnimations();
+      return { ok: true };
+    case "export_face_clip": {
+      const input = args as { clipId?: string; characterId?: string; characterName?: string };
+      const project = useDirectorStore.getState().project;
+      const character = input.characterId || input.characterName ? findObject(input.characterId ?? input.characterName, "character") : null;
+      const clip = (project.characterFaceClips ?? []).find((candidate) =>
+        input.clipId ? candidate.id === input.clipId : candidate.id === character?.characterFaceTrack?.clipId
+      );
+      if (!clip) throw new Error("找不到面部动画片段");
+      return { faceAnimationPackage: exportFaceAnimationPackage(clip) };
+    }
+    case "import_face_clip": {
+      const input = args as { characterId?: string; characterName?: string; package?: unknown; profile?: CharacterFaceProfile };
+      const character = findObject(input.characterId ?? input.characterName, "character");
+      if (!character) throw new Error("找不到要导入面部动画的角色");
+      const portable = parseFaceAnimationFile(input.package ?? args);
+      const clipId = useDirectorStore.getState().addCharacterFaceClip({ ...portable, characterId: character.id });
+      useDirectorStore.getState().setCharacterFaceTrack(character.id, {
+        clipId,
+        profile: input.profile === "gnm21" ? "gnm21" : "facecap52",
+        enabled: true,
+        loop: true,
+      });
+      syncNormalCharacterAnimations(
+        useDirectorStore.getState().project.objects
+          .filter((object) =>
+            object.kind === "character" &&
+            (object.characterActionTrack?.enabled || object.characterFaceTrack?.enabled)
+          )
+          .map((object) => object.id)
+      );
+      return { characterId: character.id, clipId };
+    }
     case "reset_scene":
       useDirectorStore.getState().replaceProject(createDefaultDirectorProject({ includePersistedLocalAssets: true }));
       return { ok: true };
