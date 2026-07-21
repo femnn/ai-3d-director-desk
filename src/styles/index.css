@@ -4505,6 +4505,7 @@ body.phone-immersive .phone-action-grid button {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  transform: none !important;
   touch-action: none;
   pointer-events: none;
 }

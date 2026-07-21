@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { getCharacterActionElapsed, setCharacterAnimationElapsedSnapshot } from "../editor/animation/characterAnimation";
+import { getCameraViewSnapshotFromShot } from "../editor/schema/cameraGeometry";
+import { createDefaultDirectorProject, useDirectorStore } from "../editor/store/directorStore";
 import { PhoneController } from "./PhoneController";
 
 vi.mock("./PhoneCameraPreview", () => ({
@@ -13,10 +16,24 @@ vi.mock("./PhoneCameraPreview", () => ({
 class MockWebSocket {
   static readonly OPEN = 1;
   static sent: string[] = [];
+  static instances: MockWebSocket[] = [];
   readonly readyState = MockWebSocket.OPEN;
+  private listeners = new Map<string, Set<(event: MessageEvent) => void>>();
+
+  constructor() {
+    MockWebSocket.instances.push(this);
+  }
 
   addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
     if (type === "open") queueMicrotask(() => listener(new MessageEvent("open")));
+  }
+
+  receive(payload: unknown) {
+    const event = new MessageEvent("message", { data: JSON.stringify(payload) });
+    this.listeners.get("message")?.forEach((listener) => listener(event));
   }
 
   close() {}
@@ -28,6 +45,9 @@ class MockWebSocket {
 
 beforeEach(() => {
   MockWebSocket.sent = [];
+  MockWebSocket.instances = [];
+  setCharacterAnimationElapsedSnapshot(null);
+  useDirectorStore.getState().replaceProject(createDefaultDirectorProject());
   vi.stubGlobal("WebSocket", MockWebSocket);
   vi.stubGlobal(
     "fetch",
@@ -44,8 +64,55 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setCharacterAnimationElapsedSnapshot(null);
   vi.unstubAllGlobals();
   window.history.replaceState({}, "", "/");
+});
+
+it("keeps applying desktop character animation frames after replacing the phone preview scene", async () => {
+  window.history.replaceState({}, "", "/phone?mode=standard");
+  const project = createDefaultDirectorProject();
+  const character = project.objects.find((object) => object.kind === "character")!;
+  character.characterActionTrack = {
+    actionId: "wave",
+    duration: 5,
+    loop: true,
+    enabled: true,
+    playbackMode: "normal",
+  };
+  const camera = project.cameras[0];
+  const cameraSnapshot = getCameraViewSnapshotFromShot(camera);
+  render(<PhoneController />);
+
+  await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, ...cameraSnapshot }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-test:1",
+      phonePreviewProject: project,
+      characterAnimationElapsed: { [character.id]: 1.25 },
+    },
+  });
+
+  await waitFor(() => expect(getCharacterActionElapsed(character.id)).toBe(1.25));
+  expect(useDirectorStore.getState().project.objects.find((object) => object.id === character.id)?.characterActionTrack)
+    .toMatchObject({ actionId: "wave", enabled: true });
+
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, ...cameraSnapshot }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-test:1",
+      characterAnimationElapsed: { [character.id]: 2.5 },
+    },
+  });
+
+  await waitFor(() => expect(getCharacterActionElapsed(character.id)).toBe(2.5));
 });
 
 it("keeps sensor controls out of the standard LAN controller", () => {

@@ -1,6 +1,7 @@
 import { Grid } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Suspense, type RefObject } from "react";
+import { Suspense, useRef, type RefObject } from "react";
+import { Vector3 } from "three";
 import type { CameraViewSnapshot } from "../editor/schema/cameraGeometry";
 import { useDirectorStore } from "../editor/store/directorStore";
 import { SceneRoot } from "../editor/canvas/SceneRoot";
@@ -15,16 +16,35 @@ export type PhoneCameraPreviewOption = {
 
 function PhonePreviewCamera({ viewRef }: { viewRef: RefObject<CameraViewSnapshot | null> }) {
   const camera = useThree((state) => state.camera);
+  const positionRef = useRef(new Vector3());
+  const targetRef = useRef(new Vector3());
+  const desiredPositionRef = useRef(new Vector3());
+  const desiredTargetRef = useRef(new Vector3());
+  const initializedRef = useRef(false);
+  const fovRef = useRef(35);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const view = viewRef.current;
     if (!view) return;
-    camera.position.set(...view.position);
+    desiredPositionRef.current.set(...view.position);
+    desiredTargetRef.current.set(...view.target);
+    if (!initializedRef.current) {
+      positionRef.current.copy(desiredPositionRef.current);
+      targetRef.current.copy(desiredTargetRef.current);
+      fovRef.current = view.fov;
+      initializedRef.current = true;
+    } else {
+      const smoothing = 1 - Math.exp(-24 * Math.min(delta, 0.1));
+      positionRef.current.lerp(desiredPositionRef.current, smoothing);
+      targetRef.current.lerp(desiredTargetRef.current, smoothing);
+      fovRef.current += (view.fov - fovRef.current) * smoothing;
+    }
+    camera.position.copy(positionRef.current);
     if ("fov" in camera) {
-      camera.fov = view.fov;
+      camera.fov = fovRef.current;
       camera.updateProjectionMatrix();
     }
-    camera.lookAt(...view.target);
+    camera.lookAt(targetRef.current);
     camera.updateMatrixWorld();
   });
 
@@ -66,7 +86,12 @@ export function PhoneCameraPreview({
         {viewRef.current ? <strong>FOV {Math.round(displayFov)}</strong> : null}
       </label>
       {ready && viewRef.current ? (
-        <Canvas className="phone-camera-preview-canvas" camera={{ position: [0, 1.6, 5], fov: 35 }} gl={{ antialias: true }}>
+        <Canvas
+          className="phone-camera-preview-canvas"
+          camera={{ position: [0, 1.6, 5], fov: 35 }}
+          frameloop="always"
+          gl={{ antialias: false, powerPreference: "high-performance" }}
+        >
           <ViewportBackground
             backgroundColor={scene.backgroundColor}
             panoramaAsset={panoramaAsset}

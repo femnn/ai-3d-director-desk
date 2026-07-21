@@ -213,6 +213,7 @@ export function PhoneController() {
   const cameraTopologySignatureRef = useRef("");
   const cameraOwnerSignatureRef = useRef("");
   const cameraDrivenSignatureRef = useRef("");
+  const characterAnimationElapsedRef = useRef<Record<string, number>>({});
   const liveStateRef = useRef<LiveCameraState>({
     position: [0, 1.6, 5],
     yaw: 0,
@@ -364,6 +365,7 @@ export function PhoneController() {
         if (message.type === "desktop_state" && message.state?.cameras) {
           const desktopAspectRatio = message.state.viewportAspectRatio ?? "auto";
           if (message.state.characterAnimationElapsed) {
+            characterAnimationElapsedRef.current = message.state.characterAnimationElapsed;
             setCharacterAnimationElapsedSnapshot(message.state.characterAnimationElapsed);
           }
           if (message.state.objectAnimationElapsed) {
@@ -393,6 +395,7 @@ export function PhoneController() {
           ) {
             previewVersionRef.current = { revision: previewRevision, token: previewToken ?? "" };
             useDirectorStore.getState().replaceProject(message.state.phonePreviewProject);
+            setCharacterAnimationElapsedSnapshot(characterAnimationElapsedRef.current);
             if (message.state.objectAnimationElapsed) {
               setObjectAnimationElapsedSnapshot(message.state.objectAnimationElapsed);
             }
@@ -424,6 +427,19 @@ export function PhoneController() {
           }
           const assignedCameraId = message.state.phoneAssignments?.[controllerIdRef.current];
           const assignedCamera = message.state.cameras.find((camera) => camera.id === assignedCameraId) ?? null;
+          const controlledCamera = message.state.cameras.find(
+            (camera) => camera.id === (assignedCameraId ?? liveStateRef.current.cameraId)
+          ) ?? null;
+          const controlledCameraAcknowledged =
+            controlledCamera &&
+            (typeof controlledCamera.phoneUpdatedAt !== "number" || controlledCamera.phoneUpdatedAt >= lastSentAtRef.current);
+          if (controlledCameraAcknowledged && controlledCamera?.position && controlledCamera.target) {
+            previewViewRef.current = {
+              fov: controlledCamera.fov,
+              position: [...controlledCamera.position],
+              target: [...controlledCamera.target],
+            };
+          }
           const bootstrapCamera =
             assignedCamera ??
             (liveStateRef.current.cameraId
