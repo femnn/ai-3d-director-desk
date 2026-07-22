@@ -139,6 +139,24 @@ export function estimateTextFaceDuration(text: string) {
   return getTextFaceTiming(text).duration;
 }
 
+export function fitTextFaceInput(text: string) {
+  const characters = Array.from(text);
+  const limitedCharacters = characters.slice(0, MAX_TEXT_FACE_INPUT_LENGTH);
+  let fitted = "";
+  let truncated = limitedCharacters.length < characters.length;
+
+  for (const character of limitedCharacters) {
+    const candidate = `${fitted}${character}`;
+    if (getTextFaceTiming(candidate).exceedsLimit) {
+      truncated = true;
+      break;
+    }
+    fitted = candidate;
+  }
+
+  return { text: fitted, truncated };
+}
+
 function shapeAt(units: SpeechUnit[], time: number) {
   return units.find((unit) => time >= unit.start && time <= unit.end) ?? null;
 }

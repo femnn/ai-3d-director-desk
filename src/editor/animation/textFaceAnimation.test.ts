@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MEDIAPIPE_FACE_CHANNELS } from "./characterFaceAnimation";
-import { createTextFaceClip, estimateTextFaceDuration, getTextFaceTiming } from "./textFaceAnimation";
+import { createTextFaceClip, estimateTextFaceDuration, fitTextFaceInput, getTextFaceTiming } from "./textFaceAnimation";
 
 describe("text face animation", () => {
   it("uses empty, 5, 10 and 15 second duration buckets", () => {
@@ -37,5 +37,15 @@ describe("text face animation", () => {
 
   it("rejects text without spoken content", async () => {
     await expect(createTextFaceClip("……", "演员")).rejects.toThrow("没有可生成口型");
+  });
+
+  it("keeps pasted text and truncates only the part beyond 15 seconds", () => {
+    const source = "这是一段通过剪贴板粘贴进来的角色对白。".repeat(8);
+    const fitted = fitTextFaceInput(source);
+
+    expect(fitted.truncated).toBe(true);
+    expect(fitted.text.length).toBeGreaterThan(0);
+    expect(source.startsWith(fitted.text)).toBe(true);
+    expect(getTextFaceTiming(fitted.text).exceedsLimit).toBe(false);
   });
 });

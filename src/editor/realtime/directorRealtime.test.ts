@@ -141,10 +141,29 @@ it("syncs face clips once and invalidates the phone preview when their content c
     ],
     checksum: "face_initial",
   };
-  const faceProject: DirectorProject = { ...project, characterFaceClips: [faceClip] };
+  const faceActor = {
+    id: "character-1",
+    name: "面捕演员",
+    kind: "character" as const,
+    visible: true,
+    locked: false,
+    bodyType: "face-capture" as const,
+    transform: {
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: [1, 1, 1] as [number, number, number],
+    },
+    characterFaceTrack: { clipId: faceClip.id, profile: "facecap52" as const, enabled: true, loop: true },
+  };
+  const unusedFaceClip = { ...faceClip, id: "face-unused", checksum: "face_unused" };
+  const faceProject: DirectorProject = {
+    ...project,
+    objects: [...project.objects, faceActor],
+    characterFaceClips: [faceClip, unusedFaceClip],
+  };
   const revisedProject: DirectorProject = {
     ...faceProject,
-    characterFaceClips: [{ ...faceClip, checksum: "face_revised" }],
+    characterFaceClips: [{ ...faceClip, checksum: "face_revised" }, unusedFaceClip],
   };
 
   expect(createPhonePreviewProject(faceProject).characterFaceClips).toEqual([faceClip]);

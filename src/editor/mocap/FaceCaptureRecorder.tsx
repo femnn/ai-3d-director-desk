@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import type { DirectorObject, CharacterFaceClip, CharacterFaceFrame, CharacterFaceProfile } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 import {
@@ -15,6 +15,7 @@ import { exportFaceAnimationPackage, parseFaceAnimationFile } from "../animation
 import {
   MAX_TEXT_FACE_INPUT_LENGTH,
   createTextFaceClip,
+  fitTextFaceInput,
   getTextFaceTiming,
 } from "../animation/textFaceAnimation";
 
@@ -144,6 +145,21 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
     } finally {
       setGeneratingTextFace(false);
     }
+  }
+
+  function updateSpeechText(next: string) {
+    const fitted = fitTextFaceInput(next);
+    setSpeechText(fitted.text);
+    if (fitted.truncated) setStatus("已粘贴可容纳的内容，文字最长为15秒");
+  }
+
+  function pasteSpeechText(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = event.clipboardData.getData("text");
+    if (!pasted) return;
+    event.preventDefault();
+    const start = event.currentTarget.selectionStart ?? speechText.length;
+    const end = event.currentTarget.selectionEnd ?? start;
+    updateSpeechText(`${speechText.slice(0, start)}${pasted}${speechText.slice(end)}`);
   }
 
   useEffect(() => {
@@ -348,14 +364,8 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
           maxLength={MAX_TEXT_FACE_INPUT_LENGTH}
           placeholder="输入角色要说的文字，例如：我们现在出发吧！"
           value={speechText}
-          onChange={(event) => {
-            const next = event.target.value;
-            if (getTextFaceTiming(next).exceedsLimit) {
-              setStatus("文字最长为15秒，请删减后继续输入");
-              return;
-            }
-            setSpeechText(next);
-          }}
+          onChange={(event) => updateSpeechText(event.target.value)}
+          onPaste={pasteSpeechText}
         />
         <small>按拼音音素生成口型 · 最长15秒 · {speechText.length}/{MAX_TEXT_FACE_INPUT_LENGTH}字</small>
         <button type="button" disabled={!speechText.trim() || speechTiming.exceedsLimit || generatingTextFace} onClick={generateTextFaceAnimation}>

@@ -5,13 +5,15 @@ import { getCameraViewSnapshotFromShot } from "../editor/schema/cameraGeometry";
 import { createDefaultDirectorProject, useDirectorStore } from "../editor/store/directorStore";
 import { PhoneController } from "./PhoneController";
 
-const previewProbe = vi.hoisted(() => ({ viewRef: null as { current: unknown } | null }));
+const previewProbe = vi.hoisted(() => ({ ready: false, viewRef: null as { current: unknown } | null }));
 
 vi.mock("./PhoneCameraPreview", () => ({
-  PhoneCameraPreview: ({ onCameraChange, viewRef }: {
+  PhoneCameraPreview: ({ onCameraChange, ready, viewRef }: {
     onCameraChange: (cameraId: string) => void;
+    ready: boolean;
     viewRef: { current: unknown };
   }) => {
+    previewProbe.ready = ready;
     previewProbe.viewRef = viewRef;
     return (
       <div aria-label="我的机位画面">
@@ -54,6 +56,7 @@ class MockWebSocket {
 beforeEach(() => {
   MockWebSocket.sent = [];
   MockWebSocket.instances = [];
+  previewProbe.ready = false;
   previewProbe.viewRef = null;
   setCharacterAnimationElapsedSnapshot(null);
   useDirectorStore.getState().replaceProject(createDefaultDirectorProject());
@@ -105,6 +108,40 @@ it("keeps the phone preview on the desktop-authoritative camera while local inpu
     },
   });
   await waitFor(() => expect(previewProbe.viewRef?.current).toEqual(confirmedView));
+});
+
+it("keeps an existing scene visible while large phone assets continue syncing", async () => {
+  window.history.replaceState({}, "", "/phone?mode=standard");
+  const project = createDefaultDirectorProject();
+  const camera = project.cameras[0];
+  const cameraSnapshot = getCameraViewSnapshotFromShot(camera);
+  render(<PhoneController />);
+
+  await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, ...cameraSnapshot }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-heavy:1",
+      phonePreviewPending: true,
+      phonePreviewProject: project,
+    },
+  });
+  await waitFor(() => expect(previewProbe.ready).toBe(true));
+
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, ...cameraSnapshot }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-heavy:1",
+      phonePreviewPending: true,
+    },
+  });
+  await waitFor(() => expect(previewProbe.ready).toBe(true));
 });
 
 afterEach(() => {

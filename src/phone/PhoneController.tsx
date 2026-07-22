@@ -200,6 +200,7 @@ export function PhoneController() {
   const orientationHandlerRef = useRef<(event: DeviceOrientationEvent) => void>(() => {});
   const orientationListenerRef = useRef<(event: DeviceOrientationEvent) => void>((event) => orientationHandlerRef.current(event));
   const previewVersionRef = useRef({ revision: -1, token: "" });
+  const previewReadyRef = useRef(false);
   const lastSentAtRef = useRef(0);
   const cameraTopologySignatureRef = useRef("");
   const cameraOwnerSignatureRef = useRef("");
@@ -366,12 +367,12 @@ export function PhoneController() {
             setAnimationSequenceRuntimeSnapshot(message.state.animationSequenceRuntime);
           }
           setPreviewAspectRatio((current) => (current === desktopAspectRatio ? current : desktopAspectRatio));
-          if (message.state.phonePreviewPending && !previewReady && !message.state.phonePreviewProject) {
+          if (message.state.phonePreviewPending && !previewReadyRef.current && !message.state.phonePreviewProject) {
             setPreviewReady(false);
             setStatus("正在同步当前布景");
           }
           if (message.state.phonePreviewError) {
-            if (!previewReady && !message.state.phonePreviewProject) {
+            if (!previewReadyRef.current && !message.state.phonePreviewProject) {
               setPreviewReady(false);
               setStatus(message.state.phonePreviewError);
             } else {
@@ -393,6 +394,7 @@ export function PhoneController() {
             if (message.state.animationSequenceRuntime) {
               setAnimationSequenceRuntimeSnapshot(message.state.animationSequenceRuntime);
             }
+            previewReadyRef.current = true;
             setPreviewReady(true);
             if (!liveStateRef.current.recording) setStatus("当前布景已同步");
           }

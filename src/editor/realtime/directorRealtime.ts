@@ -32,10 +32,26 @@ let lastSentPhonePreviewRevision = -1;
 
 export function createPhonePreviewProject(project: DirectorProject): DirectorProject {
   const objects = project.objects.filter((object) => object.kind !== "camera");
+  const animationSequences = project.animationSequences ?? [];
   const usedAssetIds = new Set(
     objects
       .map((object) => object.assetRefId)
       .filter((assetId): assetId is string => typeof assetId === "string")
+  );
+  const usedMotionClipIds = new Set(
+    objects
+      .map((object) => object.characterActionTrack?.motionClipId)
+      .filter((clipId): clipId is string => typeof clipId === "string")
+  );
+  animationSequences.forEach((sequence) => {
+    sequence.tracks.forEach((track) => {
+      if (track.type === "character" && track.motionClipId) usedMotionClipIds.add(track.motionClipId);
+    });
+  });
+  const usedFaceClipIds = new Set(
+    objects
+      .map((object) => object.characterFaceTrack?.clipId)
+      .filter((clipId): clipId is string => typeof clipId === "string")
   );
   if (project.panoramaAssetId) usedAssetIds.add(project.panoramaAssetId);
 
@@ -46,9 +62,9 @@ export function createPhonePreviewProject(project: DirectorProject): DirectorPro
     objects,
     cameras: [],
     cameraAnimations: [],
-    characterMotionClips: project.characterMotionClips ?? [],
-    characterFaceClips: project.characterFaceClips ?? [],
-    animationSequences: project.animationSequences ?? [],
+    characterMotionClips: (project.characterMotionClips ?? []).filter((clip) => usedMotionClipIds.has(clip.id)),
+    characterFaceClips: (project.characterFaceClips ?? []).filter((clip) => usedFaceClipIds.has(clip.id)),
+    animationSequences,
     activeAnimationSequenceId: project.activeAnimationSequenceId ?? null,
     activeCameraId: null,
     panoramaAssetId: project.panoramaAssetId,
