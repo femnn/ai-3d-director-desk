@@ -87,6 +87,7 @@ export function PhoneCameraPreview({
       </label>
       {ready && viewRef.current ? (
         <Canvas
+          key={cameraId}
           className="phone-camera-preview-canvas"
           camera={{ position: [0, 1.6, 5], fov: 35 }}
           frameloop="always"

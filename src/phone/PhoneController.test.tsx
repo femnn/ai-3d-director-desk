@@ -5,12 +5,20 @@ import { getCameraViewSnapshotFromShot } from "../editor/schema/cameraGeometry";
 import { createDefaultDirectorProject, useDirectorStore } from "../editor/store/directorStore";
 import { PhoneController } from "./PhoneController";
 
+const previewProbe = vi.hoisted(() => ({ viewRef: null as { current: unknown } | null }));
+
 vi.mock("./PhoneCameraPreview", () => ({
-  PhoneCameraPreview: ({ onCameraChange }: { onCameraChange: (cameraId: string) => void }) => (
-    <div aria-label="我的机位画面">
-      <select aria-label="切换控制机位" onChange={(event) => onCameraChange(event.currentTarget.value)} />
-    </div>
-  ),
+  PhoneCameraPreview: ({ onCameraChange, viewRef }: {
+    onCameraChange: (cameraId: string) => void;
+    viewRef: { current: unknown };
+  }) => {
+    previewProbe.viewRef = viewRef;
+    return (
+      <div aria-label="我的机位画面">
+        <select aria-label="切换控制机位" onChange={(event) => onCameraChange(event.currentTarget.value)} />
+      </div>
+    );
+  },
 }));
 
 class MockWebSocket {
@@ -46,6 +54,7 @@ class MockWebSocket {
 beforeEach(() => {
   MockWebSocket.sent = [];
   MockWebSocket.instances = [];
+  previewProbe.viewRef = null;
   setCharacterAnimationElapsedSnapshot(null);
   useDirectorStore.getState().replaceProject(createDefaultDirectorProject());
   vi.stubGlobal("WebSocket", MockWebSocket);
@@ -60,6 +69,42 @@ beforeEach(() => {
       }),
     })
   );
+});
+
+it("keeps the phone preview on the desktop-authoritative camera while local input is pending", async () => {
+  window.history.replaceState({}, "", "/phone?mode=standard");
+  const project = createDefaultDirectorProject();
+  const camera = project.cameras[0];
+  const firstView = { fov: 42, position: [1, 1.8, 5] as [number, number, number], target: [-1, 1.2, 0] as [number, number, number] };
+  render(<PhoneController />);
+
+  await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, ...firstView }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-camera:1",
+      phonePreviewProject: project,
+    },
+  });
+
+  await waitFor(() => expect(previewProbe.viewRef?.current).toEqual(firstView));
+  fireEvent.click(screen.getByRole("button", { name: "重置摄影机" }));
+  expect(previewProbe.viewRef?.current).toEqual(firstView);
+
+  const confirmedView = { fov: 35, position: [0, 1.6, 5] as [number, number, number], target: [0, 1.6, 1] as [number, number, number] };
+  MockWebSocket.instances[0].receive({
+    type: "desktop_state",
+    state: {
+      activeCameraId: camera.id,
+      cameras: [{ id: camera.id, name: camera.name, phoneUpdatedAt: Date.now(), ...confirmedView }],
+      phonePreviewRevision: 1,
+      phonePreviewToken: "desktop-camera:1",
+    },
+  });
+  await waitFor(() => expect(previewProbe.viewRef?.current).toEqual(confirmedView));
 });
 
 afterEach(() => {

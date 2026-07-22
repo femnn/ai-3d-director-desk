@@ -58,9 +58,11 @@ type LiveVideoCapture = {
   chunks: BlobPart[];
   frameRate: number;
   frameRequestTrack: FrameRequestVideoTrack | null;
+  finalizing: boolean;
   maxDurationSeconds: number;
   nextFrameRequestAt: number;
   recorder: MediaRecorder;
+  stopComplete: Promise<void>;
   stream: MediaStream;
   watchdogTimer: number;
 };
@@ -344,14 +346,20 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     if (!videoTrack) throw new Error("机位监看没有可录制的视频轨道");
     videoTrack.contentHint = "motion";
     const recorder = createVideoRecorder(stream);
+    let resolveStop!: () => void;
+    const stopComplete = new Promise<void>((resolve) => {
+      resolveStop = resolve;
+    });
     const capture: LiveVideoCapture = {
       cameraId,
       chunks: [],
       frameRate,
       frameRequestTrack,
+      finalizing: false,
       maxDurationSeconds,
       nextFrameRequestAt: 0,
       recorder,
+      stopComplete,
       stream,
       watchdogTimer: 0,
     };
@@ -359,13 +367,13 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size > 0) capture.chunks.push(event.data);
     });
-    // Flush once per second so 10/15-second recordings do not build one growing
-    // encoder buffer. This is infrequent enough to stay off the render hot path.
-    recorder.start(1000);
+    recorder.addEventListener("stop", resolveStop, { once: true });
+    // Keep one continuous container. Concatenating one-second MP4 MediaRecorder
+    // fragments makes FFmpeg see only the first fragment on newer Chromium builds.
+    recorder.start();
     capture.watchdogTimer = window.setTimeout(() => {
       if (capture.recorder.state !== "recording") return;
-      capture.recorder.requestData();
-      capture.recorder.pause();
+      capture.recorder.stop();
     }, maxDurationSeconds * 1000 + 250);
     const project = useDirectorStore.getState().project;
     beginAnimationSequenceRecording(
@@ -416,6 +424,8 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
     window.clearTimeout(capture.watchdogTimer);
     capture.watchdogTimer = 0;
   }
+  if (capture.finalizing) return;
+  capture.finalizing = true;
 
   recordedVideoByAnimationId.set(animationId, { status: "processing" });
   emitLiveVideoChange();
@@ -442,13 +452,8 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
         emitLiveVideoChange();
       });
   };
-  if (capture.recorder.state === "inactive") {
-    finishCapture();
-    return;
-  }
-  capture.recorder.addEventListener("stop", finishCapture, { once: true });
-  if (capture.recorder.state === "recording") capture.recorder.requestData();
-  capture.recorder.stop();
+  if (capture.recorder.state !== "inactive") capture.recorder.stop();
+  void capture.stopComplete.then(finishCapture);
 }
 
 function downloadVideo(blob: Blob, name: string) {
@@ -682,15 +687,15 @@ export function getCameraAnimationPlaybackDuration(animation: DirectorCameraAnim
   return Math.max(Math.max(keyframes[keyframes.length - 1].time, 1), 1200);
 }
 
-function createVideoRecorder(stream: MediaStream) {
-  const candidates = [
-    "video/mp4;codecs=avc1.42E01E",
+export const VIDEO_RECORDER_MIME_TYPE_CANDIDATES = [
     "video/webm;codecs=vp8",
-    "video/webm;codecs=vp9",
     "video/webm",
+    "video/mp4;codecs=avc1.42E01E",
     "video/mp4",
-  ];
-  for (const mimeType of candidates) {
+  ] as const;
+
+export function createVideoRecorder(stream: MediaStream) {
+  for (const mimeType of VIDEO_RECORDER_MIME_TYPE_CANDIDATES) {
     if (!MediaRecorder.isTypeSupported(mimeType)) continue;
     try {
       return new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_CAPTURE_BIT_RATE });

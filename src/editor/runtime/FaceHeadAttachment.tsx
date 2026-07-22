@@ -138,6 +138,26 @@ function collectMorphMeshes(root: Object3D) {
   return meshes;
 }
 
+export function applyFaceSampleToMorphMeshes(
+  trackingRoot: Group | null,
+  meshes: Mesh[],
+  sample: CharacterFaceSample
+) {
+  if (trackingRoot) {
+    trackingRoot.quaternion.fromArray(sample.headRotation).normalize();
+  }
+  meshes.forEach((face) => {
+    const dictionary = face.morphTargetDictionary;
+    const influences = face.morphTargetInfluences;
+    if (!dictionary || !influences) return;
+    influences.fill(0);
+    Object.entries(sample.influences).forEach(([name, value]) => {
+      const index = dictionary[name];
+      if (index !== undefined) influences[index] = value;
+    });
+  });
+}
+
 function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sample: CharacterFaceSample }) {
   const renderer = useThree((state) => state.gl);
   const url = profile === "facecap52" ? FACECAP_URL : GNM_URL;
@@ -148,6 +168,9 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
     loader.setMeshoptDecoder(MeshoptDecoder);
   }) as LoadedGLTF;
   const trackingRef = useRef<Group>(null!);
+  const sampleRef = useRef(sample);
+  const appliedSampleRef = useRef<CharacterFaceSample | null>(null);
+  sampleRef.current = sample;
   const prepared = useMemo(() => {
     const scene = cloneSkeleton(gltf.scene) as Group;
     scene.updateMatrixWorld(true);
@@ -163,20 +186,12 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
     container.add(scene);
     return { container, meshes: collectMorphMeshes(scene) };
   }, [gltf.scene, profile]);
-  useLayoutEffect(() => {
-    const trackedRotation = new Quaternion().fromArray(sample.headRotation).normalize();
-    trackingRef.current?.quaternion.copy(trackedRotation);
-    prepared.meshes.forEach((face) => {
-      const dictionary = face.morphTargetDictionary;
-      const influences = face.morphTargetInfluences;
-      if (!dictionary || !influences) return;
-      influences.fill(0);
-      Object.entries(sample.influences).forEach(([name, value]) => {
-        const index = dictionary[name];
-        if (index !== undefined) influences[index] = value;
-      });
-    });
-  }, [prepared.meshes, sample]);
+  useFrame(() => {
+    const nextSample = sampleRef.current;
+    if (appliedSampleRef.current === nextSample) return;
+    applyFaceSampleToMorphMeshes(trackingRef.current, prepared.meshes, nextSample);
+    appliedSampleRef.current = nextSample;
+  });
 
   return (
     <group ref={trackingRef} name="face-capture-tracking-root">

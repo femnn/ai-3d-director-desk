@@ -1,12 +1,30 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createInitialDirectorState, useDirectorStore } from "../store/directorStore";
 import {
+  createVideoRecorder,
   getPhoneCameraAssignments,
   getPhoneCameraUpdateTimestamp,
   getVideoCaptureFrameRate,
   queuePhoneCameraState,
   releasePhoneCamera,
 } from "./phoneCameraControl";
+
+it("prefers one continuous VP8 WebM recorder source", () => {
+  const starts: Array<{ mimeType?: string; bits?: number }> = [];
+  class MockMediaRecorder {
+    static isTypeSupported(mimeType: string) {
+      return mimeType === "video/webm;codecs=vp8" || mimeType.startsWith("video/mp4");
+    }
+    constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
+      starts.push({ mimeType: options?.mimeType, bits: options?.videoBitsPerSecond });
+    }
+  }
+  vi.stubGlobal("MediaRecorder", MockMediaRecorder);
+
+  createVideoRecorder({} as MediaStream);
+
+  expect(starts).toEqual([{ mimeType: "video/webm;codecs=vp8", bits: 6_000_000 }]);
+});
 
 it("keeps five-second capture at 60fps and reduces encoder pressure for longer takes", () => {
   expect(getVideoCaptureFrameRate(5)).toBe(60);

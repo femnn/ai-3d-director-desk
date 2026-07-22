@@ -102,15 +102,6 @@ function getCameraAngles(camera: PhoneCameraOption | null, fallbackYaw: number, 
   };
 }
 
-function getCameraTarget(position: Tuple3, yaw: number, pitch: number): Tuple3 {
-  const cosPitch = Math.cos(pitch);
-  return [
-    position[0] + Math.sin(yaw) * cosPitch * 4,
-    position[1] + Math.sin(pitch) * 4,
-    position[2] - Math.cos(yaw) * cosPitch * 4,
-  ];
-}
-
 function getAspectUnits(ratio: ViewportAspectRatio): [number, number] {
   switch (ratio) {
     case "1:1":
@@ -251,13 +242,6 @@ export function PhoneController() {
   function updateLiveCameraState(patch: Partial<LiveCameraState>, syncUi = true) {
     const next = { ...liveStateRef.current, ...patch };
     liveStateRef.current = next;
-    previewViewRef.current = next.cameraId
-      ? {
-          fov: next.fov,
-          position: next.position,
-          target: getCameraTarget(next.position, next.yaw, next.pitch),
-        }
-      : null;
     dirtyRef.current = true;
     if (!syncUi) return;
     if (patch.position) setPosition(next.position);
@@ -273,6 +257,13 @@ export function PhoneController() {
     if (!camera) return;
     const nextPosition = camera.position ?? [0, 1.6, 5];
     const angles = getCameraAngles(camera, liveStateRef.current.yaw, liveStateRef.current.pitch);
+    if (camera.position && camera.target) {
+      previewViewRef.current = {
+        fov: camera.fov,
+        position: [...camera.position],
+        target: [...camera.target],
+      };
+    }
     if (!hasCameraSnapshotDifference(liveStateRef.current, camera, nextPosition, angles.yaw, angles.pitch)) return;
     updateLiveCameraState({
       cameraId: camera.id,
@@ -430,10 +421,7 @@ export function PhoneController() {
           const controlledCamera = message.state.cameras.find(
             (camera) => camera.id === (assignedCameraId ?? liveStateRef.current.cameraId)
           ) ?? null;
-          const controlledCameraAcknowledged =
-            controlledCamera &&
-            (typeof controlledCamera.phoneUpdatedAt !== "number" || controlledCamera.phoneUpdatedAt >= lastSentAtRef.current);
-          if (controlledCameraAcknowledged && controlledCamera?.position && controlledCamera.target) {
+          if (controlledCamera?.position && controlledCamera.target) {
             previewViewRef.current = {
               fov: controlledCamera.fov,
               position: [...controlledCamera.position],
@@ -447,9 +435,9 @@ export function PhoneController() {
               : message.state.cameras.find((camera) => camera.id === message.state?.activeCameraId) ?? null);
           if (bootstrapCamera) {
             const isNewCamera = liveStateRef.current.cameraId !== bootstrapCamera.id;
-            const isAcknowledged =
+            const controlStateAcknowledged =
               typeof bootstrapCamera.phoneUpdatedAt !== "number" || bootstrapCamera.phoneUpdatedAt >= lastSentAtRef.current;
-            if (isNewCamera || isAcknowledged) applyCameraSnapshot(bootstrapCamera, isNewCamera);
+            if (isNewCamera || controlStateAcknowledged) applyCameraSnapshot(bootstrapCamera, isNewCamera);
             if (isNewCamera) {
               sendCurrentState(true);
               if (!liveStateRef.current.recording) {

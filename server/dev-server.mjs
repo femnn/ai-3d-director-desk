@@ -84,8 +84,8 @@ function readBuffer(req, limit = 120_000_000) {
 
 function getVideoFilter(captureFrameRate) {
   return captureFrameRate <= 30
-    ? "fps=30,minterpolate=fps=60:mi_mode=blend"
-    : "fps=60";
+    ? "setpts=PTS-STARTPTS,fps=30,minterpolate=fps=60:mi_mode=blend"
+    : "setpts=PTS-STARTPTS,fps=60";
 }
 
 function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60, maxDurationSeconds = 5) {
@@ -94,8 +94,13 @@ function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60, maxDurat
       FFMPEG_PATH,
       [
         "-y",
+        "-fflags",
+        "+genpts",
         "-i",
         inputPath,
+        "-map",
+        "0:v:0",
+        "-an",
         "-t",
         String(maxDurationSeconds),
         "-vf",
