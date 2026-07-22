@@ -1,6 +1,6 @@
 import { Grid } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Suspense, useRef, type RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import { Vector3 } from "three";
 import type { CameraViewSnapshot } from "../editor/schema/cameraGeometry";
 import { useDirectorStore } from "../editor/store/directorStore";
@@ -110,9 +110,7 @@ export function PhoneCameraPreview({
             />
           ) : null}
           <PhonePreviewCamera viewRef={viewRef} />
-          <Suspense fallback={null}>
-            <SceneRoot showCameraRigs={false} />
-          </Suspense>
+          <SceneRoot showCameraRigs={false} />
         </Canvas>
       ) : (
         <div className="phone-camera-preview-empty">正在分配我的机位...</div>

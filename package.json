@@ -39,6 +39,7 @@
     "@react-three/fiber": "^8.17.14",
     "camera-controls": "^2.9.0",
     "lucide-react": "^0.469.0",
+    "pinyin-pro": "^3.28.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

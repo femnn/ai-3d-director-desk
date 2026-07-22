@@ -12,7 +12,11 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { exportFaceAnimationPackage, parseFaceAnimationFile } from "../animation/faceClipIo";
-import { createTextFaceClip, estimateTextFaceDuration } from "../animation/textFaceAnimation";
+import {
+  MAX_TEXT_FACE_INPUT_LENGTH,
+  createTextFaceClip,
+  getTextFaceTiming,
+} from "../animation/textFaceAnimation";
 
 type CaptureFrame = {
   timestamp: number;
@@ -88,7 +92,8 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("打开摄像头后校准中性表情");
   const [speechText, setSpeechText] = useState("");
-  const estimatedSpeechDuration = useMemo(() => estimateTextFaceDuration(speechText), [speechText]);
+  const [generatingTextFace, setGeneratingTextFace] = useState(false);
+  const speechTiming = useMemo(() => getTextFaceTiming(speechText), [speechText]);
 
   function attachClip(input: Omit<CharacterFaceClip, "id" | "characterId">) {
     const target = characterRef.current;
@@ -126,13 +131,18 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
     attachClip(clip);
   }
 
-  function generateTextFaceAnimation() {
+  async function generateTextFaceAnimation() {
+    if (generatingTextFace) return;
+    setGeneratingTextFace(true);
+    setStatus("正在分析拼音并生成口型...");
     try {
-      const clip = createTextFaceClip(speechText, characterRef.current.name);
+      const clip = await createTextFaceClip(speechText, characterRef.current.name);
       attachClip(clip);
-      setStatus(`文字面部动画已生成 · ${clip.duration.toFixed(1)} 秒 · 正在循环播放`);
+      setStatus(`文字面部动画已生成 · ${clip.duration} 秒 · 正在循环播放`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "文字面部动画生成失败");
+    } finally {
+      setGeneratingTextFace(false);
     }
   }
 
@@ -331,17 +341,25 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
       <div className="face-text-animation" aria-label="文字生成面部动画">
         <div className="face-text-animation-heading">
           <strong>文字面部动画</strong>
-          <span>预计时长 {estimatedSpeechDuration.toFixed(1)} 秒</span>
+          <span>{speechTiming.duration ? `预计时长 ${speechTiming.duration} 秒` : "预计时长 未计算"}</span>
         </div>
         <textarea
           aria-label="面部动画文字"
-          maxLength={500}
+          maxLength={MAX_TEXT_FACE_INPUT_LENGTH}
           placeholder="输入角色要说的文字，例如：我们现在出发吧！"
           value={speechText}
-          onChange={(event) => setSpeechText(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (getTextFaceTiming(next).exceedsLimit) {
+              setStatus("文字最长为15秒，请删减后继续输入");
+              return;
+            }
+            setSpeechText(next);
+          }}
         />
-        <button type="button" disabled={!speechText.trim()} onClick={generateTextFaceAnimation}>
-          生成并循环播放
+        <small>按拼音音素生成口型 · 最长15秒 · {speechText.length}/{MAX_TEXT_FACE_INPUT_LENGTH}字</small>
+        <button type="button" disabled={!speechText.trim() || speechTiming.exceedsLimit || generatingTextFace} onClick={generateTextFaceAnimation}>
+          {generatingTextFace ? "正在生成口型..." : "生成并循环播放"}
         </button>
       </div>
       <div className="face-capture-field">
