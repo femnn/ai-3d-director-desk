@@ -32,6 +32,8 @@ export interface PhoneCameraState {
   fov?: number;
   recording?: boolean;
   recordingDuration?: number;
+  recordingSessionId?: string;
+  recordingStartedAt?: number;
   updatedAt?: number;
 }
 
@@ -61,7 +63,9 @@ type LiveVideoCapture = {
   finalizing: boolean;
   maxDurationSeconds: number;
   nextFrameRequestAt: number;
+  recordingSessionId: string;
   recorder: MediaRecorder;
+  startedAt: number;
   stopComplete: Promise<void>;
   stream: MediaStream;
   watchdogTimer: number;
@@ -74,10 +78,12 @@ type RecordedVideo = {
 const recordingByCameraId = new Map<
   string,
   {
+    recordingSessionId: string;
     startedAt: number;
     keyframes: DirectorCameraAnimationKeyframe[];
   }
 >();
+const completedRecordingSessionIds = new Set<string>();
 const liveVideoCapturesByCameraId = new Map<string, LiveVideoCapture>();
 const requestedLiveVideoCameraIds = new Set<string>();
 const requestedLiveVideoDurationByCameraId = new Map<string, number>();
@@ -229,9 +235,10 @@ function appendPathPoint(cameraId: string, position: Tuple3) {
   emit();
 }
 
-function finishCameraRecording(cameraId: string) {
+function finishCameraRecording(cameraId: string, recordingSessionId?: string) {
   const recording = recordingByCameraId.get(cameraId);
   if (!recording) return null;
+  if (recordingSessionId && recording.recordingSessionId !== recordingSessionId) return null;
   let animationId: string | null = null;
   if (recording.keyframes.length >= 2) {
     const camera = useDirectorStore.getState().project.cameras.find((item) => item.id === cameraId);
@@ -241,6 +248,11 @@ function finishCameraRecording(cameraId: string) {
         keyframes: recording.keyframes,
       });
   }
+  completedRecordingSessionIds.add(recording.recordingSessionId);
+  if (completedRecordingSessionIds.size > 100) {
+    const oldestSessionId = completedRecordingSessionIds.values().next().value;
+    if (oldestSessionId) completedRecordingSessionIds.delete(oldestSessionId);
+  }
   recordingByCameraId.delete(cameraId);
   removePhoneCameraPath(cameraId);
   return animationId;
@@ -249,25 +261,45 @@ function finishCameraRecording(cameraId: string) {
 function updateRecording(
   cameraId: string,
   keyframe: DirectorCameraAnimationKeyframe,
-  recordingEnabled: boolean,
-  recordingDuration?: number
+  state: PhoneCameraState,
+  phoneClientId: string
 ) {
+  const recordingEnabled = Boolean(state.recording);
+  const suppliedSessionId = typeof state.recordingSessionId === "string" ? state.recordingSessionId : "";
+  const recordingSessionId = suppliedSessionId || `legacy:${phoneClientId}:${cameraId}`;
   if (!recordingEnabled) {
-    const animationId = finishCameraRecording(cameraId);
+    const activeRecording = recordingByCameraId.get(cameraId);
+    if (!activeRecording) return;
+    // A newly mounted or reconnecting phone first sends a non-recording state.
+    // It must not split an already active recording from the same controller.
+    if (!suppliedSessionId && !activeRecording.recordingSessionId.startsWith("legacy:")) return;
+    const animationId = finishCameraRecording(cameraId, recordingSessionId);
     if (animationId) stopLiveVideoCapture(cameraId, animationId);
     else cancelLiveVideoCapture(cameraId);
     return;
   }
 
+  if (completedRecordingSessionIds.has(recordingSessionId)) return;
   let recording = recordingByCameraId.get(cameraId);
+  if (recording && recording.recordingSessionId !== recordingSessionId) {
+    const nextStartedAt = typeof state.recordingStartedAt === "number" ? state.recordingStartedAt : keyframe.time * 1000;
+    const currentStartedAt = recording.startedAt * 1000;
+    if (nextStartedAt <= currentStartedAt) return;
+    const previousAnimationId = finishCameraRecording(cameraId, recording.recordingSessionId);
+    if (previousAnimationId) stopLiveVideoCapture(cameraId, previousAnimationId);
+    else cancelLiveVideoCapture(cameraId);
+    recording = undefined;
+  }
   if (!recording) {
+    const expectedDuration = state.recordingDuration === 10 || state.recordingDuration === 15 ? state.recordingDuration : 5;
     recording = {
+      recordingSessionId,
       startedAt: keyframe.time,
       keyframes: [],
     };
     recordingByCameraId.set(cameraId, recording);
     removePhoneCameraPath(cameraId);
-    requestLiveVideoCapture(cameraId, recordingDuration);
+    requestLiveVideoCapture(cameraId, expectedDuration);
   }
 
   const normalizedTime = Number((keyframe.time - recording.startedAt).toFixed(2));
@@ -358,7 +390,9 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
       finalizing: false,
       maxDurationSeconds,
       nextFrameRequestAt: 0,
+      recordingSessionId: recordingByCameraId.get(cameraId)?.recordingSessionId ?? "",
       recorder,
+      startedAt: performance.now(),
       stopComplete,
       stream,
       watchdogTimer: 0,
@@ -372,8 +406,9 @@ function startLiveVideoCapture(cameraId: string, canvas: HTMLCanvasElement) {
     // fragments makes FFmpeg see only the first fragment on newer Chromium builds.
     recorder.start();
     capture.watchdogTimer = window.setTimeout(() => {
-      if (capture.recorder.state !== "recording") return;
-      capture.recorder.stop();
+      const animationId = finishCameraRecording(cameraId, capture.recordingSessionId);
+      if (animationId) stopLiveVideoCapture(cameraId, animationId);
+      else cancelLiveVideoCapture(cameraId);
     }, maxDurationSeconds * 1000 + 250);
     const project = useDirectorStore.getState().project;
     beginAnimationSequenceRecording(
@@ -416,6 +451,18 @@ function stopLiveVideoCapture(cameraId: string, animationId: string) {
       error: liveVideoCaptureErrorsByCameraId.get(cameraId) ?? "机位监看尚未准备完成，未能保存本次原始视频。",
     });
     liveVideoCaptureErrorsByCameraId.delete(cameraId);
+    emitLiveVideoChange();
+    return;
+  }
+
+  const remainingCaptureMs = capture.maxDurationSeconds * 1000 - (performance.now() - capture.startedAt);
+  if (remainingCaptureMs > 16 && capture.recorder.state === "recording") {
+    if (capture.watchdogTimer) window.clearTimeout(capture.watchdogTimer);
+    capture.watchdogTimer = window.setTimeout(
+      () => stopLiveVideoCapture(cameraId, animationId),
+      Math.ceil(remainingCaptureMs)
+    );
+    recordedVideoByAnimationId.set(animationId, { status: "capturing" });
     emitLiveVideoChange();
     return;
   }
@@ -535,8 +582,8 @@ function applyPhoneCameraState(state: PhoneCameraState) {
       target,
       fov,
     },
-    Boolean(state.recording),
-    state.recordingDuration
+    state,
+    phoneClientId
   );
   if (!state.recording) removePhoneCameraPath(cameraId);
 }
@@ -588,6 +635,14 @@ export function releasePhoneCamera(phoneClientId: string) {
   cameraIdByPhoneClientId.delete(phoneClientId);
   lastAppliedUpdateByPhoneClientId.delete(phoneClientId);
   pendingPhoneStateByClientId.delete(phoneClientId);
+}
+
+export function resetPhoneCameraControlForTests() {
+  recordingByCameraId.clear();
+  completedRecordingSessionIds.clear();
+  requestedLiveVideoCameraIds.clear();
+  requestedLiveVideoDurationByCameraId.clear();
+  liveVideoCaptureErrorsByCameraId.clear();
 }
 
 export function clearPhoneCameraPath() {

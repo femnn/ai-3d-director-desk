@@ -7,6 +7,7 @@ import {
   getVideoCaptureFrameRate,
   queuePhoneCameraState,
   releasePhoneCamera,
+  resetPhoneCameraControlForTests,
 } from "./phoneCameraControl";
 
 it("prefers one continuous VP8 WebM recorder source", () => {
@@ -44,6 +45,7 @@ beforeEach(() => {
   });
   releasePhoneCamera("phone_test_one");
   releasePhoneCamera("phone_test_two");
+  resetPhoneCameraControlForTests();
 });
 
 afterEach(() => {
@@ -106,4 +108,82 @@ it("applies the latest phone state when requestAnimationFrame is throttled", () 
 
   expect(useDirectorStore.getState().project.cameras.find((camera) => camera.id === cameraId)?.fov).toBe(51);
   expect(getPhoneCameraUpdateTimestamp(cameraId)).toBe(10);
+});
+
+it("creates only one trajectory for duplicate states in the same recording session", async () => {
+  const cameraId = useDirectorStore.getState().project.cameras[0]!.id;
+  const baseState = {
+    phoneClientId: "phone_test_one",
+    cameraId,
+    yaw: 0,
+    pitch: 0,
+    fov: 35,
+    recording: true,
+    recordingDuration: 5,
+    recordingSessionId: "session_one",
+    recordingStartedAt: 1_000,
+  };
+
+  for (let index = 0; index < 8; index += 1) {
+    queuePhoneCameraState({
+      ...baseState,
+      position: [index * 0.1, 1.6, 5],
+      updatedAt: 1_000 + index * 20,
+    });
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+  }
+  queuePhoneCameraState({ ...baseState, position: [0.8, 1.6, 5], recording: false, updatedAt: 1_200 });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+  expect(useDirectorStore.getState().project.cameraAnimations).toHaveLength(1);
+
+  queuePhoneCameraState({ ...baseState, position: [0.9, 1.6, 5], updatedAt: 1_220 });
+  queuePhoneCameraState({ ...baseState, position: [1, 1.6, 5], recording: false, updatedAt: 1_240 });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+  expect(useDirectorStore.getState().project.cameraAnimations).toHaveLength(1);
+});
+
+it("ignores a reconnecting phone's empty stop state during an active session", async () => {
+  const cameraId = useDirectorStore.getState().project.cameras[0]!.id;
+  queuePhoneCameraState({
+    phoneClientId: "phone_test_one",
+    cameraId,
+    position: [0, 1.6, 5],
+    recording: true,
+    recordingSessionId: "session_reconnect",
+    recordingStartedAt: 2_000,
+    updatedAt: 2_000,
+  });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  queuePhoneCameraState({
+    phoneClientId: "phone_test_one",
+    cameraId,
+    position: [0.2, 1.6, 5],
+    recording: false,
+    updatedAt: 2_020,
+  });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  queuePhoneCameraState({
+    phoneClientId: "phone_test_one",
+    cameraId,
+    position: [0.4, 1.6, 5],
+    recording: true,
+    recordingSessionId: "session_reconnect",
+    recordingStartedAt: 2_000,
+    updatedAt: 2_040,
+  });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  queuePhoneCameraState({
+    phoneClientId: "phone_test_one",
+    cameraId,
+    position: [0.6, 1.6, 5],
+    recording: false,
+    recordingSessionId: "session_reconnect",
+    recordingStartedAt: 2_000,
+    updatedAt: 2_060,
+  });
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+  expect(useDirectorStore.getState().project.cameraAnimations).toHaveLength(1);
 });

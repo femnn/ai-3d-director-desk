@@ -73,6 +73,7 @@
       "desktop/**/*",
       "server/dev-server.mjs",
       "server/websocket-frames.mjs",
+      "server/video-transcode.mjs",
       "package.json"
     ],
     "asar": false,

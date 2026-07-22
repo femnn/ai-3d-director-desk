@@ -9,6 +9,7 @@ import process from "node:process";
 import QRCode from "qrcode";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { createFrame, parseFrames } from "./websocket-frames.mjs";
+import { getVideoFilter } from "./video-transcode.mjs";
 
 const DEFAULT_HTTP_PORT = 5173;
 const CONTROL_DIR = path.join(os.homedir(), ".config", "storyai-director-desk");
@@ -83,12 +84,6 @@ function readBuffer(req, limit = 120_000_000) {
   });
 }
 
-function getVideoFilter(captureFrameRate) {
-  return captureFrameRate <= 30
-    ? "setpts=PTS-STARTPTS,fps=30,minterpolate=fps=60:mi_mode=blend"
-    : "setpts=PTS-STARTPTS,fps=60";
-}
-
 function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60, maxDurationSeconds = 5) {
   return new Promise((resolve, reject) => {
     execFile(
@@ -105,7 +100,7 @@ function convertWebmToMp4(inputPath, outputPath, captureFrameRate = 60, maxDurat
         "-t",
         String(maxDurationSeconds),
         "-vf",
-        getVideoFilter(captureFrameRate),
+        getVideoFilter(captureFrameRate, maxDurationSeconds),
         "-vsync",
         "cfr",
         "-c:v",

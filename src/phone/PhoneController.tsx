@@ -64,6 +64,8 @@ interface LiveCameraState {
   recording: boolean;
 }
 
+const PHONE_STATE_FRAME_INTERVAL_MS = 16;
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -185,6 +187,8 @@ export function PhoneController() {
   const dirtyRef = useRef(true);
   const recordingTimerRef = useRef(0);
   const recordingDurationRef = useRef<5 | 10 | 15>(5);
+  const recordingSessionIdRef = useRef("");
+  const recordingStartedAtRef = useRef(0);
   const controllerIdRef = useRef(getPhoneControllerId());
   const orientationBaseRef = useRef<{
     alpha: number;
@@ -495,7 +499,7 @@ export function PhoneController() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       sendCurrentState(false);
-    }, 33);
+    }, PHONE_STATE_FRAME_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -696,6 +700,8 @@ export function PhoneController() {
         ...liveStateRef.current,
         phoneClientId: controllerIdRef.current,
         recordingDuration: recordingDurationRef.current,
+        recordingSessionId: recordingSessionIdRef.current || undefined,
+        recordingStartedAt: recordingStartedAtRef.current || undefined,
         updatedAt,
       },
     });
@@ -732,7 +738,12 @@ export function PhoneController() {
   }
 
   function startRecording() {
+    if (liveStateRef.current.recording || recordingSessionIdRef.current) return;
     if (recordingTimerRef.current) window.clearTimeout(recordingTimerRef.current);
+    const startedAt = Date.now();
+    const randomPart = window.crypto?.randomUUID?.().replace(/-/g, "") ?? Math.random().toString(36).slice(2);
+    recordingSessionIdRef.current = `${controllerIdRef.current}_${startedAt.toString(36)}_${randomPart}`;
+    recordingStartedAtRef.current = startedAt;
     updateLiveCameraState({ recording: true });
     sendCurrentState(true);
     setStatus(
@@ -744,12 +755,15 @@ export function PhoneController() {
   }
 
   function stopRecording() {
+    if (!liveStateRef.current.recording || !recordingSessionIdRef.current) return;
     if (recordingTimerRef.current) {
       window.clearTimeout(recordingTimerRef.current);
       recordingTimerRef.current = 0;
     }
     updateLiveCameraState({ recording: false });
     sendCurrentState(true);
+    recordingSessionIdRef.current = "";
+    recordingStartedAtRef.current = 0;
     setStatus("轨迹已保存");
   }
 

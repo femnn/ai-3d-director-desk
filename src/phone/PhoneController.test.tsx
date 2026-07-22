@@ -227,8 +227,34 @@ it("sends the selected long recording duration with the camera state", async () 
     const phoneStates = MockWebSocket.sent
       .map((payload) => JSON.parse(payload))
       .filter((payload) => payload.type === "phone_state");
-    expect(phoneStates[phoneStates.length - 1]?.payload).toMatchObject({ recording: true, recordingDuration: 15 });
+    expect(phoneStates[phoneStates.length - 1]?.payload).toMatchObject({
+      recording: true,
+      recordingDuration: 15,
+      recordingSessionId: expect.stringMatching(/^phone_.+_/),
+      recordingStartedAt: expect.any(Number),
+    });
   });
+});
+
+it("keeps one recording session id for the complete take", async () => {
+  vi.useFakeTimers();
+  window.history.replaceState({}, "", "/phone?mode=standard");
+  render(<PhoneController />);
+  await vi.runAllTicks();
+
+  fireEvent.click(screen.getByRole("button", { name: "录制5秒" }));
+  vi.advanceTimersByTime(80);
+
+  const activeStates = MockWebSocket.sent
+    .map((payload) => JSON.parse(payload).payload)
+    .filter((payload) => payload?.recording === true);
+  expect(activeStates.length).toBeGreaterThan(1);
+  expect(new Set(activeStates.map((payload) => payload.recordingSessionId)).size).toBe(1);
+
+  vi.advanceTimersByTime(5_000);
+  const sentStates = MockWebSocket.sent.map((payload) => JSON.parse(payload).payload).filter(Boolean);
+  const finalState = sentStates[sentStates.length - 1];
+  expect(finalState).toMatchObject({ recording: false, recordingSessionId: activeStates[0].recordingSessionId });
 });
 
 it("shows the secure motion controls only in motion mode", () => {
