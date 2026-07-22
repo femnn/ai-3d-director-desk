@@ -1,6 +1,6 @@
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Component, Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { Box3, Group, Matrix4, Mesh, Quaternion, Vector3, type Object3D } from "three";
+import { Box3, Group, Matrix4, Mesh, Quaternion, Vector3, type Material, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
@@ -158,7 +158,26 @@ export function applyFaceSampleToMorphMeshes(
   });
 }
 
-function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sample: CharacterFaceSample }) {
+function cloneMaterial(material: Material | Material[]) {
+  return Array.isArray(material) ? material.map((item) => item.clone()) : material.clone();
+}
+
+export function isolateFaceModelInstance(scene: Object3D) {
+  scene.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    object.geometry = object.geometry.clone();
+    object.material = cloneMaterial(object.material);
+    if (object.morphTargetInfluences) object.morphTargetInfluences = [...object.morphTargetInfluences];
+    object.frustumCulled = false;
+  });
+  return scene;
+}
+
+function LoadedFaceHead({ instanceId, profile, sample }: {
+  instanceId: string;
+  profile: CharacterFaceProfile;
+  sample: CharacterFaceSample;
+}) {
   const renderer = useThree((state) => state.gl);
   const url = profile === "facecap52" ? FACECAP_URL : GNM_URL;
   const gltf = useLoader(GLTFLoader, url, (loader) => {
@@ -169,10 +188,9 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
   }) as LoadedGLTF;
   const trackingRef = useRef<Group>(null!);
   const sampleRef = useRef(sample);
-  const appliedSampleRef = useRef<CharacterFaceSample | null>(null);
   sampleRef.current = sample;
   const prepared = useMemo(() => {
-    const scene = cloneSkeleton(gltf.scene) as Group;
+    const scene = isolateFaceModelInstance(cloneSkeleton(gltf.scene) as Group) as Group;
     scene.updateMatrixWorld(true);
     const bounds = new Box3().setFromObject(scene, true);
     const center = bounds.getCenter(new Vector3());
@@ -181,16 +199,13 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
     const scale = desiredHeight / Math.max(0.001, size.y);
     scene.position.copy(center).multiplyScalar(-1);
     const container = new Group();
-    container.name = `face-capture-avatar-head-${profile}`;
+    container.name = `face-capture-avatar-head-${profile}-${instanceId}`;
     container.scale.setScalar(scale);
     container.add(scene);
     return { container, meshes: collectMorphMeshes(scene) };
-  }, [gltf.scene, profile]);
+  }, [gltf.scene, instanceId, profile]);
   useFrame(() => {
-    const nextSample = sampleRef.current;
-    if (appliedSampleRef.current === nextSample) return;
-    applyFaceSampleToMorphMeshes(trackingRef.current, prepared.meshes, nextSample);
-    appliedSampleRef.current = nextSample;
+    applyFaceSampleToMorphMeshes(trackingRef.current, prepared.meshes, sampleRef.current);
   });
 
   return (
@@ -200,8 +215,9 @@ function LoadedFaceHead({ profile, sample }: { profile: CharacterFaceProfile; sa
   );
 }
 
-export function FaceHeadAttachment({ headBone, mannequinScene, profile, sample }: {
+export function FaceHeadAttachment({ headBone, instanceId = "face-actor", mannequinScene, profile, sample }: {
   headBone?: Object3D;
+  instanceId?: string;
   mannequinScene?: Object3D;
   profile: CharacterFaceProfile;
   sample: CharacterFaceSample;
@@ -210,7 +226,7 @@ export function FaceHeadAttachment({ headBone, mannequinScene, profile, sample }
   const content = (
     <FaceHeadBoundary key={profile} fallback={fallback}>
       <Suspense fallback={fallback}>
-        <LoadedFaceHead profile={profile} sample={sample} />
+        <LoadedFaceHead instanceId={instanceId} profile={profile} sample={sample} />
       </Suspense>
     </FaceHeadBoundary>
   );

@@ -4107,6 +4107,32 @@ body.phone-immersive .phone-action-grid button {
   min-width: 0;
 }
 
+.face-text-animation {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 10, 18, 0.42);
+}
+
+.face-text-animation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.face-text-animation-heading span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.face-text-animation textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
 .face-capture-field {
   display: grid;
   gap: 5px;

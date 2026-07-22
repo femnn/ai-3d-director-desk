@@ -30,6 +30,7 @@ interface UE4MannequinModelProps {
   color?: string;
   faceProfile?: CharacterFaceProfile;
   faceSample?: CharacterFaceSample;
+  instanceId?: string;
   onLabelAnchorYChange?: (anchorY: number) => void;
   onJointPositionsChange?: (positions: Record<string, [number, number, number]>) => void;
   rigState?: CharacterRigState;
@@ -135,6 +136,7 @@ export function UE4MannequinModel({
   color = "#F3F5F7",
   faceProfile,
   faceSample,
+  instanceId = "face-actor",
   onLabelAnchorYChange,
   onJointPositionsChange,
   rigState,
@@ -193,6 +195,7 @@ export function UE4MannequinModel({
         <FaceHeadAttachment
           mannequinScene={scene}
           headBone={headBone}
+          instanceId={instanceId}
           profile={faceProfile}
           sample={faceSample}
         />

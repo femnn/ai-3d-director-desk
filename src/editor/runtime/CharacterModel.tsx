@@ -14,6 +14,7 @@ interface CharacterModelProps {
   rigState?: CharacterRigState;
   faceProfile?: CharacterFaceProfile;
   faceSample?: CharacterFaceSample;
+  instanceId?: string;
 }
 
 class CharacterModelBoundary extends Component<
@@ -36,13 +37,14 @@ class CharacterModelBoundary extends Component<
   }
 }
 
-export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJointPositionsChange, onLabelAnchorYChange, rigState }: CharacterModelProps) {
+export function CharacterModel({ bodyType, color, faceProfile, faceSample, instanceId, onJointPositionsChange, onLabelAnchorYChange, rigState }: CharacterModelProps) {
   const fallback = (
     <PrimitiveMannequin
       bodyType={bodyType}
       color={color}
       faceProfile={faceProfile}
       faceSample={faceSample}
+      instanceId={instanceId}
       rigState={rigState}
     />
   );
@@ -58,6 +60,7 @@ export function CharacterModel({ bodyType, color, faceProfile, faceSample, onJoi
         color={color}
         faceProfile={bodyType === "face-capture" ? faceProfile : undefined}
         faceSample={bodyType === "face-capture" ? faceSample : undefined}
+        instanceId={instanceId}
         onJointPositionsChange={onJointPositionsChange}
         onLabelAnchorYChange={onLabelAnchorYChange}
         rigState={rigState}

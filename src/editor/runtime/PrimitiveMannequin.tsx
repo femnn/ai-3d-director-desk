@@ -8,16 +8,18 @@ interface PrimitiveMannequinProps {
   color?: string;
   faceProfile?: CharacterFaceProfile;
   faceSample?: CharacterFaceSample;
+  instanceId?: string;
   rigState?: CharacterRigState;
 }
 
-export function PrimitiveMannequin({ bodyType, color = "#4F8EF7", faceProfile, faceSample, rigState }: PrimitiveMannequinProps) {
+export function PrimitiveMannequin({ bodyType, color = "#4F8EF7", faceProfile, faceSample, instanceId, rigState }: PrimitiveMannequinProps) {
   return (
     <ProceduralMannequin
       bodyType={bodyType}
       color={color}
       faceProfile={faceProfile}
       faceSample={faceSample}
+      instanceId={instanceId}
       rigState={rigState}
     />
   );

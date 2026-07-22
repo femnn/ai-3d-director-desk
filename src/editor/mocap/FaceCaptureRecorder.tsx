@@ -12,6 +12,7 @@ import {
   stopNormalCharacterAnimations,
 } from "../animation/characterAnimation";
 import { exportFaceAnimationPackage, parseFaceAnimationFile } from "../animation/faceClipIo";
+import { createTextFaceClip, estimateTextFaceDuration } from "../animation/textFaceAnimation";
 
 type CaptureFrame = {
   timestamp: number;
@@ -86,6 +87,8 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
   const [countdown, setCountdown] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("打开摄像头后校准中性表情");
+  const [speechText, setSpeechText] = useState("");
+  const estimatedSpeechDuration = useMemo(() => estimateTextFaceDuration(speechText), [speechText]);
 
   function attachClip(input: Omit<CharacterFaceClip, "id" | "characterId">) {
     const target = characterRef.current;
@@ -121,6 +124,16 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
     };
     clip.checksum = createFaceClipChecksum(clip);
     attachClip(clip);
+  }
+
+  function generateTextFaceAnimation() {
+    try {
+      const clip = createTextFaceClip(speechText, characterRef.current.name);
+      attachClip(clip);
+      setStatus(`文字面部动画已生成 · ${clip.duration.toFixed(1)} 秒 · 正在循环播放`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "文字面部动画生成失败");
+    }
   }
 
   useEffect(() => {
@@ -314,6 +327,22 @@ export function FaceCaptureRecorder({ character }: { character: DirectorObject }
           <option value="facecap52">FaceCap 52 · 精确表情</option>
           <option value="gnm21">GNM Head · 语义表情</option>
         </select>
+      </div>
+      <div className="face-text-animation" aria-label="文字生成面部动画">
+        <div className="face-text-animation-heading">
+          <strong>文字面部动画</strong>
+          <span>预计时长 {estimatedSpeechDuration.toFixed(1)} 秒</span>
+        </div>
+        <textarea
+          aria-label="面部动画文字"
+          maxLength={500}
+          placeholder="输入角色要说的文字，例如：我们现在出发吧！"
+          value={speechText}
+          onChange={(event) => setSpeechText(event.target.value)}
+        />
+        <button type="button" disabled={!speechText.trim()} onClick={generateTextFaceAnimation}>
+          生成并循环播放
+        </button>
       </div>
       <div className="face-capture-field">
         <label htmlFor="face-camera">摄像头</label>

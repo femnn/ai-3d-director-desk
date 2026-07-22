@@ -1324,6 +1324,7 @@ function ObjectSceneNode({
                 color={item.color}
                 faceProfile={isFaceCaptureActor ? (item.characterFaceTrack?.profile ?? "facecap52") : undefined}
                 faceSample={faceSample}
+                instanceId={item.id}
                 onJointPositionsChange={editingPose ? handleJointPositionsChange : undefined}
                 onLabelAnchorYChange={handleCharacterLabelAnchorYChange}
                 rigState={visibleRigState}

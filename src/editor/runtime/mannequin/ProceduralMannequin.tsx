@@ -11,6 +11,7 @@ interface ProceduralMannequinProps {
   color?: string;
   faceProfile?: CharacterFaceProfile;
   faceSample?: CharacterFaceSample;
+  instanceId?: string;
   rigState?: CharacterRigState;
 }
 
@@ -36,6 +37,7 @@ export function ProceduralMannequin({
   color = "#4F8EF7",
   faceProfile = "facecap52",
   faceSample = NEUTRAL_CHARACTER_FACE_SAMPLE,
+  instanceId = "face-actor",
   rigState,
 }: ProceduralMannequinProps) {
   const preset = getBodyPreset(bodyType);
@@ -127,7 +129,7 @@ export function ProceduralMannequin({
               <HumanoidMaterial color="#D9E2EE" />
             </mesh>
             <group name="face-capture-head" position={[0, headY, 0]} rotation={headRotation}>
-              <FaceHeadAttachment profile={faceProfile} sample={faceSample} />
+              <FaceHeadAttachment instanceId={instanceId} profile={faceProfile} sample={faceSample} />
             </group>
           </>
         ) : (
