@@ -1,6 +1,6 @@
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Component, Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { Box3, Group, Matrix4, Mesh, Quaternion, Vector3, type Material, type Object3D } from "three";
+import { Box3, Group, Matrix4, Mesh, Quaternion, Vector3, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
@@ -158,21 +158,6 @@ export function applyFaceSampleToMorphMeshes(
   });
 }
 
-function cloneMaterial(material: Material | Material[]) {
-  return Array.isArray(material) ? material.map((item) => item.clone()) : material.clone();
-}
-
-export function isolateFaceModelInstance(scene: Object3D) {
-  scene.traverse((object) => {
-    if (!(object instanceof Mesh)) return;
-    object.geometry = object.geometry.clone();
-    object.material = cloneMaterial(object.material);
-    if (object.morphTargetInfluences) object.morphTargetInfluences = [...object.morphTargetInfluences];
-    object.frustumCulled = false;
-  });
-  return scene;
-}
-
 function LoadedFaceHead({ instanceId, profile, sample }: {
   instanceId: string;
   profile: CharacterFaceProfile;
@@ -190,7 +175,14 @@ function LoadedFaceHead({ instanceId, profile, sample }: {
   const sampleRef = useRef(sample);
   sampleRef.current = sample;
   const prepared = useMemo(() => {
-    const scene = isolateFaceModelInstance(cloneSkeleton(gltf.scene) as Group) as Group;
+    const scene = cloneSkeleton(gltf.scene) as Group;
+    scene.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      // Morph weights belong to the mesh instance. Keep the original geometry
+      // because cloning the GNM morph geometry corrupts its calibrated bounds.
+      if (object.morphTargetInfluences) object.morphTargetInfluences = [...object.morphTargetInfluences];
+      object.frustumCulled = false;
+    });
     scene.updateMatrixWorld(true);
     const bounds = new Box3().setFromObject(scene, true);
     const center = bounds.getCenter(new Vector3());
