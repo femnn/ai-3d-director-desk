@@ -72,6 +72,7 @@
       "dist/**/*",
       "desktop/**/*",
       "server/dev-server.mjs",
+      "server/websocket-frames.mjs",
       "package.json"
     ],
     "asar": false,
