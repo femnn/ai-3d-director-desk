@@ -115,17 +115,23 @@ export function mapFaceInfluences(profile: CharacterFaceProfile, values: Record<
     surprise: clamp01(Math.max((values.browInnerUp ?? 0) * 0.7, average("eyeWideLeft", "eyeWideRight") * 0.62)),
     disgust: clamp01(maximum("noseSneerLeft", "noseSneerRight", "mouthFrownLeft", "mouthFrownRight")),
     suck: clamp01(maximum("mouthFunnel", "mouthPucker") * 0.75),
-    compress_face: clamp01(maximum("eyeSquintLeft", "eyeSquintRight", "mouthPressLeft", "mouthPressRight")),
-    stretch_face: clamp01(maximum("mouthStretchLeft", "mouthStretchRight")),
+    // These GNM semantic targets deform the whole head. Speech mouth shapes
+    // must never drive them or the avatar visibly pulses in scale.
+    compress_face: 0,
+    stretch_face: 0,
     happy: clamp01(average("mouthSmileLeft", "mouthSmileRight") + average("cheekSquintLeft", "cheekSquintRight") * 0.35),
     squint: clamp01(maximum("eyeSquintLeft", "eyeSquintRight")),
     platysma: clamp01(average("mouthFrownLeft", "mouthFrownRight", "jawOpen") * 0.45),
     blow: clamp01(values.cheekPuff ?? 0), funneler: clamp01(values.mouthFunnel ?? 0),
-    smile_wide: clamp01(average("mouthSmileLeft", "mouthSmileRight") + average("mouthStretchLeft", "mouthStretchRight") * 0.4),
+    smile_wide: clamp01(average("mouthSmileLeft", "mouthSmileRight") + average("mouthStretchLeft", "mouthStretchRight") * 0.55),
     corners_down: clamp01(average("mouthFrownLeft", "mouthFrownRight")), pucker: clamp01(values.mouthPucker ?? 0),
     wink_left: clamp01(values.eyeBlinkLeft ?? 0), wink_right: clamp01(values.eyeBlinkRight ?? 0),
     mouth_left: clamp01(values.mouthLeft ?? 0), mouth_right: clamp01(values.mouthRight ?? 0),
-    lips_roll_in: clamp01(average("mouthRollLower", "mouthRollUpper")),
+    lips_roll_in: clamp01(Math.max(
+      average("mouthRollLower", "mouthRollUpper"),
+      (values.mouthClose ?? 0) * 0.62,
+      average("mouthPressLeft", "mouthPressRight") * 0.38
+    )),
     snarl: clamp01(maximum("noseSneerLeft", "noseSneerRight")), tongue_center: clamp01(values.tongueOut ?? 0),
     jaw_open: clamp01(values.jawOpen ?? 0),
   };

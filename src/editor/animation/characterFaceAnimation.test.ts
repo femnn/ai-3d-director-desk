@@ -35,4 +35,19 @@ describe("character face animation", () => {
     expect(gnm.influences.happy).toBeGreaterThan(0.3);
     expect(mapFaceInfluences("facecap52", { eyeBlinkLeft: 1 }).eyeBlink_L).toBe(1);
   });
+
+  it("keeps GNM speech shapes on the mouth instead of scaling the whole head", () => {
+    const speech = mapFaceInfluences("gnm21", {
+      mouthClose: 0.8,
+      mouthPressLeft: 0.5,
+      mouthPressRight: 0.5,
+      mouthStretchLeft: 0.7,
+      mouthStretchRight: 0.7,
+    });
+
+    expect(speech.compress_face).toBe(0);
+    expect(speech.stretch_face).toBe(0);
+    expect(speech.lips_roll_in).toBeGreaterThan(0.45);
+    expect(speech.smile_wide).toBeGreaterThan(0.35);
+  });
 });
