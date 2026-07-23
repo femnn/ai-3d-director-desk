@@ -32,5 +32,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ai-director-desk-${{ matrix.artifact }}
-          path: release/*
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*Setup.exe
+            release/*Portable.exe
           if-no-files-found: error
