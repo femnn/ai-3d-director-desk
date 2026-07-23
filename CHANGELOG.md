@@ -24,6 +24,7 @@
 - 修复多段短视频、录像提前结束、帧数异常和导出 MP4 失败问题。
 - 修复面捕演员头部反复缩放、比例异常、多角色动画串绑及文字输入无法粘贴问题。
 - 完善完整工程、布景命令、角色、姿势、动画和导入模型的保存与恢复。
+- 修复跨平台依赖锁定和桌面打包配置，支持生成 macOS ARM64 与 Windows x64 安装包。
 
 ## English
 
@@ -39,3 +40,4 @@ Version 0.9.0 completes the core AI previs workflow, from agent-assisted scene b
 - Local GNM facial animation with dedicated actors, webcam capture, and text-driven lip sync.
 - More reliable large-scene synchronization and smoother complete MP4 recording.
 - Project, scene-command, character, pose, animation, and imported-asset persistence.
+- Fixed cross-platform dependency locking and desktop packaging for macOS ARM64 and Windows x64.

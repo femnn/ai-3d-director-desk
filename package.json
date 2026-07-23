@@ -24,8 +24,8 @@
     "dev:vite": "vite",
     "build": "tsc -b && vite build",
     "desktop": "npm run build && electron .",
-    "package:mac": "node scripts/prepare-desktop-binaries.mjs --platform=darwin && npm run build && electron-builder --mac",
-    "package:win": "node scripts/prepare-desktop-binaries.mjs --platform=win32 && npm run build && electron-builder --win",
+    "package:mac": "node scripts/prepare-desktop-binaries.mjs --platform=darwin && npm run build && electron-builder --mac --publish never",
+    "package:win": "node scripts/prepare-desktop-binaries.mjs --platform=win32 && npm run build && electron-builder --win --publish never",
     "package:all": "npm run build && electron-builder --mac --win",
     "test": "vitest run",
     "preview": "vite preview",
@@ -47,7 +47,6 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
