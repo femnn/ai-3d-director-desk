@@ -2,6 +2,8 @@
 
 [中文](#中文) | [English](#english)
 
+[最新版本 v0.9.0](https://github.com/femnn/ai-3d-director-desk/releases/tag/v0.9.0) | [更新日志 / Changelog](CHANGELOG.md)
+
 一个本地优先的 AI 影视预演与虚拟摄影工具：在电脑上快速搭建 3D 布景，让多台手机分别控制不同机位，并将实时机位监看直接录制为 MP4。
 
 A local-first AI previs and virtual cinematography tool. Build 3D scenes on a computer, assign independent cameras to multiple phones, and record the live camera monitor directly to MP4.

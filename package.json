@@ -1,7 +1,7 @@
 {
   "name": "storyai-3d-director-desk-demo",
   "productName": "AI影视导演台",
-  "version": "0.0.1",
+  "version": "0.9.0",
   "description": "Local-first AI 3D director desk with multi-phone camera control, character animation, scene scripting, and smooth video export.",
   "author": "femnn",
   "license": "MIT",
