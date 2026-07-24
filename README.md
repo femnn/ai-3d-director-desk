@@ -1,4 +1,4 @@
-# AI 影视 3D 导演台 / AI 3D Director Desk
+# AI 影视 3D 导演台 / ai-virtual-director-studio
 
 [中文](#中文) | [English](#english)
 
